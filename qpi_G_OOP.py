@@ -57,6 +57,13 @@ class SystemParameters:
     apodization_alpha: float = 0.3
     zoom_factor: float = 1.5
     
+    # FFT artifact suppression parameters
+    high_pass_strength: float = 0.3  # Strength of background removal (0-1)
+    low_freq_suppress_radius: int = 10  # Pixels to heavily suppress in FFT
+    low_freq_transition_radius: int = 20  # Gradual transition zone
+    subtract_radial_average: bool = False  # Subtract azimuthally-averaged background
+    radial_average_strength: float = 0.5  # How much to subtract (0-1)
+    
     @property
     def a(self) -> float:
         """Lattice spacing."""
@@ -210,26 +217,27 @@ class ImpuritySystem:
         n_imp = len(self.positions)
         
         if n_imp == 1:
-            # Single impurity - use completely non-periodic approach to avoid splitting
+            # Single impurity
             imp_row, imp_col = self.positions[0]
+            gridsize = G0.shape[0]
+            center = gridsize // 2
             
             # For single impurity: T = V_s / (1 - V_s * G0(R,R))
-            G0_imp = G0[0, 0]  # G0(impurity, impurity) = G0(0,0) due to translational invariance
+            # G0(R,R) = G0(0) which is at the center of fftshifted G0
+            G0_imp = G0[center, center]
             T = greens_function.params.V_s / (1 - greens_function.params.V_s * G0_imp)
             
-            # Use vectorized calculation with NO PERIODIC BOUNDARIES
-            rows, cols = np.mgrid[0:G0.shape[0], 0:G0.shape[1]]
+            # Vectorized calculation
+            rows, cols = np.mgrid[0:gridsize, 0:gridsize]
             
-            # Direct distances from impurity (absolutely no wrapping)
-            delta_rows = np.abs(rows - imp_row)
-            delta_cols = np.abs(cols - imp_col)
+            # Calculate displacements from impurity
+            delta_rows = rows - imp_row
+            delta_cols = cols - imp_col
             
-            # Ensure indices are within bounds
-            delta_rows = np.minimum(delta_rows, G0.shape[0] - 1)
-            delta_cols = np.minimum(delta_cols, G0.shape[1] - 1)
-            
-            # Get Green's function values using direct indexing
-            G0_values = G0[delta_rows, delta_cols]
+            # G0 is fftshifted: to get G0(displacement), index with center + displacement
+            G0_indices_row = (center + delta_rows) % gridsize
+            G0_indices_col = (center + delta_cols) % gridsize
+            G0_values = G0[G0_indices_row, G0_indices_col]
             
             # Calculate LDOS change: Δρ(r) = -(1/π) Im{G0(r,R_imp) * T * G0(R_imp,r)}
             # For single impurity with symmetric Green's function
@@ -256,15 +264,24 @@ class ImpuritySystem:
         # G_imp0[a,b] = G0(R_a, R_b) - Green's function between impurity sites
         G_imp0 = np.zeros((n_imp, n_imp), dtype=complex)
         
+        # IMPORTANT: G0 is fftshifted, so we need to account for this
+        center = gridsize // 2
+        
         for a in range(n_imp):
             for b in range(n_imp):
                 row_a, col_a = self.positions[a]
                 row_b, col_b = self.positions[b]
-                # G0[i,j] is Green's function from (0,0) to (i,j) due to translational invariance
-                # So G0(R_a, R_b) = G0(R_b - R_a) with periodic boundary conditions
-                delta_row = (row_b - row_a) % gridsize
-                delta_col = (col_b - col_a) % gridsize
-                G_imp0[a, b] = G0[delta_row, delta_col]
+                
+                # Calculate displacement: R_b - R_a
+                delta_row = row_b - row_a
+                delta_col = col_b - col_a
+                
+                # G0 is fftshifted: G0[center, center] = G0(r=0)
+                # For displacement (delta_row, delta_col), we need G0[center + delta_row, center + delta_col]
+                G0_row = (center + delta_row) % gridsize
+                G0_col = (center + delta_col) % gridsize
+                    
+                G_imp0[a, b] = G0[G0_row, G0_col]
         
         # Step 2: Build the impurity potential matrix V
         # V[a,b] = V_a * δ_ab (diagonal matrix for uncoupled impurities)
@@ -292,20 +309,34 @@ class ImpuritySystem:
         G0_to_imp = np.zeros((n_imp, gridsize, gridsize), dtype=complex)
         G0_from_imp = np.zeros((n_imp, gridsize, gridsize), dtype=complex)
         
+        # IMPORTANT: G0 is fftshifted, so G0[gridsize//2, gridsize//2] corresponds to r=(0,0)
+        # We need to undo this shift when indexing
+        center = gridsize // 2
+        
         for a in range(n_imp):
             row_a, col_a = self.positions[a]
             # Create meshgrid for all positions
             rows, cols = np.meshgrid(range(gridsize), range(gridsize), indexing='ij')
             
-            # Vectorized calculation of G0(r, R_a) for all r
-            delta_rows = (row_a - rows) % gridsize
-            delta_cols = (col_a - cols) % gridsize
-            G0_to_imp[a] = G0[delta_rows, delta_cols]
+            # Calculate relative positions: (row, col) - (row_a, col_a)
+            # These are the ACTUAL distances in real space
+            delta_rows = rows - row_a
+            delta_cols = cols - col_a
             
-            # Vectorized calculation of G0(R_a, r) for all r
-            delta_rows_from = (rows - row_a) % gridsize
-            delta_cols_from = (cols - col_a) % gridsize
-            G0_from_imp[a] = G0[delta_rows_from, delta_cols_from]
+            # G0[i,j] represents Green's function for displacement (i-center, j-center)
+            # So for displacement (delta_row, delta_col), we need G0[delta_row + center, delta_col + center]
+            # with periodic wrapping
+            G0_indices_row = (delta_rows + center) % gridsize
+            G0_indices_col = (delta_cols + center) % gridsize
+            
+            G0_to_imp[a] = G0[G0_indices_row, G0_indices_col]
+            
+            # For G0(R_a, r) = G0(r - R_a), use opposite sign
+            delta_rows_from = row_a - rows
+            delta_cols_from = col_a - cols
+            G0_indices_row_from = (delta_rows_from + center) % gridsize
+            G0_indices_col_from = (delta_cols_from + center) % gridsize
+            G0_from_imp[a] = G0[G0_indices_row_from, G0_indices_col_from]
         
         # Vectorized calculation of LDOS change
         # Δρ(r) = -(1/π) Im{∑_ab G0(r,R_a) * T_ab * G0(R_b,r)}
@@ -344,12 +375,16 @@ class QPIAnalyzer:
         
     def process_LDOS(self, LDOS: np.ndarray) -> np.ndarray:
         """Apply signal processing pipeline to LDOS data."""
-        # Center the data
+        # Center the data by removing mean
         LDOS_centered = LDOS - np.mean(LDOS)
         
-        # Apply gentle edge tapering to reduce boundary artifacts without killing the signal
-        # Only apply near the very edges
-        edge_width = min(self.params.gridsize // 20, 10)  # Much smaller edge suppression
+        # Remove large-scale trends that can create low-frequency artifacts
+        # Apply a mild high-pass filter by subtracting heavily smoothed version
+        LDOS_smooth_bg = gaussian_filter(LDOS_centered, sigma=self.params.gridsize / 10)
+        LDOS_highpass = LDOS_centered - self.params.high_pass_strength * LDOS_smooth_bg
+        
+        # Apply gentle edge tapering to reduce boundary artifacts
+        edge_width = min(self.params.gridsize // 15, 15)  # Slightly larger taper
         if edge_width > 0:
             rows, cols = np.mgrid[0:LDOS.shape[0], 0:LDOS.shape[1]]
             
@@ -359,22 +394,22 @@ class QPIAnalyzer:
                 np.minimum(cols, LDOS.shape[1] - 1 - cols)
             )
             
-            # Very gentle tapering only at the very edges
+            # Smooth tapering at edges using cosine window
             edge_taper = np.ones_like(dist_from_edges, dtype=float)
             edge_mask = dist_from_edges < edge_width
-            edge_taper[edge_mask] = np.sin(np.pi * dist_from_edges[edge_mask] / (2 * edge_width))**2
+            edge_taper[edge_mask] = 0.5 * (1 - np.cos(np.pi * dist_from_edges[edge_mask] / edge_width))
             
-            LDOS_centered *= edge_taper
+            LDOS_highpass *= edge_taper
         
-        # Physical broadening
+        # Physical broadening (reduces noise but preserves QPI features)
         LDOS_broadened = gaussian_filter(
-            LDOS_centered, sigma=self.params.physical_broadening_sigma
+            LDOS_highpass, sigma=self.params.physical_broadening_sigma
         )
         
-        # Apply pre-computed apodization
+        # Apply pre-computed apodization (further reduces edge artifacts)
         LDOS_windowed = LDOS_broadened * self._apod_window
         
-        # Sub-pixel interpolation
+        # Sub-pixel interpolation for better FFT resolution
         LDOS_upsampled = zoom(LDOS_windowed, self.params.zoom_factor, order=3)
         
         return LDOS_upsampled
@@ -405,10 +440,51 @@ class QPIAnalyzer:
         end_idx = start_idx + crop_size
         fft_magnitude = fft_magnitude[start_idx:end_idx, start_idx:end_idx].copy()
         
-        # Suppress DC component
+        # Enhanced DC and low-frequency suppression to reduce circular artifacts
         center = self.params.gridsize // 2
-        dc_suppress_val = np.percentile(fft_magnitude, 10)
-        fft_magnitude[center-5:center+6, center-5:center+6] = dc_suppress_val
+        
+        # Create a radial mask to suppress low frequencies
+        y, x = np.ogrid[:self.params.gridsize, :self.params.gridsize]
+        r_pixel = np.sqrt((x - center)**2 + (y - center)**2)
+        
+        # Suppress center and apply gradual high-pass filter
+        # This reduces circular artifacts from periodic boundaries
+        low_freq_radius = self.params.low_freq_suppress_radius
+        transition_radius = self.params.low_freq_transition_radius
+        
+        # Create suppression mask
+        suppression_mask = np.ones_like(fft_magnitude, dtype=float)
+        
+        # Heavy suppression at center
+        central_mask = r_pixel < low_freq_radius
+        suppression_mask[central_mask] = 0.01  # Near-zero suppression
+        
+        # Gradual transition (high-pass filter)
+        transition_mask = (r_pixel >= low_freq_radius) & (r_pixel < transition_radius)
+        suppression_mask[transition_mask] = 0.01 + 0.99 * (r_pixel[transition_mask] - low_freq_radius) / (transition_radius - low_freq_radius)
+        
+        # Apply suppression
+        fft_magnitude *= suppression_mask
+        
+        # Optional: Subtract radially-averaged background to remove circular artifacts
+        if self.params.subtract_radial_average:
+            # Create radial coordinate grid
+            y, x = np.ogrid[:self.params.gridsize, :self.params.gridsize]
+            center = self.params.gridsize // 2
+            r_pixel = np.sqrt((x - center)**2 + (y - center)**2)
+            
+            # Compute azimuthal average
+            max_radius = int(np.sqrt(2) * self.params.gridsize / 2)
+            r_bins = np.arange(0, max_radius + 1)
+            radial_profile = self.signal_proc.radial_average(fft_magnitude, r_pixel, r_bins)
+            
+            # Interpolate back to 2D
+            r_indices = np.clip(r_pixel.astype(int), 0, len(radial_profile) - 1)
+            radial_background = radial_profile[r_indices]
+            
+            # Subtract (partially) to preserve anisotropic features
+            fft_magnitude -= self.params.radial_average_strength * radial_background
+            fft_magnitude = np.maximum(fft_magnitude, 0)  # Ensure non-negative
         
         # Apply power law enhancement in-place
         np.power(fft_magnitude, 0.8, out=fft_magnitude)
@@ -502,9 +578,17 @@ class QPISimulation:
     def update_dispersion_data(self, peak_q: Optional[float]):
         """Update accumulated dispersion data."""
         if peak_q is not None and peak_q > 0:
-            # Direct correspondence: q = k_F (intra-band scattering)
-            k_F_extracted = peak_q
-            E_extracted = k_F_extracted**2
+            n_imp = len(self.impurities.positions)
+            
+            if n_imp == 1:
+                # Single impurity: q = k_F (intra-band scattering at Fermi surface)
+                k_F_extracted = peak_q
+                E_extracted = k_F_extracted**2
+            else:
+                # Multiple impurities: q = 2k_F (backscattering)
+                # So k_F = q / 2
+                k_F_extracted = peak_q / 2.0
+                E_extracted = k_F_extracted**2
             
             # Check if this point is significantly different from existing points
             tolerance = 0.1  # Minimum separation in k-space
@@ -564,7 +648,7 @@ class QPIVisualizer:
         self.ax2.grid(True, alpha=0.3)
         plt.colorbar(self.im2, ax=self.ax2, label='log|FFT(LDOS)|')
         
-        # Add theoretical circle
+        # Add theoretical circles
         theta = np.linspace(0, 2*np.pi, 100)
         k_F_init = self.sim.energy_to_kF(self.params.E_min)
         circle_x = k_F_init * np.cos(theta)
@@ -572,12 +656,28 @@ class QPIVisualizer:
         self.circle_line, = self.ax2.plot(
             circle_x, circle_y, 'r--', linewidth=2, alpha=0.6, label='q = k_F'
         )
+        
+        # Add 2k_F circle for multiple impurities (backscattering)
+        n_imp = len(self.sim.impurities.positions)
+        if n_imp > 1:
+            circle_2kF_x = 2 * k_F_init * np.cos(theta)
+            circle_2kF_y = 2 * k_F_init * np.sin(theta)
+            self.circle_2kF_line, = self.ax2.plot(
+                circle_2kF_x, circle_2kF_y, 'k-', linewidth=2, alpha=0.8, label='q = 2k_F'
+            )
+        else:
+            self.circle_2kF_line = None
+        
         self.ax2.legend()
         
         # Dispersion plot
-        self.ax3.set_xlabel('k (1/length units)')
+        n_imp = len(self.sim.impurities.positions)
+        self.ax3.set_xlabel('k_F (1/length units)')
         self.ax3.set_ylabel('Energy E')
-        self.ax3.set_title('Dispersion: Theory vs Extracted')
+        if n_imp > 1:
+            self.ax3.set_title('Dispersion: Theory vs Extracted (from 2k_F peaks)')
+        else:
+            self.ax3.set_title('Dispersion: Theory vs Extracted (from k_F peaks)')
         self.ax3.grid(True, alpha=0.3)
         
         # Theoretical dispersion
@@ -586,8 +686,12 @@ class QPIVisualizer:
         self.ax3.plot(k_theory, E_theory, 'b-', linewidth=2, label='Theory: E = k²')
         
         # Extracted points (will be updated)
+        if n_imp > 1:
+            scatter_label = 'Extracted from q=2k_F'
+        else:
+            scatter_label = 'Extracted from q=k_F'
         self.extracted_scatter = self.ax3.scatter(
-            [], [], c='red', s=50, alpha=0.7, label='Extracted from QPI'
+            [], [], c='red', s=50, alpha=0.7, label=scatter_label
         )
         
         self.ax3.legend()
@@ -615,7 +719,11 @@ class QPIVisualizer:
         self._update_circle(k_F)
         self._update_dispersion_plot(peak_q)
         
-        return [self.im1, self.im2, self.circle_line, self.energy_text, self.extracted_scatter]
+        # Return artists for animation
+        artists = [self.im1, self.im2, self.circle_line, self.energy_text, self.extracted_scatter]
+        if self.circle_2kF_line is not None:
+            artists.append(self.circle_2kF_line)
+        return artists
     
     def _update_real_space_plot(self, LDOS: np.ndarray, energy: float, k_F: float):
         """Update the real space LDOS plot."""
@@ -652,11 +760,19 @@ class QPIVisualizer:
         self.im2.set_clim(vmin=vmin_fft, vmax=vmax_fft)
     
     def _update_circle(self, k_F: float):
-        """Update the theoretical circle."""
+        """Update the theoretical circles."""
         theta = np.linspace(0, 2*np.pi, 100)
+        
+        # Update k_F circle
         circle_x = k_F * np.cos(theta)
         circle_y = k_F * np.sin(theta)
         self.circle_line.set_data(circle_x, circle_y)
+        
+        # Update 2k_F circle if it exists (multiple impurities)
+        if self.circle_2kF_line is not None:
+            circle_2kF_x = 2 * k_F * np.cos(theta)
+            circle_2kF_y = 2 * k_F * np.sin(theta)
+            self.circle_2kF_line.set_data(circle_2kF_x, circle_2kF_y)
     
     def _update_dispersion_plot(self, peak_q: Optional[float]):
         """Update the dispersion plot with new extracted points."""

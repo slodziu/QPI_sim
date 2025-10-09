@@ -27,8 +27,8 @@ class SimulationConfig:
     V_s: float = 1.0
     
     # Energy sweep
-    E_min: float = 5.0
-    E_max: float = 25.0
+    E_min: float = 3.0
+    E_max: float = 5.0
     n_frames: int = 20
     
     # Processing parameters
@@ -161,7 +161,7 @@ DISTRIBUTED_10_IMPURITIES = SimulationConfig(
 
 
 def setup_n_random_positions(config: SimulationConfig, n_impurities: int, seed: int = 42, 
-                             margin: int = 50, distributed: bool = True):
+                             margin: int = None, distributed: bool = True):
     """
     Setup n randomly placed impurity positions.
     
@@ -169,12 +169,15 @@ def setup_n_random_positions(config: SimulationConfig, n_impurities: int, seed: 
         config: Configuration object to modify
         n_impurities: Number of impurities to place
         seed: Random seed for reproducibility
-        margin: Margin from edges in pixels
+        margin: Margin from edges in pixels (if None, use gridsize//6 for better edge avoidance)
         distributed: If True, distribute across grid; if False, cluster in center
     """
     np.random.seed(seed)
     config.impurity_positions = []
     
+    # Use larger default margin to avoid periodic boundary artifacts
+    if margin is None:
+        margin = config.gridsize // 32  
     # Calculate appropriate minimum distance based on density
     available_area = (config.gridsize - 2*margin)**2
     if not distributed:
@@ -195,16 +198,17 @@ def setup_n_random_positions(config: SimulationConfig, n_impurities: int, seed: 
         x_max = config.gridsize - margin
         y_min = margin  
         y_max = config.gridsize - margin
-        print(f"Distributing {n_impurities} impurities across grid ({x_min}-{x_max}, {y_min}-{y_max}), min_distance={min_distance}")
+        print(f"Distributing {n_impurities} impurities across grid ({y_min}-{y_max}, {x_min}-{x_max}), min_distance={min_distance}")
     else:
-        # Place impurities in a larger central region for 30 impurities
+        # Place impurities in a central region
         center = config.gridsize // 2
-        region_size = min(config.gridsize // 3, 150)  # Much larger region for 30 impurities
-        x_min = center - region_size//2
-        x_max = center + region_size//2
-        y_min = center - region_size//2
-        y_max = center + region_size//2
-        print(f"Clustering {n_impurities} impurities in central region ({x_min}-{x_max}, {y_min}-{y_max}), min_distance={min_distance}")
+        # Use margin-based region size for consistency
+        region_radius = (config.gridsize - 2*margin) // 3  # 1/3 of available space
+        x_min = center - region_radius
+        x_max = center + region_radius
+        y_min = center - region_radius
+        y_max = center + region_radius
+        print(f"Clustering {n_impurities} impurities in central region ({y_min}-{y_max}, {x_min}-{x_max}), min_distance={min_distance}")
     
     for i in range(n_impurities):
         attempts = 0
@@ -212,20 +216,21 @@ def setup_n_random_positions(config: SimulationConfig, n_impurities: int, seed: 
         
         while attempts < max_attempts and not placed:
             # Generate random position in the appropriate region
-            x = np.random.randint(x_min, x_max)
-            y = np.random.randint(y_min, y_max)
+            # Note: Using (row, col) convention to match array indexing
+            row = np.random.randint(y_min, y_max)
+            col = np.random.randint(x_min, x_max)
             
             # Check distance to existing impurities
             valid_position = True
-            for existing_x, existing_y in config.impurity_positions:
-                distance = np.sqrt((x - existing_x)**2 + (y - existing_y)**2)
+            for existing_row, existing_col in config.impurity_positions:
+                distance = np.sqrt((row - existing_row)**2 + (col - existing_col)**2)
                 if distance < min_distance:
                     valid_position = False
                     break
             
             if valid_position:
-                config.impurity_positions.append((x, y))
-                print(f"  Impurity {i+1} placed at ({x}, {y})")
+                config.impurity_positions.append((row, col))
+                print(f"  Impurity {i+1} placed at (row={row}, col={col})")
                 placed = True
             
             attempts += 1
@@ -236,19 +241,19 @@ def setup_n_random_positions(config: SimulationConfig, n_impurities: int, seed: 
             print(f"  Relaxing distance constraint to {relaxed_min_distance:.1f} for impurity {i+1}")
             
             for attempt in range(max_attempts):
-                x = np.random.randint(x_min, x_max)
-                y = np.random.randint(y_min, y_max)
+                row = np.random.randint(y_min, y_max)
+                col = np.random.randint(x_min, x_max)
                 
                 valid_position = True
-                for existing_x, existing_y in config.impurity_positions:
-                    distance = np.sqrt((x - existing_x)**2 + (y - existing_y)**2)
+                for existing_row, existing_col in config.impurity_positions:
+                    distance = np.sqrt((row - existing_row)**2 + (col - existing_col)**2)
                     if distance < relaxed_min_distance:
                         valid_position = False
                         break
                 
                 if valid_position:
-                    config.impurity_positions.append((x, y))
-                    print(f"  Impurity {i+1} placed at ({x}, {y}) with relaxed constraint")
+                    config.impurity_positions.append((row, col))
+                    print(f"  Impurity {i+1} placed at (row={row}, col={col}) with relaxed constraint")
                     placed = True
                     break
         
@@ -351,16 +356,16 @@ def get_config(config_name: str) -> SimulationConfig:
     config = configs[config_name]
     
     # Setup special position configurations
+    # All "random" configs now use distributed=True for truly random placement
     if config_name == 'random_2_impurities':
-        setup_n_random_positions(config, 2, distributed=False)
+        setup_n_random_positions(config, 2, distributed=True)
     elif config_name == 'random_3_impurities':
-        setup_n_random_positions(config, 3, distributed=False)
+        setup_n_random_positions(config, 3, distributed=True)
     elif config_name == 'random_5_impurities':
-        setup_n_random_positions(config, 5, distributed=False)
+        setup_n_random_positions(config, 5, distributed=True)
     elif config_name == 'random_10_impurities':
-        setup_n_random_positions(config, 10, distributed=False)
+        setup_n_random_positions(config, 10, distributed=True)
     elif config_name == 'random_30_impurities':
-        # Use distributed placement for 30 impurities to avoid clustering issues
         setup_n_random_positions(config, 30, distributed=True)
     elif config_name == 'distributed_5_impurities':
         setup_n_random_positions(config, 5, distributed=True)
