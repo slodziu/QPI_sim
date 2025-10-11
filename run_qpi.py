@@ -34,8 +34,6 @@ def run_simulation(config_name: str):
             n_frames=config.n_frames,
             rotation_angle=config.rotation_angle,
             disorder_strength=config.disorder_strength,
-            physical_broadening_sigma=config.physical_broadening_sigma,
-            apodization_alpha=config.apodization_alpha,
             zoom_factor=config.zoom_factor
         )
         

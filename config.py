@@ -32,11 +32,9 @@ class SimulationConfig:
     n_frames: int = 20
     
     # Processing parameters
-    rotation_angle: float = np.pi/12
-    disorder_strength: float = 0.05
-    physical_broadening_sigma: float = 0.8
-    apodization_alpha: float = 0.3
-    zoom_factor: float = 1.5
+    rotation_angle: float = 0.0  # No rotation
+    disorder_strength: float = 0.0  # No disorder
+    zoom_factor: float = 1.0  # No zoom
     
     # Impurity configuration
     impurity_positions: List[Tuple[int, int]] = None
@@ -44,11 +42,9 @@ class SimulationConfig:
     def get_impurity_positions(self) -> List[Tuple[int, int]]:
         """Get impurity positions, calculating if needed."""
         if self.impurity_positions is None:
-            # Default: single impurity OFF-CENTER to avoid periodic boundary splitting
+            # Default: single impurity at CENTER
             center = self.gridsize // 2
-            # Place at 3/8 of the way across to avoid center and edge issues
-            offset = self.gridsize // 8
-            return [(center - offset, center - offset)]
+            return [(center, center)]
         return self.impurity_positions
 
 
@@ -64,9 +60,7 @@ HIGH_QUALITY_SINGLE = SimulationConfig(
     n_frames=30,
     E_min=3.0,
     E_max=30.0,
-    V_s=-2.0,  # Attractive impurity
-    physical_broadening_sigma=0.5,
-    apodization_alpha=0.25
+    V_s=-2.0  # Attractive impurity
 )
 
 # Fast preview simulation
@@ -77,8 +71,7 @@ FAST_PREVIEW = SimulationConfig(
     n_frames=10,
     E_min=5.0,
     E_max=15.0,
-    zoom_factor=1.2,
-    apodization_alpha=0.5  # More aggressive windowing to suppress boundary artifacts
+    zoom_factor=1.0  # No zoom
 )
 
 # N-impurity random configurations

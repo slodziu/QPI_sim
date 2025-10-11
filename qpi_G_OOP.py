@@ -14,7 +14,6 @@ Performance optimizations implemented:
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from scipy.ndimage import gaussian_filter, zoom
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
@@ -51,18 +50,15 @@ class SystemParameters:
     n_frames: int = 20
     
     # Processing parameters
-    rotation_angle: float = np.pi/12  # 15 degrees
-    disorder_strength: float = 0.05
-    physical_broadening_sigma: float = 0.8
-    apodization_alpha: float = 0.3
-    zoom_factor: float = 1.5
+    rotation_angle: float = 0.0  # No rotation - perfect square lattice
+    disorder_strength: float = 0.0  # No disorder
+    zoom_factor: float = 1.0  # No zoom
     
     # FFT artifact suppression parameters
-    high_pass_strength: float = 0.3  # Strength of background removal (0-1)
-    low_freq_suppress_radius: int = 10  # Pixels to heavily suppress in FFT
-    low_freq_transition_radius: int = 20  # Gradual transition zone
-    subtract_radial_average: bool = False  # Subtract azimuthally-averaged background
-    radial_average_strength: float = 0.5  # How much to subtract (0-1)
+    high_pass_strength: float = 0.0  # No background removal 
+    low_freq_suppress_radius: int = 2  # Minimal DC suppression only
+    low_freq_transition_radius: int = 3  # Minimal transition zone
+    subtract_radial_average: bool = False  # No radial averaging
     
     @property
     def a(self) -> float:
@@ -76,55 +72,7 @@ class SystemParameters:
 
 
 class SignalProcessing:
-    """Signal processing utilities for QPI analysis."""
-    
-    @staticmethod
-    def tapered_cosine_window_1d(number_of_points: int, alpha: float = 0.5) -> np.ndarray:
-        """
-        1D Tapered cosine (Tukey) window with parameter α∈[0,1].
-        α=0 -> rectangular; α=1 -> Hann window.
-        """
-        if alpha <= 0.0:
-            return np.ones(number_of_points, dtype=float)
-        if alpha >= 1.0:
-            n = np.arange(number_of_points, dtype=float)
-            return 0.5 * (1.0 - np.cos(2.0 * np.pi * n / (number_of_points - 1.0)))
-        
-        n = np.arange(number_of_points, dtype=float)
-        window = np.ones(number_of_points, dtype=float)
-        
-        left_region = n < alpha * (number_of_points - 1) / 2.0
-        right_region = n > (number_of_points - 1) * (1.0 - alpha / 2.0)
-        
-        window[left_region] = 0.5 * (
-            1.0 + np.cos(np.pi * (2.0 * n[left_region] / (alpha * (number_of_points - 1)) - 1.0))
-        )
-        window[right_region] = 0.5 * (
-            1.0 + np.cos(np.pi * (
-                2.0 * n[right_region] / (alpha * (number_of_points - 1))
-                - 2.0 / alpha + 1.0
-            ))
-        )
-        return window
-    
-    @staticmethod
-    def gaussian_kernel_1d(sigma: float, half_width_sigmas: float = 3.0) -> np.ndarray:
-        """Normalized 1D Gaussian kernel for smoothing."""
-        if sigma <= 0:
-            return np.array([1.0])
-        radius = max(1, int(half_width_sigmas * sigma))
-        x = np.arange(-radius, radius + 1, dtype=float)
-        kernel = np.exp(-0.5 * (x / sigma) ** 2)
-        return kernel / kernel.sum()
-    
-    @staticmethod
-    def gaussian_smooth_1d(array: np.ndarray, sigma: float) -> np.ndarray:
-        """Convolve with Gaussian kernel (reflect at boundaries)."""
-        kernel = SignalProcessing.gaussian_kernel_1d(sigma)
-        pad = (len(kernel) - 1) // 2
-        padded = np.pad(array, pad, mode="reflect")
-        smoothed = np.convolve(padded, kernel, mode="same")
-        return smoothed[pad:-pad] if pad > 0 else smoothed
+    """Signal processing utilities for QPI analysis - NO SMOOTHING VERSION."""
     
     @staticmethod
     def radial_average(array_2d: np.ndarray, radius_grid: np.ndarray, 
@@ -159,19 +107,12 @@ class GreensFunction:
         ky = 2*np.pi*np.fft.fftfreq(self.params.gridsize, d=self.params.a)
         KX, KY = np.meshgrid(kx, ky)
         
-        # Rotate k-space grid to break square lattice symmetry
-        cos_theta = np.cos(self.params.rotation_angle)
-        sin_theta = np.sin(self.params.rotation_angle)
-        self.KX_rot = KX * cos_theta - KY * sin_theta
-        self.KY_rot = KX * sin_theta + KY * cos_theta
+        # No rotation, no disorder - pure parabolic dispersion
+        self.KX_rot = KX
+        self.KY_rot = KY
         
-        # Add disorder to break perfect lattice coherence
-        disorder = self.params.disorder_strength * np.random.normal(
-            0, 1, (self.params.gridsize, self.params.gridsize)
-        )
-        
-        # Parabolic dispersion: E = k² + disorder
-        self.epsilon_k = (self.KX_rot**2 + self.KY_rot**2) - self.params.mu + disorder
+        # Pure parabolic dispersion: E = k² 
+        self.epsilon_k = (KX**2 + KY**2) - self.params.mu
         
         # Store k-space info for later use
         self.kx, self.ky = kx, ky
@@ -184,7 +125,7 @@ class GreensFunction:
         if energy_key in self._G0_cache:
             return self._G0_cache[energy_key]
             
-        Gk = 1.0 / (energy - self.epsilon_k + 1j*self.params.eta)
+        Gk = 1.0 / (energy - self.epsilon_k + 8j*self.params.eta)
         
         # Apply FFT with proper normalization
         # The k-space integral ∫ dk² /(2π)² becomes sum * (dk)² / (2π)²  
@@ -370,130 +311,32 @@ class QPIAnalyzer:
     def __init__(self, params: SystemParameters):
         self.params = params
         self.signal_proc = SignalProcessing()
-        # Pre-compute apodization window to avoid recalculation
-        self._apod_window = self._create_apodization_window()
         
     def process_LDOS(self, LDOS: np.ndarray) -> np.ndarray:
-        """Apply signal processing pipeline to LDOS data."""
-        # Center the data by removing mean
-        LDOS_centered = LDOS - np.mean(LDOS)
+        """Process LDOS for QPI analysis - completely raw, no smoothing."""
+        # For QPI, we want to analyze the LDOS modulations
+        # The standard approach is to look at δρ(r) = ρ(r) - ρ₀
+        # where ρ₀ is the clean (unperturbed) LDOS
         
-        # Remove large-scale trends that can create low-frequency artifacts
-        # Apply a mild high-pass filter by subtracting heavily smoothed version
-        LDOS_smooth_bg = gaussian_filter(LDOS_centered, sigma=self.params.gridsize / 10)
-        LDOS_highpass = LDOS_centered - self.params.high_pass_strength * LDOS_smooth_bg
-        
-        # Apply gentle edge tapering to reduce boundary artifacts
-        edge_width = min(self.params.gridsize // 15, 15)  # Slightly larger taper
-        if edge_width > 0:
-            rows, cols = np.mgrid[0:LDOS.shape[0], 0:LDOS.shape[1]]
-            
-            # Distance from edges
-            dist_from_edges = np.minimum(
-                np.minimum(rows, LDOS.shape[0] - 1 - rows),
-                np.minimum(cols, LDOS.shape[1] - 1 - cols)
-            )
-            
-            # Smooth tapering at edges using cosine window
-            edge_taper = np.ones_like(dist_from_edges, dtype=float)
-            edge_mask = dist_from_edges < edge_width
-            edge_taper[edge_mask] = 0.5 * (1 - np.cos(np.pi * dist_from_edges[edge_mask] / edge_width))
-            
-            LDOS_highpass *= edge_taper
-        
-        # Physical broadening (reduces noise but preserves QPI features)
-        LDOS_broadened = gaussian_filter(
-            LDOS_highpass, sigma=self.params.physical_broadening_sigma
-        )
-        
-        # Apply pre-computed apodization (further reduces edge artifacts)
-        LDOS_windowed = LDOS_broadened * self._apod_window
-        
-        # Sub-pixel interpolation for better FFT resolution
-        LDOS_upsampled = zoom(LDOS_windowed, self.params.zoom_factor, order=3)
-        
-        return LDOS_upsampled
+        # Since we calculated the LDOS change directly in the impurity system,
+        # this is already δρ(r), so return as-is
+        return LDOS
     
-    def _create_apodization_window(self) -> np.ndarray:
-        """Create 2D apodization window."""
-        window_x = self.signal_proc.tapered_cosine_window_1d(
-            self.params.gridsize, self.params.apodization_alpha
-        )
-        window_y = self.signal_proc.tapered_cosine_window_1d(
-            self.params.gridsize, self.params.apodization_alpha
-        )
-        return np.outer(window_y, window_x)
-    
-    def calculate_FFT(self, LDOS_processed: np.ndarray) -> np.ndarray:
-        """Calculate and process FFT of LDOS (optimized)."""
-        # FFT - use numpy's efficient FFT
-        LDOS_fft = np.fft.fftshift(np.fft.fft2(LDOS_processed))
+    def calculate_FFT(self, LDOS_processed: np.ndarray) -> tuple:
+        """Calculate FFT for QPI analysis - return both complex and magnitude data."""
+        # In QPI analysis, we take FFT of the LDOS modulations δρ(r)
+        # Common preprocessing: subtract the spatial average to remove DC component
+        LDOS_zero_mean = LDOS_processed - np.mean(LDOS_processed)
         
-        # Calculate magnitude in-place to save memory
-        np.abs(LDOS_fft, out=LDOS_fft.real)  # Reuse real part for magnitude
-        fft_magnitude = LDOS_fft.real
+        # Take 2D FFT and shift zero frequency to center
+        LDOS_fft_complex = np.fft.fftshift(np.fft.fft2(LDOS_zero_mean))
         
-        # Crop back to original size
-        up_center = LDOS_processed.shape[0] // 2
-        crop_size = self.params.gridsize
-        start_idx = up_center - crop_size // 2
-        end_idx = start_idx + crop_size
-        fft_magnitude = fft_magnitude[start_idx:end_idx, start_idx:end_idx].copy()
-        
-        # Enhanced DC and low-frequency suppression to reduce circular artifacts
-        center = self.params.gridsize // 2
-        
-        # Create a radial mask to suppress low frequencies
-        y, x = np.ogrid[:self.params.gridsize, :self.params.gridsize]
-        r_pixel = np.sqrt((x - center)**2 + (y - center)**2)
-        
-        # Suppress center and apply gradual high-pass filter
-        # This reduces circular artifacts from periodic boundaries
-        low_freq_radius = self.params.low_freq_suppress_radius
-        transition_radius = self.params.low_freq_transition_radius
-        
-        # Create suppression mask
-        suppression_mask = np.ones_like(fft_magnitude, dtype=float)
-        
-        # Heavy suppression at center
-        central_mask = r_pixel < low_freq_radius
-        suppression_mask[central_mask] = 0.01  # Near-zero suppression
-        
-        # Gradual transition (high-pass filter)
-        transition_mask = (r_pixel >= low_freq_radius) & (r_pixel < transition_radius)
-        suppression_mask[transition_mask] = 0.01 + 0.99 * (r_pixel[transition_mask] - low_freq_radius) / (transition_radius - low_freq_radius)
-        
-        # Apply suppression
-        fft_magnitude *= suppression_mask
-        
-        # Optional: Subtract radially-averaged background to remove circular artifacts
-        if self.params.subtract_radial_average:
-            # Create radial coordinate grid
-            y, x = np.ogrid[:self.params.gridsize, :self.params.gridsize]
-            center = self.params.gridsize // 2
-            r_pixel = np.sqrt((x - center)**2 + (y - center)**2)
-            
-            # Compute azimuthal average
-            max_radius = int(np.sqrt(2) * self.params.gridsize / 2)
-            r_bins = np.arange(0, max_radius + 1)
-            radial_profile = self.signal_proc.radial_average(fft_magnitude, r_pixel, r_bins)
-            
-            # Interpolate back to 2D
-            r_indices = np.clip(r_pixel.astype(int), 0, len(radial_profile) - 1)
-            radial_background = radial_profile[r_indices]
-            
-            # Subtract (partially) to preserve anisotropic features
-            fft_magnitude -= self.params.radial_average_strength * radial_background
-            fft_magnitude = np.maximum(fft_magnitude, 0)  # Ensure non-negative
-        
-        # Apply power law enhancement in-place
-        np.power(fft_magnitude, 0.8, out=fft_magnitude)
-        np.log1p(fft_magnitude, out=fft_magnitude)
-        
-        return fft_magnitude
+        # Return both complex FFT and magnitude squared for different uses
+        magnitude_squared = np.abs(LDOS_fft_complex)**2
+        return LDOS_fft_complex, magnitude_squared
     
     def extract_peak_q(self, fft_data: np.ndarray, k_display_max: float) -> Optional[float]:
-        """Extract QPI peak position from FFT data."""
+        """Extract QPI peak position from FFT data - NO SMOOTHING."""
         center = fft_data.shape[0] // 2
         
         # Create radial distance grid
@@ -506,28 +349,27 @@ class QPIAnalyzer:
         
         # Create finer radial bins for better resolution
         max_r_k = k_display_max * 0.8
-        n_bins = max(int(fft_data.shape[0]/2), 100)  # Ensure sufficient resolution
+        n_bins = max(int(fft_data.shape[0]/2), 100)
         r_bins = np.linspace(0, max_r_k, n_bins)
         
         if len(r_bins) < 2:
             return None
         
-        # Radial averaging and smoothing
+        # Radial averaging - NO SMOOTHING
         radial_profile = self.signal_proc.radial_average(fft_data, r_k, r_bins)
-        radial_smoothed = self.signal_proc.gaussian_smooth_1d(radial_profile, 0.8)  # Less smoothing
         
-        # Find peak (exclude central region)
-        exclude_center = max(1, int(len(radial_smoothed) * 0.08))  # Smaller exclusion zone
-        if exclude_center < len(radial_smoothed) - 2:
-            peak_idx = np.argmax(radial_smoothed[exclude_center:]) + exclude_center
+        # Find peak (exclude central region) - NO SMOOTHING
+        exclude_center = max(1, int(len(radial_profile) * 0.08))
+        if exclude_center < len(radial_profile) - 2:
+            peak_idx = np.argmax(radial_profile[exclude_center:]) + exclude_center
             if peak_idx < len(r_bins) - 1:
-                # Interpolate for sub-bin precision
-                peak_q = (r_bins[peak_idx] + r_bins[peak_idx+1]) / 2
+                # Simple peak position
+                peak_q = r_bins[peak_idx]
                 
                 # Only return if the peak is significant
-                peak_height = radial_smoothed[peak_idx]
-                background = np.mean(radial_smoothed[exclude_center:exclude_center+5])
-                if peak_height > background * 1.2:  # 20% above background
+                peak_height = radial_profile[peak_idx]
+                background = np.mean(radial_profile[exclude_center:exclude_center+5])
+                if peak_height > background * 1.2:
                     return peak_q
         
         return None
@@ -542,7 +384,7 @@ class QPISimulation:
         self.impurities = ImpuritySystem(impurity_positions)
         self.analyzer = QPIAnalyzer(params)
         
-        # Data storage
+        # Data storage for 2k_F scattering only (focus on backscattering)
         self.extracted_k = []
         self.extracted_E = []
     
@@ -550,7 +392,7 @@ class QPISimulation:
         """Convert energy to Fermi wavevector: k_F = √E."""
         return np.sqrt(E)
     
-    def run_single_energy(self, energy: float) -> Tuple[np.ndarray, np.ndarray, Optional[float]]:
+    def run_single_energy(self, energy: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Optional[float]]:
         """Run simulation for a single energy value."""
         k_F = self.energy_to_kF(energy)
         
@@ -562,7 +404,7 @@ class QPISimulation:
         
         # Process LDOS and calculate FFT
         LDOS_processed = self.analyzer.process_LDOS(LDOS)
-        fft_display = self.analyzer.calculate_FFT(LDOS_processed)
+        fft_complex, fft_display = self.analyzer.calculate_FFT(LDOS_processed)
         
         # Extract QPI peak from the cropped FFT data (same as what's displayed)
         k_display_max = max(2 * self.params.k_F_max * 1.3, 8.0)
@@ -573,39 +415,45 @@ class QPISimulation:
         
         peak_q = self.analyzer.extract_peak_q(fft_cropped, k_display_max)
         
-        return LDOS, fft_display, peak_q
+        # Store current energy for dispersion analysis
+        self.current_energy = energy
+        
+        return LDOS, fft_display, fft_complex, peak_q
     
     def update_dispersion_data(self, peak_q: Optional[float]):
-        """Update accumulated dispersion data."""
+        """Update accumulated dispersion data by looking for 2k_F peaks only."""
         if peak_q is not None and peak_q > 0:
-            n_imp = len(self.impurities.positions)
+            # Use current energy if available, otherwise fall back to E_min
+            current_energy = getattr(self, 'current_energy', self.params.E_min)
             
-            if n_imp == 1:
-                # Single impurity: q = k_F (intra-band scattering at Fermi surface)
-                k_F_extracted = peak_q
-                E_extracted = k_F_extracted**2
-            else:
-                # Multiple impurities: q = 2k_F (backscattering)
-                # So k_F = q / 2
+            # Calculate expected k_F for current energy
+            k_F_expected = np.sqrt(current_energy)
+            
+            # Only look for 2k_F peaks (q ≈ 2k_F)
+            # Use more generous tolerance and wider range to capture more points
+            expected_2kF = 2 * k_F_expected
+            tolerance_2kF = 0.6 * expected_2kF  # 60% tolerance for better capture
+            
+            # Check for 2k_F peak with broader range
+            if peak_q >= 0.3 * expected_2kF and peak_q <= 3.0 * expected_2kF:
+                # For 2k_F peak, the actual k_F is q/2
                 k_F_extracted = peak_q / 2.0
                 E_extracted = k_F_extracted**2
-            
-            # Check if this point is significantly different from existing points
-            tolerance = 0.1  # Minimum separation in k-space
-            is_new_point = True
-            
-            if len(self.extracted_k) > 0:
-                existing_k = np.array(self.extracted_k)
-                existing_positive_k = existing_k[existing_k > 0]  # Only check positive k
-                if len(existing_positive_k) > 0:
-                    min_distance = np.min(np.abs(existing_positive_k - k_F_extracted))
-                    if min_distance < tolerance:
-                        is_new_point = False
-            
-            if is_new_point:
-                # Store both positive and negative k
-                self.extracted_k.extend([k_F_extracted, -k_F_extracted])
-                self.extracted_E.extend([E_extracted, E_extracted])
+                
+                # Check if this point is significantly different from existing 2k_F points
+                # Use smaller tolerance for uniqueness check to avoid duplicates
+                is_new_point = True
+                if len(self.extracted_k) > 0:
+                    existing_k = np.array(self.extracted_k)
+                    existing_positive_k = existing_k[existing_k > 0]
+                    if len(existing_positive_k) > 0:
+                        min_distance = np.min(np.abs(existing_positive_k - k_F_extracted))
+                        if min_distance < 0.03:  # Very small tolerance for uniqueness
+                            is_new_point = False
+                
+                if is_new_point:
+                    self.extracted_k.extend([k_F_extracted, -k_F_extracted])
+                    self.extracted_E.extend([E_extracted, E_extracted])
 
 
 class QPIVisualizer:
@@ -618,8 +466,8 @@ class QPIVisualizer:
         
     def _setup_figure(self):
         """Initialize the figure and subplots."""
-        self.fig, (self.ax1, self.ax2, self.ax3) = plt.subplots(
-            1, 3, figsize=(24, 8), dpi=100
+        self.fig, (self.ax1, self.ax2, self.ax3, self.ax4) = plt.subplots(
+            1, 4, figsize=(32, 8), dpi=100
         )
         
         # Real space LDOS plot
@@ -648,55 +496,46 @@ class QPIVisualizer:
         self.ax2.grid(True, alpha=0.3)
         plt.colorbar(self.im2, ax=self.ax2, label='log|FFT(LDOS)|')
         
-        # Add theoretical circles
+        # Add 2k_F circle only (focus on backscattering)
         theta = np.linspace(0, 2*np.pi, 100)
         k_F_init = self.sim.energy_to_kF(self.params.E_min)
-        circle_x = k_F_init * np.cos(theta)
-        circle_y = k_F_init * np.sin(theta)
-        self.circle_line, = self.ax2.plot(
-            circle_x, circle_y, 'r--', linewidth=2, alpha=0.6, label='q = k_F'
+        circle_2kF_x = 2 * k_F_init * np.cos(theta)
+        circle_2kF_y = 2 * k_F_init * np.sin(theta)
+        self.circle_2kF_line, = self.ax2.plot(
+            circle_2kF_x, circle_2kF_y, 'r-', linewidth=3, alpha=0.8, label='q = 2k_F (backscattering)'
         )
-        
-        # Add 2k_F circle for multiple impurities (backscattering)
-        n_imp = len(self.sim.impurities.positions)
-        if n_imp > 1:
-            circle_2kF_x = 2 * k_F_init * np.cos(theta)
-            circle_2kF_y = 2 * k_F_init * np.sin(theta)
-            self.circle_2kF_line, = self.ax2.plot(
-                circle_2kF_x, circle_2kF_y, 'k-', linewidth=2, alpha=0.8, label='q = 2k_F'
-            )
-        else:
-            self.circle_2kF_line = None
         
         self.ax2.legend()
         
-        # Dispersion plot
-        n_imp = len(self.sim.impurities.positions)
-        self.ax3.set_xlabel('k_F (1/length units)')
-        self.ax3.set_ylabel('Energy E')
-        if n_imp > 1:
-            self.ax3.set_title('Dispersion: Theory vs Extracted (from 2k_F peaks)')
-        else:
-            self.ax3.set_title('Dispersion: Theory vs Extracted (from k_F peaks)')
-        self.ax3.grid(True, alpha=0.3)
+        # Inverse FFT plot (new diagnostic window)
+        self.im3 = self.ax3.imshow(
+            np.zeros((self.params.gridsize, self.params.gridsize)), 
+            origin='lower', cmap='RdBu_r', extent=[0, self.params.L, 0, self.params.L]
+        )
+        self.ax3.set_title('Inverse FFT of Momentum Pattern')
+        self.ax3.set_xlabel('x (physical units)')
+        self.ax3.set_ylabel('y (physical units)')
+        plt.colorbar(self.im3, ax=self.ax3, label='Reconstructed LDOS')
+        
+        # Dispersion plot (moved to ax4) - focus on 2k_F scattering only
+        self.ax4.set_xlabel('k_F (1/length units)')
+        self.ax4.set_ylabel('Energy E')
+        self.ax4.set_title('Dispersion: Theory vs Extracted (2k_F backscattering only)')
+        self.ax4.grid(True, alpha=0.3)
         
         # Theoretical dispersion
         k_theory = np.linspace(-self.params.k_F_max * 1.2, self.params.k_F_max * 1.2, 400)
         E_theory = k_theory**2
-        self.ax3.plot(k_theory, E_theory, 'b-', linewidth=2, label='Theory: E = k²')
+        self.ax4.plot(k_theory, E_theory, 'b-', linewidth=2, label='Theory: E = k²')
         
-        # Extracted points (will be updated)
-        if n_imp > 1:
-            scatter_label = 'Extracted from q=2k_F'
-        else:
-            scatter_label = 'Extracted from q=k_F'
-        self.extracted_scatter = self.ax3.scatter(
-            [], [], c='red', s=50, alpha=0.7, label=scatter_label
+        # Extracted points for 2k_F scattering only
+        self.extracted_scatter = self.ax4.scatter(
+            [], [], c='red', s=50, alpha=0.7, label='From q=2k_F peaks'
         )
         
-        self.ax3.legend()
-        self.ax3.set_xlim(-self.params.k_F_max * 1.2, self.params.k_F_max * 1.2)
-        self.ax3.set_ylim(0, self.params.E_max * 1.05)
+        self.ax4.legend()
+        self.ax4.set_xlim(-self.params.k_F_max * 1.2, self.params.k_F_max * 1.2)
+        self.ax4.set_ylim(0, self.params.E_max * 1.05)
         
         # Energy text
         self.energy_text = self.ax1.text(
@@ -711,25 +550,25 @@ class QPIVisualizer:
         k_F = self.sim.energy_to_kF(energy)
         
         # Run simulation
-        LDOS, fft_display, peak_q = self.sim.run_single_energy(energy)
+        LDOS, fft_display, fft_complex, peak_q = self.sim.run_single_energy(energy)
         
         # Update plots
         self._update_real_space_plot(LDOS, energy, k_F)
         self._update_momentum_plot(fft_display)
+        self._update_inverse_fft_plot(fft_complex)
         self._update_circle(k_F)
         self._update_dispersion_plot(peak_q)
         
         # Return artists for animation
-        artists = [self.im1, self.im2, self.circle_line, self.energy_text, self.extracted_scatter]
-        if self.circle_2kF_line is not None:
-            artists.append(self.circle_2kF_line)
+        artists = [self.im1, self.im2, self.im3, self.circle_2kF_line, self.energy_text, self.extracted_scatter]
         return artists
     
     def _update_real_space_plot(self, LDOS: np.ndarray, energy: float, k_F: float):
         """Update the real space LDOS plot."""
         self.im1.set_data(LDOS)
-        vmax = np.percentile(np.abs(LDOS), 99)
-        self.im1.set_clim(vmin=0, vmax=vmax)
+        # Use symmetric color scale for LDOS
+        vmax = np.max(np.abs(LDOS))
+        self.im1.set_clim(vmin=-vmax, vmax=vmax)
         self.ax1.set_title(f"LDOS (E = {energy:.3f}, k_F = {k_F:.2f})")
         self.energy_text.set_text(f'E = {energy:.2f}\nk_F = {k_F:.2f}')
         
@@ -759,25 +598,38 @@ class QPIVisualizer:
         vmin_fft = np.percentile(fft_cropped, 5)
         self.im2.set_clim(vmin=vmin_fft, vmax=vmax_fft)
     
+    def _update_inverse_fft_plot(self, fft_complex: np.ndarray):
+        """Update the inverse FFT plot to show what features contribute to artifacts."""
+        # Take the inverse FFT of the complex momentum space pattern
+        # This will show us what spatial features the momentum patterns correspond to
+        inverse_fft = np.fft.ifft2(np.fft.ifftshift(fft_complex))
+        inverse_fft_real = np.real(inverse_fft)
+        
+        # Update the plot
+        self.im3.set_data(inverse_fft_real)
+        
+        # Use symmetric color scale
+        vmax = np.max(np.abs(inverse_fft_real))
+        if vmax > 0:
+            self.im3.set_clim(vmin=-vmax, vmax=vmax)
+        
+        # Update title with information
+        self.ax3.set_title(f'Inverse FFT of Momentum Pattern\nShows spatial origin of k-space features')
+    
     def _update_circle(self, k_F: float):
-        """Update the theoretical circles."""
+        """Update the theoretical 2k_F circle."""
         theta = np.linspace(0, 2*np.pi, 100)
         
-        # Update k_F circle
-        circle_x = k_F * np.cos(theta)
-        circle_y = k_F * np.sin(theta)
-        self.circle_line.set_data(circle_x, circle_y)
-        
-        # Update 2k_F circle if it exists (multiple impurities)
-        if self.circle_2kF_line is not None:
-            circle_2kF_x = 2 * k_F * np.cos(theta)
-            circle_2kF_y = 2 * k_F * np.sin(theta)
-            self.circle_2kF_line.set_data(circle_2kF_x, circle_2kF_y)
+        # Update 2k_F circle only
+        circle_2kF_x = 2 * k_F * np.cos(theta)
+        circle_2kF_y = 2 * k_F * np.sin(theta)
+        self.circle_2kF_line.set_data(circle_2kF_x, circle_2kF_y)
     
     def _update_dispersion_plot(self, peak_q: Optional[float]):
-        """Update the dispersion plot with new extracted points."""
+        """Update the dispersion plot with new extracted 2k_F points."""
         self.sim.update_dispersion_data(peak_q)
         
+        # Update 2k_F scattering points only
         if len(self.sim.extracted_k) > 0:
             self.extracted_scatter.set_offsets(
                 np.column_stack([self.sim.extracted_k, self.sim.extracted_E])
@@ -819,9 +671,13 @@ def main():
     ani = visualizer.create_animation(filename)
     
     # Show final dispersion data
-    if len(simulation.extracted_k) > 0:
-        print(f"\nExtracted {len(simulation.extracted_k)} dispersion points")
-        print(f"Energy range covered: {min(simulation.extracted_E):.2f} to {max(simulation.extracted_E):.2f}")
+    total_points = len(simulation.extracted_k)
+    
+    if total_points > 0:
+        print(f"\nExtracted {total_points} dispersion points from 2k_F scattering")
+        print(f"Energy range: {min(simulation.extracted_E):.2f} to {max(simulation.extracted_E):.2f}")
+    else:
+        print("\nNo 2k_F scattering points extracted")
 
 
 if __name__ == "__main__":
