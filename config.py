@@ -23,7 +23,7 @@ class SimulationConfig:
     # Physical parameters
     t: float = 0.3
     mu: float = 0.0
-    eta: float = 0.1
+    eta: float = 0.9  # Sharper energy broadening
     V_s: float = 1.0
     
     # Energy sweep
@@ -60,52 +60,30 @@ HIGH_QUALITY_SINGLE = SimulationConfig(
     n_frames=30,
     E_min=3.0,
     E_max=30.0,
-    V_s=-2.0  # Attractive impurity
+    V_s=-1.0,  # Moderate strength for clean scattering
 )
 
 # Fast preview simulation
 FAST_PREVIEW = SimulationConfig(
     name="fast_preview",
     description="Quick preview with reduced quality",
-    gridsize=256,
-    n_frames=10,
-    E_min=5.0,
-    E_max=15.0,
+    gridsize=512,  # Reasonable resolution
+    n_frames=15,
+    E_min=20.0,  # Higher energy for better defined Fermi surface
+    E_max=50.0,  # Narrower range for more focused analysis
+    V_s=3.0,  # Slightly weaker to avoid over-scattering
     zoom_factor=1.0  # No zoom
 )
 
 # N-impurity random configurations
-RANDOM_2_IMPURITIES = SimulationConfig(
-    name="random_2_impurities",
-    description="Two randomly placed impurities",
-    gridsize=512,
-    n_frames=20,
-    E_min=5.0,
-    E_max=25.0,
-    V_s=-2.0,  # Attractive impurities for LDOS enhancement
-    disorder_strength=0.02
-)
-
-RANDOM_3_IMPURITIES = SimulationConfig(
-    name="random_3_impurities", 
-    description="Three randomly placed impurities",
-    gridsize=512,
-    n_frames=20,
-    E_min=5.0,
-    E_max=25.0,
-    V_s=-2.0,  # Attractive impurities
-    disorder_strength=0.02
-)
-
 RANDOM_5_IMPURITIES = SimulationConfig(
     name="random_5_impurities",
     description="Five randomly placed impurities",
     gridsize=512,
     n_frames=20,
     E_min=5.0,
-    E_max=25.0,
+    E_max=50.0,
     V_s=-1.5,  # Moderately attractive
-    disorder_strength=0.02
 )
 
 RANDOM_10_IMPURITIES = SimulationConfig(
@@ -114,42 +92,29 @@ RANDOM_10_IMPURITIES = SimulationConfig(
     gridsize=512,
     n_frames=10,
     E_min=5.0,
-    E_max=25.0,
-    V_s=-1.2,  # Mildly attractive
-    disorder_strength=0.01
+    E_max=50.0,
+    V_s=-1.0,  
 )
 
 RANDOM_30_IMPURITIES = SimulationConfig(
     name="random_30_impurities",
     description="Thirty randomly placed impurities",
-    gridsize=512,
-    n_frames=30,
+    gridsize=1024,  # Larger grid for better spacing
+    n_frames=20,    # Reduced frames for faster computation
     E_min=5.0,
-    E_max=25.0,
-    V_s=-1.0,  # Weakly attractive
-    disorder_strength=0.01
+    E_max=50.0,
+    V_s=-0.3,       # Much weaker impurities for numerical stability
 )
-# Distributed impurity configurations
-DISTRIBUTED_5_IMPURITIES = SimulationConfig(
-    name="distributed_5_impurities",
-    description="Five impurities distributed across the grid",
+
+# Dynamic N-impurity configuration template
+RANDOM_N_IMPURITIES_TEMPLATE = SimulationConfig(
+    name="random_N_impurities",
+    description="N randomly placed impurities (dynamic)",
     gridsize=512,
     n_frames=20,
     E_min=5.0,
     E_max=25.0,
-    V_s=-3.0,  # Strong attractive for clear visibility
-    disorder_strength=0.01
-)
-
-DISTRIBUTED_10_IMPURITIES = SimulationConfig(
-    name="distributed_10_impurities", 
-    description="Ten impurities distributed across the grid",
-    gridsize=512,
-    n_frames=10,  # Reduced from 20 for faster execution
-    E_min=5.0,
-    E_max=25.0,
-    V_s=-2.5,  # Strong attractive for visibility
-    disorder_strength=0.01
+    V_s=-1.5,  # Default moderately attractive
 )
 
 
@@ -181,7 +146,8 @@ def setup_n_random_positions(config: SimulationConfig, n_impurities: int, seed: 
     # Calculate density and adjust min_distance accordingly
     density = n_impurities / available_area
     # Use sqrt of inverse density as rough min_distance, with reasonable bounds
-    min_distance = max(8, min(25, int(np.sqrt(1.0 / density) * 0.5)))
+    # Much larger minimum distances for numerical stability without smoothing
+    min_distance = max(25, min(60, int(np.sqrt(1.0 / density) * 1.2)))
     
     max_attempts = 1000
     
@@ -257,50 +223,49 @@ def setup_n_random_positions(config: SimulationConfig, n_impurities: int, seed: 
     print(f"Successfully placed {len(config.impurity_positions)} impurities")
     return config.impurity_positions
 
-# Strong scattering regime
-STRONG_SCATTERING = SimulationConfig(
-    name="strong_scattering",
-    description="Strong impurity scattering (unitarity limit)",
-    gridsize=512,
-    n_frames=20,
-    V_s=10.0,  # Very strong impurity
-    eta=0.05,  # Sharper features
-    E_min=5.0,
-    E_max=25.0
-)
 
-# Weak scattering regime
-WEAK_SCATTERING = SimulationConfig(
-    name="weak_scattering",
-    description="Weak impurity scattering (Born approximation)",
-    gridsize=512,
-    n_frames=20,
-    V_s=0.1,   # Weak impurity
-    eta=0.15,  # Broader features
-    E_min=5.0,
-    E_max=25.0
-)
-
-# High energy resolution
-HIGH_ENERGY_RESOLUTION = SimulationConfig(
-    name="high_energy_resolution",
-    description="Fine energy steps for detailed dispersion",
-    gridsize=512,
-    n_frames=50,  # Many energy steps
-    E_min=5.0,
-    E_max=20.0,
-    eta=0.05  # Sharp energy resolution
-)
-
-# Wide energy range
-WIDE_ENERGY_RANGE = SimulationConfig(
-    name="wide_energy_range",
-    description="Exploration of wide energy range",
-    gridsize=512,
-    n_frames=25,
-    E_min=1.0,
-    E_max=50.0
-)
+def create_random_n_config(n_impurities: int) -> SimulationConfig:
+    """
+    Create a dynamic configuration for N randomly placed impurities.
+    
+    Args:
+        n_impurities: Number of impurities to place
+    
+    Returns:
+        SimulationConfig: Configured simulation with N impurities
+    """
+    # Create a copy of the template
+    import copy
+    config = copy.deepcopy(RANDOM_N_IMPURITIES_TEMPLATE)
+    
+    # Update name and description
+    config.name = f"random_{n_impurities}_impurities"
+    config.description = f"{n_impurities} randomly placed impurities"
+    
+    # Adjust parameters based on number of impurities
+    if n_impurities == 1:
+        config.V_s = -1.0  # Moderate strength for sharp scattering  
+        config.n_frames = 20
+        config.gridsize = max(512, config.gridsize)  # Ensure good resolution
+    elif n_impurities <= 5:
+        config.V_s = -1.0  # Few impurities - moderate strength for sharpness
+        config.n_frames = 20
+    elif n_impurities <= 15:
+        config.V_s = -1.0  # Many impurities - reduce strength
+        config.n_frames = 15
+    elif n_impurities <= 25:
+        config.V_s = -0.7  # More impurities - weaker for stability
+        config.n_frames = 12
+        config.gridsize = 1024 if config.gridsize < 1024 else config.gridsize
+    else:
+        config.V_s = -0.3  # Many impurities - very weak to avoid numerical issues
+        config.n_frames = 10  # Faster for large numbers
+        config.gridsize = 1024 if config.gridsize < 1024 else config.gridsize
+    
+    # Setup random positions
+    setup_n_random_positions(config, n_impurities, distributed=True)
+    
+    return config
 
 
 # ============================================================================
@@ -309,63 +274,75 @@ WIDE_ENERGY_RANGE = SimulationConfig(
 
 def get_config(config_name: str) -> SimulationConfig:
     """
-    Get a predefined configuration by name.
+    Get a predefined configuration by name or create a dynamic N-impurity configuration.
     
     Available configurations:
     - 'high_quality_single': High-resolution single impurity
     - 'fast_preview': Quick preview simulation
-    - 'random_2_impurities': Two randomly placed impurities (clustered)
-    - 'random_3_impurities': Three randomly placed impurities (clustered)
-    - 'random_5_impurities': Five randomly placed impurities (clustered)
-    - 'random_10_impurities': Ten randomly placed impurities (clustered)
-    - 'distributed_5_impurities': Five impurities distributed across grid
-    - 'distributed_10_impurities': Ten impurities distributed across grid
-    - 'strong_scattering': Strong impurity strength
-    - 'weak_scattering': Weak impurity strength
-    - 'high_energy_resolution': Many energy steps
-    - 'wide_energy_range': Large energy range
+    - 'random_5_impurities': Five randomly placed impurities
+    - 'random_10_impurities': Ten randomly placed impurities
+    - 'random_30_impurities': Thirty randomly placed impurities
+    - 'random_N_impurities' where N is any integer: Dynamic N impurities
+    
+    Examples:
+    - get_config('random_7_impurities') -> 7 randomly placed impurities
+    - get_config('random_25_impurities') -> 25 randomly placed impurities
+    - get_config('random_5_impurities') -> Uses preset configuration
     """
     
-    configs = {
+    # Predefined configurations
+    preset_configs = {
         'high_quality_single': HIGH_QUALITY_SINGLE,
         'fast_preview': FAST_PREVIEW,
-        'random_2_impurities': RANDOM_2_IMPURITIES,
-        'random_3_impurities': RANDOM_3_IMPURITIES,
         'random_5_impurities': RANDOM_5_IMPURITIES,
         'random_10_impurities': RANDOM_10_IMPURITIES,
         'random_30_impurities': RANDOM_30_IMPURITIES,
-        'distributed_5_impurities': DISTRIBUTED_5_IMPURITIES,
-        'distributed_10_impurities': DISTRIBUTED_10_IMPURITIES,
-        'strong_scattering': STRONG_SCATTERING,
-        'weak_scattering': WEAK_SCATTERING,
-        'high_energy_resolution': HIGH_ENERGY_RESOLUTION,
-        'wide_energy_range': WIDE_ENERGY_RANGE,
     }
     
-    if config_name not in configs:
-        available = ', '.join(configs.keys())
-        raise ValueError(f"Unknown config '{config_name}'. Available: {available}")
+    # Check if it's a preset configuration
+    if config_name in preset_configs:
+        config = preset_configs[config_name]
+        
+        # Setup special position configurations for presets
+        if config_name == 'random_5_impurities':
+            setup_n_random_positions(config, 5, distributed=True)
+        elif config_name == 'random_10_impurities':
+            setup_n_random_positions(config, 10, distributed=True)
+        elif config_name == 'random_30_impurities':
+            setup_n_random_positions(config, 30, distributed=True)
+        
+        return config
     
-    config = configs[config_name]
+    # Check if it's a dynamic random_N_impurities configuration
+    if config_name.startswith('random_') and config_name.endswith('_impurities'):
+        try:
+            # Extract N from 'random_N_impurities'
+            n_str = config_name[7:-11]  # Remove 'random_' and '_impurities'
+            n_impurities = int(n_str)
+            
+            if n_impurities <= 0:
+                raise ValueError(f"Number of impurities must be positive, got {n_impurities}")
+            
+            # Check if this should fall back to a preset
+            fallback_name = f"random_{n_impurities}_impurities"
+            if fallback_name in preset_configs:
+                print(f"Using preset configuration for {fallback_name}")
+                return get_config(fallback_name)
+            
+            # Create dynamic configuration
+            print(f"Creating dynamic configuration for {n_impurities} impurities")
+            return create_random_n_config(n_impurities)
+            
+        except ValueError as e:
+            if "invalid literal for int()" in str(e):
+                raise ValueError(f"Invalid format '{config_name}'. Use 'random_N_impurities' where N is an integer.")
+            else:
+                raise e
     
-    # Setup special position configurations
-    # All "random" configs now use distributed=True for truly random placement
-    if config_name == 'random_2_impurities':
-        setup_n_random_positions(config, 2, distributed=True)
-    elif config_name == 'random_3_impurities':
-        setup_n_random_positions(config, 3, distributed=True)
-    elif config_name == 'random_5_impurities':
-        setup_n_random_positions(config, 5, distributed=True)
-    elif config_name == 'random_10_impurities':
-        setup_n_random_positions(config, 10, distributed=True)
-    elif config_name == 'random_30_impurities':
-        setup_n_random_positions(config, 30, distributed=True)
-    elif config_name == 'distributed_5_impurities':
-        setup_n_random_positions(config, 5, distributed=True)
-    elif config_name == 'distributed_10_impurities':
-        setup_n_random_positions(config, 10, distributed=True)
-    
-    return config
+    # If we get here, it's an unknown configuration
+    available_presets = ', '.join(preset_configs.keys())
+    raise ValueError(f"Unknown config '{config_name}'. Available presets: {available_presets}. "
+                    f"Or use 'random_N_impurities' format where N is any positive integer.")
 
 
 def list_available_configs():
@@ -373,23 +350,21 @@ def list_available_configs():
     configs = [
         ('high_quality_single', HIGH_QUALITY_SINGLE),
         ('fast_preview', FAST_PREVIEW),
-        ('random_2_impurities', RANDOM_2_IMPURITIES),
-        ('random_3_impurities', RANDOM_3_IMPURITIES),
         ('random_5_impurities', RANDOM_5_IMPURITIES),
         ('random_10_impurities', RANDOM_10_IMPURITIES),
         ('random_30_impurities', RANDOM_30_IMPURITIES),
-        ('distributed_5_impurities', DISTRIBUTED_5_IMPURITIES),
-        ('distributed_10_impurities', DISTRIBUTED_10_IMPURITIES),
-        ('strong_scattering', STRONG_SCATTERING),
-        ('weak_scattering', WEAK_SCATTERING),
-        ('high_energy_resolution', HIGH_ENERGY_RESOLUTION),
-        ('wide_energy_range', WIDE_ENERGY_RANGE),
     ]
     
     print("Available QPI Simulation Configurations:")
     print("=" * 50)
     for name, config in configs:
         print(f"{name:25}: {config.description}")
+    
+    print("\nDynamic Configurations:")
+    print("-" * 25)
+    print("random_N_impurities      : N randomly placed impurities (any positive integer)")
+    print("                          Examples: random_1_impurities, random_7_impurities, random_50_impurities")
+    print("                          Note: Falls back to preset if N=5,10,30")
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ class SystemParameters:
     L: float = 50.0  # Physical system size
     t: float = 0.3   # Hopping parameter
     mu: float = 0.0  # Chemical potential
-    eta: float = 0.1 # Broadening for Green's function
+    eta: float = 0.1  # Energy broadening parameter (overridden by config)
     V_s: float = 1.0 # Impurity strength
     
     # Energy sweep parameters
@@ -125,7 +125,7 @@ class GreensFunction:
         if energy_key in self._G0_cache:
             return self._G0_cache[energy_key]
             
-        Gk = 1.0 / (energy - self.epsilon_k + 8j*self.params.eta)
+        Gk = 1.0 / (energy - self.epsilon_k + 1j*self.params.eta)
         
         # Apply FFT with proper normalization
         # The k-space integral ∫ dk² /(2π)² becomes sum * (dk)² / (2π)²  
@@ -237,7 +237,11 @@ class ImpuritySystem:
             # Check condition number to ensure matrix is well-conditioned
             cond_num = np.linalg.cond(matrix_to_invert)
             
-            if cond_num > 1e12:
+            # Much stricter condition number threshold for numerical stability
+            max_cond = 1e6  # Very strict threshold to avoid numerical noise
+            
+            if cond_num > max_cond:
+                print(f"Warning: Matrix ill-conditioned (cond={cond_num:.2e}), using independent impurities")
                 raise np.linalg.LinAlgError(f"Matrix is ill-conditioned (cond={cond_num:.2e})")
             
             T_matrix = np.linalg.solve(matrix_to_invert, V)
@@ -323,14 +327,24 @@ class QPIAnalyzer:
         return LDOS
     
     def calculate_FFT(self, LDOS_processed: np.ndarray) -> tuple:
-        """Calculate FFT for QPI analysis - return both complex and magnitude data."""
+        """Calculate FFT for QPI analysis - completely raw, no smoothing."""
         # In QPI analysis, we take FFT of the LDOS modulations δρ(r)
         # Common preprocessing: subtract the spatial average to remove DC component
-        LDOS_zero_mean = LDOS_processed - np.mean(LDOS_processed)
+        N = LDOS_processed.shape[0]
+        alpha = 0.3  # Tukey shape (0 = rectangular, 1 = Hann), tweak 0.1-0.3
+        tukey1d = np.hanning(N) * alpha + (1 - alpha)  # simple compromise; or use scipy.signal.tukey
+        window2d = np.outer(tukey1d, tukey1d)
+
+        LDOS_windowed = LDOS_processed * window2d
+        LDOS_zero_mean = LDOS_windowed - np.mean(LDOS_windowed)
         
         # Take 2D FFT and shift zero frequency to center
         LDOS_fft_complex = np.fft.fftshift(np.fft.fft2(LDOS_zero_mean))
-        
+        center = LDOS_fft_complex.shape[0] // 2
+        radius = 10  # try 10–15 pixels instead of 2
+        Y, X = np.ogrid[:LDOS_fft_complex.shape[0], :LDOS_fft_complex.shape[1]]
+        mask = (X - center)**2 + (Y - center)**2 < radius**2
+        LDOS_fft_complex[mask] = 0
         # Return both complex FFT and magnitude squared for different uses
         magnitude_squared = np.abs(LDOS_fft_complex)**2
         return LDOS_fft_complex, magnitude_squared
@@ -406,7 +420,7 @@ class QPISimulation:
         LDOS_processed = self.analyzer.process_LDOS(LDOS)
         fft_complex, fft_display = self.analyzer.calculate_FFT(LDOS_processed)
         
-        # Extract QPI peak from the cropped FFT data (same as what's displayed)
+        # Extract QPI peak from cropped FFT data (for analysis, while display shows full data)
         k_display_max = max(2 * self.params.k_F_max * 1.3, 8.0)
         center = self.params.gridsize // 2
         n_pixels = int(k_display_max / self.greens.dk)
@@ -467,28 +481,26 @@ class QPIVisualizer:
     def _setup_figure(self):
         """Initialize the figure and subplots."""
         self.fig, (self.ax1, self.ax2, self.ax3, self.ax4) = plt.subplots(
-            1, 4, figsize=(32, 8), dpi=100
+            1, 4, figsize=(32, 8), dpi=300
         )
         
         # Real space LDOS plot
         self.im1 = self.ax1.imshow(
             np.zeros((self.params.gridsize, self.params.gridsize)), 
-            origin='lower', cmap='plasma', extent=[0, self.params.L, 0, self.params.L]
+            origin='lower', cmap='inferno', extent=[0, self.params.L, 0, self.params.L]
         )
         self.ax1.set_title("LDOS around impurities")
         self.ax1.set_xlabel('x (physical units)')
         self.ax1.set_ylabel('y (physical units)')
         plt.colorbar(self.im1, ax=self.ax1, label='LDOS')
         
-        # Momentum space plot
-        k_display_max = max(2 * self.params.k_F_max * 1.3, 8.0)
-        n_pixels = int(k_display_max / self.sim.greens.dk)
-        n_pixels = min(n_pixels, self.params.gridsize//2)
-        init_size = 2 * n_pixels
+        # Momentum space plot - show full k-space
+        # Calculate the full k-space range based on grid spacing
+        k_max_full = np.pi / self.sim.greens.dk  # Nyquist limit
         
         self.im2 = self.ax2.imshow(
-            np.zeros((init_size, init_size)), origin='lower', cmap='plasma',
-            extent=[-k_display_max, k_display_max, -k_display_max, k_display_max]
+            np.zeros((self.params.gridsize, self.params.gridsize)), origin='lower', cmap='plasma',
+            extent=[-k_max_full, k_max_full, -k_max_full, k_max_full]
         )
         self.ax2.set_title('Momentum Space: QPI Pattern')
         self.ax2.set_xlabel('kx (1/a)')
@@ -496,16 +508,7 @@ class QPIVisualizer:
         self.ax2.grid(True, alpha=0.3)
         plt.colorbar(self.im2, ax=self.ax2, label='log|FFT(LDOS)|')
         
-        # Add 2k_F circle only (focus on backscattering)
-        theta = np.linspace(0, 2*np.pi, 100)
-        k_F_init = self.sim.energy_to_kF(self.params.E_min)
-        circle_2kF_x = 2 * k_F_init * np.cos(theta)
-        circle_2kF_y = 2 * k_F_init * np.sin(theta)
-        self.circle_2kF_line, = self.ax2.plot(
-            circle_2kF_x, circle_2kF_y, 'r-', linewidth=3, alpha=0.8, label='q = 2k_F (backscattering)'
-        )
-        
-        self.ax2.legend()
+        # No theoretical circles - clean momentum space view
         
         # Inverse FFT plot (new diagnostic window)
         self.im3 = self.ax3.imshow(
@@ -520,7 +523,7 @@ class QPIVisualizer:
         # Dispersion plot (moved to ax4) - focus on 2k_F scattering only
         self.ax4.set_xlabel('k_F (1/length units)')
         self.ax4.set_ylabel('Energy E')
-        self.ax4.set_title('Dispersion: Theory vs Extracted (2k_F backscattering only)')
+        self.ax4.set_title('Dispersion: Theory vs Extracted')
         self.ax4.grid(True, alpha=0.3)
         
         # Theoretical dispersion
@@ -556,11 +559,10 @@ class QPIVisualizer:
         self._update_real_space_plot(LDOS, energy, k_F)
         self._update_momentum_plot(fft_display)
         self._update_inverse_fft_plot(fft_complex)
-        self._update_circle(k_F)
         self._update_dispersion_plot(peak_q)
         
         # Return artists for animation
-        artists = [self.im1, self.im2, self.im3, self.circle_2kF_line, self.energy_text, self.extracted_scatter]
+        artists = [self.im1, self.im2, self.im3, self.energy_text, self.extracted_scatter]
         return artists
     
     def _update_real_space_plot(self, LDOS: np.ndarray, energy: float, k_F: float):
@@ -584,18 +586,17 @@ class QPIVisualizer:
             self.ax1.legend(loc='upper right')
     
     def _update_momentum_plot(self, fft_display: np.ndarray):
-        """Update the momentum space plot."""
-        k_display_max = max(2 * self.params.k_F_max * 1.3, 8.0)
-        center = self.params.gridsize // 2
-        n_pixels = int(k_display_max / self.sim.greens.dk)
-        n_pixels = min(n_pixels, self.params.gridsize//2)
+        """Update the momentum space plot with full k-space view."""
+        # Show full FFT data without cropping
+        self.im2.set_data(fft_display)
         
-        fft_cropped = fft_display[center-n_pixels:center+n_pixels, center-n_pixels:center+n_pixels]
+        # Calculate full k-space extent
+        k_max_full = np.pi / self.sim.greens.dk  # Nyquist limit
+        self.im2.set_extent([-k_max_full, k_max_full, -k_max_full, k_max_full])
         
-        self.im2.set_data(fft_cropped)
-        self.im2.set_extent([-k_display_max, k_display_max, -k_display_max, k_display_max])
-        vmax_fft = np.percentile(fft_cropped, 95)
-        vmin_fft = np.percentile(fft_cropped, 5)
+        # Set color limits based on full data
+        vmax_fft = np.percentile(fft_display, 95)
+        vmin_fft = np.percentile(fft_display, 5)
         self.im2.set_clim(vmin=vmin_fft, vmax=vmax_fft)
     
     def _update_inverse_fft_plot(self, fft_complex: np.ndarray):
@@ -615,15 +616,6 @@ class QPIVisualizer:
         
         # Update title with information
         self.ax3.set_title(f'Inverse FFT of Momentum Pattern\nShows spatial origin of k-space features')
-    
-    def _update_circle(self, k_F: float):
-        """Update the theoretical 2k_F circle."""
-        theta = np.linspace(0, 2*np.pi, 100)
-        
-        # Update 2k_F circle only
-        circle_2kF_x = 2 * k_F * np.cos(theta)
-        circle_2kF_y = 2 * k_F * np.sin(theta)
-        self.circle_2kF_line.set_data(circle_2kF_x, circle_2kF_y)
     
     def _update_dispersion_plot(self, peak_q: Optional[float]):
         """Update the dispersion plot with new extracted 2k_F points."""
