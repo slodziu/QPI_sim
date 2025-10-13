@@ -50,17 +50,22 @@ def run_simulation(config_name: str):
         outputs_dir = "outputs"
         if not os.path.exists(outputs_dir):
             os.makedirs(outputs_dir)
-        filename = os.path.join(outputs_dir, f"qpi_{config.name}.gif")
+        anim_filename = os.path.join(outputs_dir, f"qpi_{config.name}.mp4")
+        snapshot_filename = os.path.join(outputs_dir, f"qpi_{config.name}_snapshot.png")
         
-        # Create animation
-        ani = visualizer.create_animation(filename)
+        # Create animation as MP4
+        ani = visualizer.create_animation(anim_filename)
+        
+        # Save snapshot at mid-energy
+        visualizer.save_mid_energy_snapshot(snapshot_filename)
         
         # Print results
         print(f"\nSimulation completed!")
         print(f"Extracted {len(simulation.extracted_k)} dispersion points")
         if len(simulation.extracted_E) > 0:
             print(f"Energy range: {min(simulation.extracted_E):.2f} to {max(simulation.extracted_E):.2f}")
-        print(f"Animation saved as: {filename}")
+        print(f"Animation saved as: {anim_filename}")
+        print(f"Snapshot saved as: {snapshot_filename}")
         
     except ValueError as e:
         print(f"Error: {e}")

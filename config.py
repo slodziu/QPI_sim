@@ -67,11 +67,11 @@ HIGH_QUALITY_SINGLE = SimulationConfig(
 FAST_PREVIEW = SimulationConfig(
     name="fast_preview",
     description="Quick preview with reduced quality",
-    gridsize=512,  # Reasonable resolution
-    n_frames=15,
-    E_min=3.0,  # Higher energy for better defined Fermi surface
-    E_max=20.0,  # Narrower range for more focused analysis
-    V_s=1.0,  # Slightly weaker to avoid over-scattering
+    gridsize=512,  # Much smaller for fast computation (16x faster than 512!)
+    n_frames=10,   # Fewer frames for quick preview
+    E_min=3.0,     # Higher energy for better defined Fermi surface
+    E_max=20.0,    # Narrower range for more focused analysis
+    V_s=1.0,       # Slightly weaker to avoid over-scattering
     zoom_factor=1.0  # No zoom
 )
 
@@ -93,7 +93,7 @@ RANDOM_10_IMPURITIES = SimulationConfig(
     n_frames=10,
     E_min=5.0,
     E_max=50.0,
-    V_s=1.0,  
+    V_s=1.5,  
 )
 
 RANDOM_30_IMPURITIES = SimulationConfig(
@@ -103,7 +103,7 @@ RANDOM_30_IMPURITIES = SimulationConfig(
     n_frames=20,    # Reduced frames for faster computation
     E_min=5.0,
     E_max=50.0,
-    V_s=0.3,       # Much weaker impurities for numerical stability
+    V_s=1.5,       # Much weaker impurities for numerical stability
 )
 
 # Dynamic N-impurity configuration template

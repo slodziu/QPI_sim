@@ -469,8 +469,9 @@ class QPIVisualizer:
         
     def _setup_figure(self):
         """Initialize the figure and subplots."""
-        self.fig, (self.ax1, self.ax2, self.ax3, self.ax4) = plt.subplots(
-            1, 4, figsize=(32, 8), dpi=300
+        # Using 3 panels instead of 4 (inverse FFT commented out)
+        self.fig, (self.ax1, self.ax2, self.ax4) = plt.subplots(
+            1, 3, figsize=(24, 8), dpi=100  # Lower DPI for faster rendering
         )
         
         # Real space LDOS plot
@@ -483,13 +484,14 @@ class QPIVisualizer:
         self.ax1.set_ylabel('y (physical units)')
         plt.colorbar(self.im1, ax=self.ax1, label='LDOS')
         
-        # Momentum space plot - zoom to relevant k-space region
-        # Show up to 3x the maximum 2k_F to include context
-        k_display_max = 3 * 2 * self.params.k_F_max
+        # Momentum space plot - use actual k-space range based on FFT grid
+        # The FFT k-space extent is determined by dk = 2π/L and gridsize
+        dk = 2 * np.pi / self.params.L
+        k_actual_max = dk * self.params.gridsize / 2
         
         self.im2 = self.ax2.imshow(
             np.zeros((self.params.gridsize, self.params.gridsize)), origin='lower', cmap='plasma',
-            extent=[-k_display_max, k_display_max, -k_display_max, k_display_max]
+            extent=[-k_actual_max, k_actual_max, -k_actual_max, k_actual_max]
         )
         self.ax2.set_title('Momentum Space: QPI Pattern')
         self.ax2.set_xlabel('kx (1/a)')
@@ -499,15 +501,15 @@ class QPIVisualizer:
         
         # No theoretical circles - clean momentum space view
         
-        # Inverse FFT plot (new diagnostic window)
-        self.im3 = self.ax3.imshow(
-            np.zeros((self.params.gridsize, self.params.gridsize)), 
-            origin='lower', cmap='RdBu_r', extent=[0, self.params.L, 0, self.params.L]
-        )
-        self.ax3.set_title('Inverse FFT of Momentum Pattern')
-        self.ax3.set_xlabel('x (physical units)')
-        self.ax3.set_ylabel('y (physical units)')
-        plt.colorbar(self.im3, ax=self.ax3, label='Reconstructed LDOS')
+        # Inverse FFT plot - COMMENTED OUT (not needed for now)
+        # self.im3 = self.ax3.imshow(
+        #     np.zeros((self.params.gridsize, self.params.gridsize)), 
+        #     origin='lower', cmap='RdBu_r', extent=[0, self.params.L, 0, self.params.L]
+        # )
+        # self.ax3.set_title('Inverse FFT of Momentum Pattern')
+        # self.ax3.set_xlabel('x (physical units)')
+        # self.ax3.set_ylabel('y (physical units)')
+        # plt.colorbar(self.im3, ax=self.ax3, label='Reconstructed LDOS')
         
         # Dispersion plot (moved to ax4) - focus on 2k_F scattering only
         self.ax4.set_xlabel('k_F (1/length units)')
@@ -547,11 +549,11 @@ class QPIVisualizer:
         # Update plots
         self._update_real_space_plot(LDOS, energy, k_F)
         self._update_momentum_plot(fft_display)
-        self._update_inverse_fft_plot(fft_complex)
+        # self._update_inverse_fft_plot(fft_complex)  # Commented out - not needed
         self._update_dispersion_plot(peak_q)
         
         # Return artists for animation
-        artists = [self.im1, self.im2, self.im3, self.energy_text, self.extracted_scatter]
+        artists = [self.im1, self.im2, self.energy_text, self.extracted_scatter]
         return artists
     
     def _update_real_space_plot(self, LDOS: np.ndarray, energy: float, k_F: float):
@@ -575,38 +577,40 @@ class QPIVisualizer:
             self.ax1.legend(loc='upper right')
     
     def _update_momentum_plot(self, fft_display: np.ndarray):
-        """Update the momentum space plot with zoomed view showing only relevant k-space."""
+        """Update the momentum space plot with correct k-space scaling."""
         # Use LOG SCALE to show the thin ring clearly
         fft_log = np.log10(fft_display + 1)  # Add 1 to avoid log(0)
         
         self.im2.set_data(fft_log)
         
-        # Zoom to show only relevant k-space (3x the maximum 2k_F to include some context)
-        k_display_max = 3 * 2 * self.params.k_F_max  # Show up to 3x the max 2k_F
-        self.im2.set_extent([-k_display_max, k_display_max, -k_display_max, k_display_max])
+        # Use actual k-space range based on dk and gridsize (NOT based on k_F_max!)
+        dk = 2 * np.pi / self.params.L
+        k_actual_max = dk * self.params.gridsize / 2
+        self.im2.set_extent([-k_actual_max, k_actual_max, -k_actual_max, k_actual_max])
         
         # Use full range of log data for maximum fidelity
         vmin_fft = np.min(fft_log)
         vmax_fft = np.max(fft_log)
         self.im2.set_clim(vmin=vmin_fft, vmax=vmax_fft)
     
-    def _update_inverse_fft_plot(self, fft_complex: np.ndarray):
-        """Update the inverse FFT plot to show what features contribute to artifacts."""
-        # Take the inverse FFT of the complex momentum space pattern
-        # This will show us what spatial features the momentum patterns correspond to
-        inverse_fft = np.fft.ifft2(np.fft.ifftshift(fft_complex))
-        inverse_fft_real = np.real(inverse_fft)
-        
-        # Update the plot
-        self.im3.set_data(inverse_fft_real)
-        
-        # Use symmetric color scale
-        vmax = np.max(np.abs(inverse_fft_real))
-        if vmax > 0:
-            self.im3.set_clim(vmin=-vmax, vmax=vmax)
-        
-        # Update title with information
-        self.ax3.set_title(f'Inverse FFT of Momentum Pattern\nShows spatial origin of k-space features')
+    # Inverse FFT update - COMMENTED OUT (not needed for now)
+    # def _update_inverse_fft_plot(self, fft_complex: np.ndarray):
+    #     """Update the inverse FFT plot to show what features contribute to artifacts."""
+    #     # Take the inverse FFT of the complex momentum space pattern
+    #     # This will show us what spatial features the momentum patterns correspond to
+    #     inverse_fft = np.fft.ifft2(np.fft.ifftshift(fft_complex))
+    #     inverse_fft_real = np.real(inverse_fft)
+    #     
+    #     # Update the plot
+    #     self.im3.set_data(inverse_fft_real)
+    #     
+    #     # Use symmetric color scale
+    #     vmax = np.max(np.abs(inverse_fft_real))
+    #     if vmax > 0:
+    #         self.im3.set_clim(vmin=-vmax, vmax=vmax)
+    #     
+    #     # Update title with information
+    #     self.ax3.set_title(f'Inverse FFT of Momentum Pattern\nShows spatial origin of k-space features')
     
     def _update_dispersion_plot(self, peak_q: Optional[float]):
         """Update the dispersion plot with new extracted 2k_F points."""
@@ -618,14 +622,59 @@ class QPIVisualizer:
                 np.column_stack([self.sim.extracted_k, self.sim.extracted_E])
             )
     
-    def create_animation(self, filename: str = 'qpi_animation.gif'):
-        """Create and save the animation."""
+    def create_animation(self, filename: str = 'qpi_animation.mp4'):
+        """Create and save the animation as MP4 (or GIF if ffmpeg unavailable)."""
+        # Check if ffmpeg is available
+        import matplotlib
+        writers = matplotlib.animation.writers.list()
+        has_ffmpeg = 'ffmpeg' in writers
+        
+        # Adjust filename and writer based on availability
+        if has_ffmpeg:
+            # Use MP4 if ffmpeg available
+            if filename.endswith('.gif'):
+                filename = filename.replace('.gif', '.mp4')
+            elif not filename.endswith('.mp4'):
+                filename = filename + '.mp4'
+            writer = 'ffmpeg'
+            writer_args = {'fps': 5, 'bitrate': 1800}
+        else:
+            # Fall back to GIF
+            if filename.endswith('.mp4'):
+                filename = filename.replace('.mp4', '.gif')
+            elif not filename.endswith('.gif'):
+                filename = filename + '.gif'
+            writer = 'pillow'
+            writer_args = {'fps': 5}
+            print("Note: ffmpeg not available, saving as GIF instead")
+        
         ani = animation.FuncAnimation(
             self.fig, self.animate_frame, frames=self.params.n_frames, 
             interval=200, blit=True
         )
-        ani.save(filename, writer='pillow', fps=5)
+        
+        # Save animation
+        ani.save(filename, writer=writer, **writer_args)
+        
         return ani
+    
+    def save_mid_energy_snapshot(self, filename: str = 'qpi_snapshot.png'):
+        """Save a static image at the middle energy of the range."""
+        # Calculate mid-point energy
+        mid_energy = (self.params.E_min + self.params.E_max) / 2
+        k_F = self.sim.energy_to_kF(mid_energy)
+        
+        # Run simulation at mid energy
+        LDOS, fft_display, fft_complex, peak_q = self.sim.run_single_energy(mid_energy)
+        
+        # Update all plots
+        self._update_real_space_plot(LDOS, mid_energy, k_F)
+        self._update_momentum_plot(fft_display)
+        self._update_dispersion_plot(peak_q)
+        
+        # Save the figure
+        self.fig.savefig(filename, dpi=150, bbox_inches='tight')
+        print(f"✓ Saved snapshot at E={mid_energy:.2f} to {filename}")
 
 
 def main():
@@ -650,8 +699,14 @@ def main():
     outputs_dir = "outputs"
     if not os.path.exists(outputs_dir):
         os.makedirs(outputs_dir)
-    filename = os.path.join(outputs_dir, 'qpi_greens_function_sweep_clean.gif')
-    ani = visualizer.create_animation(filename)
+    
+    # Save animation as MP4
+    anim_filename = os.path.join(outputs_dir, 'qpi_greens_function_sweep_clean.mp4')
+    ani = visualizer.create_animation(anim_filename)
+    
+    # Save snapshot at mid-energy
+    snapshot_filename = os.path.join(outputs_dir, 'qpi_greens_function_snapshot.png')
+    visualizer.save_mid_energy_snapshot(snapshot_filename)
     
     # Show final dispersion data
     total_points = len(simulation.extracted_k)
