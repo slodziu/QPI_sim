@@ -249,48 +249,46 @@ class ImpuritySystem:
         except np.linalg.LinAlgError as e:
             return self._calculate_single_impurity_sum(G0, greens_function)
         
-        # Step 4: OPTIMIZED LDOS calculation using vectorized operations
-        # Pre-compute all G0 matrices for each impurity to all grid points
-        G0_to_imp = np.zeros((n_imp, gridsize, gridsize), dtype=complex)
-        G0_from_imp = np.zeros((n_imp, gridsize, gridsize), dtype=complex)
-        
-        # IMPORTANT: G0 is fftshifted, so G0[gridsize//2, gridsize//2] corresponds to r=(0,0)
-        # We need to undo this shift when indexing
+        # Step 4: FULLY OPTIMIZED LDOS calculation - all vectorized, no loops
         center = gridsize // 2
         
-        for a in range(n_imp):
-            row_a, col_a = self.positions[a]
-            # Create meshgrid for all positions
-            rows, cols = np.meshgrid(range(gridsize), range(gridsize), indexing='ij')
-            
-            # Calculate relative positions: (row, col) - (row_a, col_a)
-            # These are the ACTUAL distances in real space
-            delta_rows = rows - row_a
-            delta_cols = cols - col_a
-            
-            # G0[i,j] represents Green's function for displacement (i-center, j-center)
-            # So for displacement (delta_row, delta_col), we need G0[delta_row + center, delta_col + center]
-            # with periodic wrapping
-            G0_indices_row = (delta_rows + center) % gridsize
-            G0_indices_col = (delta_cols + center) % gridsize
-            
-            G0_to_imp[a] = G0[G0_indices_row, G0_indices_col]
-            
-            # For G0(R_a, r) = G0(r - R_a), use opposite sign
-            delta_rows_from = row_a - rows
-            delta_cols_from = col_a - cols
-            G0_indices_row_from = (delta_rows_from + center) % gridsize
-            G0_indices_col_from = (delta_cols_from + center) % gridsize
-            G0_from_imp[a] = G0[G0_indices_row_from, G0_indices_col_from]
+        # Pre-compute meshgrid once (outside loop)
+        rows, cols = np.meshgrid(range(gridsize), range(gridsize), indexing='ij')
         
-        # Vectorized calculation of LDOS change
-        # Δρ(r) = -(1/π) Im{∑_ab G0(r,R_a) * T_ab * G0(R_b,r)}
-        delta_rho = np.zeros((gridsize, gridsize), dtype=complex)
+        # Extract impurity positions as arrays for vectorization
+        imp_rows = np.array([pos[0] for pos in self.positions])  # shape: (n_imp,)
+        imp_cols = np.array([pos[1] for pos in self.positions])  # shape: (n_imp,)
         
-        for a in range(n_imp):
-            for b in range(n_imp):
-                # Vectorized: G0(r,R_a) * T_ab * G0(R_b,r) for all r
-                delta_rho += G0_to_imp[a] * T_matrix[a, b] * G0_from_imp[b]
+        # Vectorized computation of G0 for all impurities at once
+        # Broadcast: rows/cols are (gridsize, gridsize), imp_rows/cols are (n_imp,)
+        # Result: (n_imp, gridsize, gridsize)
+        delta_rows = rows[np.newaxis, :, :] - imp_rows[:, np.newaxis, np.newaxis]
+        delta_cols = cols[np.newaxis, :, :] - imp_cols[:, np.newaxis, np.newaxis]
+        
+        # G0 indices with periodic wrapping
+        G0_indices_row = (delta_rows + center) % gridsize
+        G0_indices_col = (delta_cols + center) % gridsize
+        
+        # Advanced indexing to get all G0_to_imp at once
+        G0_to_imp = G0[G0_indices_row, G0_indices_col]  # shape: (n_imp, gridsize, gridsize)
+        
+        # For G0_from_imp, use opposite sign
+        delta_rows_from = imp_rows[:, np.newaxis, np.newaxis] - rows[np.newaxis, :, :]
+        delta_cols_from = imp_cols[:, np.newaxis, np.newaxis] - cols[np.newaxis, :, :]
+        
+        G0_indices_row_from = (delta_rows_from + center) % gridsize
+        G0_indices_col_from = (delta_cols_from + center) % gridsize
+        
+        G0_from_imp = G0[G0_indices_row_from, G0_indices_col_from]  # shape: (n_imp, gridsize, gridsize)
+        
+        # FULLY VECTORIZED calculation using einsum (no loops!)
+        # Δρ(r) = -(1/π) Im{∑_ab G0_to_imp[a,r] * T_matrix[a,b] * G0_from_imp[b,r]}
+        # This is a tensor contraction: sum over a,b while keeping r dimensions
+        # G0_to_imp: (n_imp, gridsize, gridsize)
+        # T_matrix: (n_imp, n_imp)
+        # G0_from_imp: (n_imp, gridsize, gridsize)
+        # Result: (gridsize, gridsize)
+        delta_rho = np.einsum('axy,ab,bxy->xy', G0_to_imp, T_matrix, G0_from_imp, optimize=True)
         
         LDOS_change = -1/np.pi * np.imag(delta_rho)
         
@@ -317,35 +315,26 @@ class QPIAnalyzer:
         self.signal_proc = SignalProcessing()
         
     def process_LDOS(self, LDOS: np.ndarray) -> np.ndarray:
-        """Process LDOS for QPI analysis - completely raw, no smoothing."""
-        # For QPI, we want to analyze the LDOS modulations
-        # The standard approach is to look at δρ(r) = ρ(r) - ρ₀
-        # where ρ₀ is the clean (unperturbed) LDOS
-        
-        # Since we calculated the LDOS change directly in the impurity system,
-        # this is already δρ(r), so return as-is
+        """Process LDOS for QPI analysis - return as-is, filtering done in k-space."""
+        # Return raw LDOS change - we'll filter in k-space to avoid distorting real space
         return LDOS
     
     def calculate_FFT(self, LDOS_processed: np.ndarray) -> tuple:
-        """Calculate FFT for QPI analysis - completely raw, no smoothing."""
-        # In QPI analysis, we take FFT of the LDOS modulations δρ(r)
-        # Common preprocessing: subtract the spatial average to remove DC component
-        N = LDOS_processed.shape[0]
-        alpha = 0.3  # Tukey shape (0 = rectangular, 1 = Hann), tweak 0.1-0.3
-        tukey1d = np.hanning(N) * alpha + (1 - alpha)  # simple compromise; or use scipy.signal.tukey
-        window2d = np.outer(tukey1d, tukey1d)
-
-        LDOS_windowed = LDOS_processed * window2d
-        LDOS_zero_mean = LDOS_windowed - np.mean(LDOS_windowed)
+        """Calculate FFT for QPI analysis - raw FFT without filtering."""
+        # Subtract the spatial average to remove DC component
+        LDOS_zero_mean = LDOS_processed - np.mean(LDOS_processed)
         
         # Take 2D FFT and shift zero frequency to center
         LDOS_fft_complex = np.fft.fftshift(np.fft.fft2(LDOS_zero_mean))
         center = LDOS_fft_complex.shape[0] // 2
-        radius = 10  # try 10–15 pixels instead of 2
+        
+        # Only suppress DC
+        radius = 10
         Y, X = np.ogrid[:LDOS_fft_complex.shape[0], :LDOS_fft_complex.shape[1]]
         mask = (X - center)**2 + (Y - center)**2 < radius**2
         LDOS_fft_complex[mask] = 0
-        # Return both complex FFT and magnitude squared for different uses
+        
+        # Return both complex FFT and magnitude squared
         magnitude_squared = np.abs(LDOS_fft_complex)**2
         return LDOS_fft_complex, magnitude_squared
     
@@ -487,20 +476,20 @@ class QPIVisualizer:
         # Real space LDOS plot
         self.im1 = self.ax1.imshow(
             np.zeros((self.params.gridsize, self.params.gridsize)), 
-            origin='lower', cmap='inferno', extent=[0, self.params.L, 0, self.params.L]
+            origin='lower', cmap='seismic', extent=[0, self.params.L, 0, self.params.L]
         )
         self.ax1.set_title("LDOS around impurities")
         self.ax1.set_xlabel('x (physical units)')
         self.ax1.set_ylabel('y (physical units)')
         plt.colorbar(self.im1, ax=self.ax1, label='LDOS')
         
-        # Momentum space plot - show full k-space
-        # Calculate the full k-space range based on grid spacing
-        k_max_full = np.pi / self.sim.greens.dk  # Nyquist limit
+        # Momentum space plot - zoom to relevant k-space region
+        # Show up to 3x the maximum 2k_F to include context
+        k_display_max = 3 * 2 * self.params.k_F_max
         
         self.im2 = self.ax2.imshow(
             np.zeros((self.params.gridsize, self.params.gridsize)), origin='lower', cmap='plasma',
-            extent=[-k_max_full, k_max_full, -k_max_full, k_max_full]
+            extent=[-k_display_max, k_display_max, -k_display_max, k_display_max]
         )
         self.ax2.set_title('Momentum Space: QPI Pattern')
         self.ax2.set_xlabel('kx (1/a)')
@@ -586,17 +575,19 @@ class QPIVisualizer:
             self.ax1.legend(loc='upper right')
     
     def _update_momentum_plot(self, fft_display: np.ndarray):
-        """Update the momentum space plot with full k-space view."""
-        # Show full FFT data without cropping
-        self.im2.set_data(fft_display)
+        """Update the momentum space plot with zoomed view showing only relevant k-space."""
+        # Use LOG SCALE to show the thin ring clearly
+        fft_log = np.log10(fft_display + 1)  # Add 1 to avoid log(0)
         
-        # Calculate full k-space extent
-        k_max_full = np.pi / self.sim.greens.dk  # Nyquist limit
-        self.im2.set_extent([-k_max_full, k_max_full, -k_max_full, k_max_full])
+        self.im2.set_data(fft_log)
         
-        # Set color limits based on full data
-        vmax_fft = np.percentile(fft_display, 95)
-        vmin_fft = np.percentile(fft_display, 5)
+        # Zoom to show only relevant k-space (3x the maximum 2k_F to include some context)
+        k_display_max = 3 * 2 * self.params.k_F_max  # Show up to 3x the max 2k_F
+        self.im2.set_extent([-k_display_max, k_display_max, -k_display_max, k_display_max])
+        
+        # Use full range of log data for maximum fidelity
+        vmin_fft = np.min(fft_log)
+        vmax_fft = np.max(fft_log)
         self.im2.set_clim(vmin=vmin_fft, vmax=vmax_fft)
     
     def _update_inverse_fft_plot(self, fft_complex: np.ndarray):

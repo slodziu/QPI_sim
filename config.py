@@ -23,7 +23,7 @@ class SimulationConfig:
     # Physical parameters
     t: float = 0.3
     mu: float = 0.0
-    eta: float = 0.9  # Sharper energy broadening
+    eta: float = 0.7  # Much smaller broadening for sharp QPI features
     V_s: float = 1.0
     
     # Energy sweep
@@ -60,7 +60,7 @@ HIGH_QUALITY_SINGLE = SimulationConfig(
     n_frames=30,
     E_min=3.0,
     E_max=30.0,
-    V_s=-1.0,  # Moderate strength for clean scattering
+    V_s=1.0,  # Moderate strength for clean scattering
 )
 
 # Fast preview simulation
@@ -69,9 +69,9 @@ FAST_PREVIEW = SimulationConfig(
     description="Quick preview with reduced quality",
     gridsize=512,  # Reasonable resolution
     n_frames=15,
-    E_min=20.0,  # Higher energy for better defined Fermi surface
-    E_max=50.0,  # Narrower range for more focused analysis
-    V_s=3.0,  # Slightly weaker to avoid over-scattering
+    E_min=3.0,  # Higher energy for better defined Fermi surface
+    E_max=20.0,  # Narrower range for more focused analysis
+    V_s=1.0,  # Slightly weaker to avoid over-scattering
     zoom_factor=1.0  # No zoom
 )
 
@@ -83,7 +83,7 @@ RANDOM_5_IMPURITIES = SimulationConfig(
     n_frames=20,
     E_min=5.0,
     E_max=50.0,
-    V_s=-1.5,  # Moderately attractive
+    V_s=1.5,  # Moderately attractive
 )
 
 RANDOM_10_IMPURITIES = SimulationConfig(
@@ -93,7 +93,7 @@ RANDOM_10_IMPURITIES = SimulationConfig(
     n_frames=10,
     E_min=5.0,
     E_max=50.0,
-    V_s=-1.0,  
+    V_s=1.0,  
 )
 
 RANDOM_30_IMPURITIES = SimulationConfig(
@@ -103,7 +103,7 @@ RANDOM_30_IMPURITIES = SimulationConfig(
     n_frames=20,    # Reduced frames for faster computation
     E_min=5.0,
     E_max=50.0,
-    V_s=-0.3,       # Much weaker impurities for numerical stability
+    V_s=0.3,       # Much weaker impurities for numerical stability
 )
 
 # Dynamic N-impurity configuration template
@@ -114,7 +114,7 @@ RANDOM_N_IMPURITIES_TEMPLATE = SimulationConfig(
     n_frames=20,
     E_min=5.0,
     E_max=25.0,
-    V_s=-1.5,  # Default moderately attractive
+    V_s=1.5,  # Default moderately attractive
 )
 
 
