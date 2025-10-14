@@ -496,7 +496,7 @@ class QPIVisualizer:
         self.ax2.set_title('Momentum Space: QPI Pattern')
         self.ax2.set_xlabel('kx (1/a)')
         self.ax2.set_ylabel('ky (1/a)')
-        self.ax2.grid(True, alpha=0.3)
+        self.ax2.grid(False)
         plt.colorbar(self.im2, ax=self.ax2, label='log|FFT(LDOS)|')
         
         # No theoretical circles - clean momentum space view
@@ -622,8 +622,14 @@ class QPIVisualizer:
                 np.column_stack([self.sim.extracted_k, self.sim.extracted_E])
             )
     
-    def create_animation(self, filename: str = 'qpi_animation.mp4'):
-        """Create and save the animation as MP4 (or GIF if ffmpeg unavailable)."""
+    def create_animation(self, filename: str = 'qpi_animation.mp4', frames_dir: str = None):
+        """Create and save the animation as MP4 (or GIF if ffmpeg unavailable), saving individual frames."""
+        import os
+        
+        # Create frames directory if specified
+        if frames_dir is not None:
+            os.makedirs(frames_dir, exist_ok=True)
+        
         # Check if ffmpeg is available
         import matplotlib
         writers = matplotlib.animation.writers.list()
@@ -648,6 +654,16 @@ class QPIVisualizer:
             writer_args = {'fps': 5}
             print("Note: ffmpeg not available, saving as GIF instead")
         
+        # Save individual frames if frames_dir is provided
+        if frames_dir is not None:
+            print(f"Saving individual frames to {frames_dir}/")
+            for frame_idx in range(self.params.n_frames):
+                self.animate_frame(frame_idx)
+                frame_filename = os.path.join(frames_dir, f'qpi_{frame_idx+1}.png')
+                self.fig.savefig(frame_filename, dpi=150, bbox_inches='tight')
+            print(f"✓ Saved {self.params.n_frames} frames")
+        
+        # Create animation
         ani = animation.FuncAnimation(
             self.fig, self.animate_frame, frames=self.params.n_frames, 
             interval=200, blit=True

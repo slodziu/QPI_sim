@@ -45,16 +45,22 @@ def run_simulation(config_name: str):
         simulation = QPISimulation(params, impurity_positions)
         visualizer = QPIVisualizer(simulation)
         
-        # Generate filename with outputs folder
+        # Generate folder structure: outputs/{config_name}/
         import os
-        outputs_dir = "outputs"
-        if not os.path.exists(outputs_dir):
-            os.makedirs(outputs_dir)
-        anim_filename = os.path.join(outputs_dir, f"qpi_{config.name}.mp4")
-        snapshot_filename = os.path.join(outputs_dir, f"qpi_{config.name}_snapshot.png")
+        outputs_base = "outputs"
+        config_output_dir = os.path.join(outputs_base, config.name)
+        frames_dir = os.path.join(config_output_dir, "frames")
         
-        # Create animation as MP4
-        ani = visualizer.create_animation(anim_filename)
+        # Create directories
+        os.makedirs(config_output_dir, exist_ok=True)
+        os.makedirs(frames_dir, exist_ok=True)
+        
+        # Generate filenames
+        anim_filename = os.path.join(config_output_dir, f"qpi_{config.name}.mp4")
+        snapshot_filename = os.path.join(config_output_dir, f"qpi_{config.name}_snapshot.png")
+        
+        # Create animation with individual frames
+        ani = visualizer.create_animation(anim_filename, frames_dir=frames_dir)
         
         # Save snapshot at mid-energy
         visualizer.save_mid_energy_snapshot(snapshot_filename)
