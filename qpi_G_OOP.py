@@ -849,8 +849,9 @@ class QPIvisualiser:
                 cut_right_fft[i] = np.mean(real_fft[mask_0])
                 cut_right_R_MA[i] = np.mean(real_R_MA[mask_0])
             
-            # θ=π (left direction): integrate around π (both near π and near -π)
-            angle_mask_pi = (np.abs(q_angle - np.pi) <= angular_width) | (np.abs(q_angle + np.pi) <= angular_width)
+            # θ=π (left direction): integrate around π
+            # Since arctan2 returns [-π, π], angles near π and near -π represent the same direction
+            angle_mask_pi = (np.abs(q_angle - np.pi) <= angular_width) | (np.abs(q_angle - (-np.pi)) <= angular_width)
             mask_pi = radial_mask & angle_mask_pi
             
             if np.sum(mask_pi) > 0:
@@ -862,20 +863,21 @@ class QPIvisualiser:
         
         # Panel 1: Real part of FFT
         ax1 = fig.add_subplot(gs[0, 0])
-        im1 = ax1.imshow(real_fft, origin='lower', cmap='RdBu_r', extent=extent)
+        # Ensure symmetric color scaling for regular FFT real part
+        vmax_real_fft = np.max(np.abs(real_fft))
+        im1 = ax1.imshow(real_fft, origin='lower', cmap='RdBu_r', extent=extent,
+                        vmin=-vmax_real_fft, vmax=vmax_real_fft)
         ax1.set_title(f'Re[FFT(δN(r))] at E={energy:.2f}', fontsize=14)
         ax1.set_xlabel('kx (1/a)', fontsize=12)
         ax1.set_ylabel('ky (1/a)', fontsize=12)
-        # Add wedge indicators for azimuthal integration regions
-        ax1.axhline(y=0, color='yellow', linestyle='--', linewidth=1, alpha=0.7)
-        ax1.plot([0, k_actual_max], [0, 0], 'g-', linewidth=2, alpha=0.8, label='θ=0 wedge')
-        ax1.plot([0, -k_actual_max], [0, 0], 'r-', linewidth=2, alpha=0.8, label='θ=π wedge')
-        ax1.legend(loc='upper right', fontsize=10)
         plt.colorbar(im1, ax=ax1, label='Re[FFT]')
         
         # Panel 2: Imaginary part of FFT
         ax2 = fig.add_subplot(gs[0, 1])
-        im2 = ax2.imshow(imag_fft, origin='lower', cmap='RdBu_r', extent=extent)
+        # Ensure symmetric color scaling for regular FFT imaginary part
+        vmax_imag_fft = np.max(np.abs(imag_fft))
+        im2 = ax2.imshow(imag_fft, origin='lower', cmap='RdBu_r', extent=extent,
+                        vmin=-vmax_imag_fft, vmax=vmax_imag_fft)
         ax2.set_title(f'Im[FFT(δN(r))] at E={energy:.2f}', fontsize=14)
         ax2.set_xlabel('kx (1/a)', fontsize=12)
         ax2.set_ylabel('ky (1/a)', fontsize=12)
@@ -886,6 +888,13 @@ class QPIvisualiser:
         ax3.plot(q_plot, cut_right_fft, 'g-', linewidth=2, label='θ=0 (right)', alpha=0.8)
         ax3.plot(q_plot, cut_left_fft, 'r-', linewidth=2, label='θ=π (left)', alpha=0.8)
         ax3.axhline(y=0, color='gray', linestyle=':', linewidth=1, alpha=0.5)
+        
+        # Add expected 2k_F peak position
+        k_F = np.sqrt(energy)
+        expected_2kF = 2 * k_F
+        if expected_2kF <= np.max(q_plot):
+            ax3.axvline(x=expected_2kF, color='black', linestyle='--', linewidth=2, alpha=0.8, label=f'2k_F = {expected_2kF:.2f}')
+        
         ax3.set_xlabel('|q| (1/a)', fontsize=12)
         ax3.set_ylabel('Re[FFT(δN)] (azimuthally integrated)', fontsize=12)
         ax3.set_title(f'Azimuthal Integration: Re[FFT] at E={energy:.2f}', fontsize=14)
@@ -894,20 +903,21 @@ class QPIvisualiser:
         
         # Panel 4: Real part of R_MA
         ax4 = fig.add_subplot(gs[1, 0])
-        im4 = ax4.imshow(real_R_MA, origin='lower', cmap='RdBu_r', extent=extent)
+        # Ensure symmetric color scaling for multi-atom real part
+        vmax_R_MA = np.max(np.abs(real_R_MA))
+        im4 = ax4.imshow(real_R_MA, origin='lower', cmap='RdBu_r', extent=extent,
+                        vmin=-vmax_R_MA, vmax=vmax_R_MA)
         ax4.set_title(f'Re[δN_MA(q)] at E={energy:.2f}', fontsize=14)
         ax4.set_xlabel('kx (1/a)', fontsize=12)
         ax4.set_ylabel('ky (1/a)', fontsize=12)
-        # Add wedge indicators for azimuthal integration regions
-        ax4.axhline(y=0, color='yellow', linestyle='--', linewidth=1, alpha=0.7)
-        ax4.plot([0, k_actual_max], [0, 0], 'g-', linewidth=2, alpha=0.8, label='θ=0 wedge')
-        ax4.plot([0, -k_actual_max], [0, 0], 'r-', linewidth=2, alpha=0.8, label='θ=π wedge')
-        ax4.legend(loc='upper right', fontsize=10)
         plt.colorbar(im4, ax=ax4, label='Re[R_MA]')
         
         # Panel 5: Imaginary part of R_MA
         ax5 = fig.add_subplot(gs[1, 1])
-        im5 = ax5.imshow(imag_R_MA, origin='lower', cmap='RdBu_r', extent=extent)
+        # Ensure symmetric color scaling for multi-atom imaginary part
+        vmax_imag_R_MA = np.max(np.abs(imag_R_MA))
+        im5 = ax5.imshow(imag_R_MA, origin='lower', cmap='RdBu_r', extent=extent,
+                        vmin=-vmax_imag_R_MA, vmax=vmax_imag_R_MA)
         ax5.set_title(f'Im[δN_MA(q)] at E={energy:.2f}', fontsize=14)
         ax5.set_xlabel('kx (1/a)', fontsize=12)
         ax5.set_ylabel('ky (1/a)', fontsize=12)
@@ -918,6 +928,11 @@ class QPIvisualiser:
         ax6.plot(q_plot, cut_right_R_MA, 'g-', linewidth=2, label='θ=0 (right)', alpha=0.8)
         ax6.plot(q_plot, cut_left_R_MA, 'r-', linewidth=2, label='θ=π (left)', alpha=0.8)
         ax6.axhline(y=0, color='gray', linestyle=':', linewidth=1, alpha=0.5)
+        
+        # Add expected 2k_F peak position  
+        if expected_2kF <= np.max(q_plot):
+            ax6.axvline(x=expected_2kF, color='black', linestyle='--', linewidth=2, alpha=0.8, label=f'2k_F = {expected_2kF:.2f}')
+        
         ax6.set_xlabel('|q| (1/a)', fontsize=12)
         ax6.set_ylabel('Re[δN_MA] (azimuthally integrated)', fontsize=12)
         ax6.set_title(f'Azimuthal Integration: Re[δN_MA] at E={energy:.2f}', fontsize=14)
@@ -926,11 +941,11 @@ class QPIvisualiser:
         
         # Add overall title with number of impurities
         n_imp = len(self.sim.impurities.positions)
-        fig.suptitle(f'Fourier Analysis with Azimuthal Integration - {n_imp} Impurities | Frame {frame_idx+1}', 
+        fig.suptitle(f'Fourier Analysis with Azimuthal Integration - {n_imp} Impurities | E={energy:.2f}', 
                      fontsize=18, fontweight='bold', y=0.995)
         
         # Save figure
-        fourier_filename = os.path.join(frames_dir, f'fourier_analysis_{frame_idx+1}.png')
+        fourier_filename = os.path.join(frames_dir, f'fourier_analysis_E{energy:.2f}.png')
         fig.savefig(fourier_filename, dpi=150, bbox_inches='tight')
         plt.close(fig)
     
@@ -981,11 +996,13 @@ class QPIvisualiser:
                 frame_filename = os.path.join(frames_dir, f'qpi_{frame_idx+1}.png')
                 self.fig.savefig(frame_filename, dpi=150, bbox_inches='tight')
                 
-                # Save Fourier analysis figure
-                self.save_fourier_analysis_figure(energy, frames_dir, frame_idx)
+            # Save only one Fourier analysis figure from middle energy
+            mid_frame_idx = self.params.n_frames // 2
+            mid_energy = self.params.E_min + (self.params.E_max - self.params.E_min) * mid_frame_idx / (self.params.n_frames - 1)
+            self.save_fourier_analysis_figure(mid_energy, frames_dir, mid_frame_idx)
                 
             print(f"✓ Saved {self.params.n_frames} QPI frames")
-            print(f"✓ Saved {self.params.n_frames} Fourier analysis frames")
+            print(f"✓ Saved 1 Fourier analysis frame at mid-energy E={mid_energy:.2f}")
             
             # Reset extracted points after saving frames so animation builds them up fresh
             self.sim.extracted_k = []
