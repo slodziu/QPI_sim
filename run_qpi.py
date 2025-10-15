@@ -8,7 +8,7 @@ Usage examples:
 """
 
 import sys
-from qpi_G_OOP import SystemParameters, QPISimulation, QPIVisualizer
+from qpi_G_OOP import SystemParameters, QPISimulation, QPIvisualiser
 from config import get_config, list_available_configs
 
 
@@ -43,7 +43,7 @@ def run_simulation(config_name: str):
         
         # Create and run simulation
         simulation = QPISimulation(params, impurity_positions)
-        visualizer = QPIVisualizer(simulation)
+        visualiser = QPIvisualiser(simulation)
         
         # Generate folder structure: outputs/{config_name}/
         import os
@@ -60,10 +60,10 @@ def run_simulation(config_name: str):
         snapshot_filename = os.path.join(config_output_dir, f"qpi_{config.name}_snapshot.png")
         
         # Create animation with individual frames
-        ani = visualizer.create_animation(anim_filename, frames_dir=frames_dir)
+        ani = visualiser.create_animation(anim_filename, frames_dir=frames_dir)
         
         # Save snapshot at mid-energy
-        visualizer.save_mid_energy_snapshot(snapshot_filename)
+        visualiser.save_mid_energy_snapshot(snapshot_filename)
         
         # Print results
         print(f"\nSimulation completed!")
