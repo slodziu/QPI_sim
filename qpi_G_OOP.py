@@ -4,12 +4,6 @@ QPI (Quasiparticle Interference) Simulation using Green's Functions
 This module simulates QPI patterns around impurities in a 2D system with 
 parabolic dispersion using the T-matrix formalism for single and multiple 
 impurity scattering.
-
-Key Features:
-- Exact T-matrix solution for arbitrary scattering strength
-- Vectorized multiple scattering calculations using einsum
-- FFT-based Green's function computation
-- Automated dispersion extraction from QPI patterns
 """
 
 import numpy as np
@@ -17,22 +11,6 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
-
-# Optional: Use numba for JIT compilation if available
-try:
-    from numba import jit, njit
-    HAS_NUMBA = True
-except ImportError:
-    HAS_NUMBA = False
-    # Define dummy decorators if numba not available
-    def jit(*args, **kwargs):
-        def decorator(func):
-            return func
-        return decorator
-    def njit(*args, **kwargs):
-        def decorator(func):
-            return func
-        return decorator
 
 
 @dataclass
