@@ -844,7 +844,7 @@ class QPIvisualiser:
         # Ensure symmetric color scaling for regular FFT real part
         vmax_real_fft = np.max(np.abs(real_fft))
         im1 = ax1.imshow(real_fft, origin='lower', cmap='RdBu_r', extent=extent,
-                        vmin=-vmax_real_fft, vmax=vmax_real_fft)
+                        vmin=-3*np.max(cut_left_fft), vmax=3*np.max(cut_right_fft))
         ax1.set_title(f'Re[FFT(δN(r))] at E={energy:.2f}', fontsize=14)
         ax1.set_xlabel('kx (1/a)', fontsize=12)
         ax1.set_ylabel('ky (1/a)', fontsize=12)
@@ -855,7 +855,7 @@ class QPIvisualiser:
         # Ensure symmetric color scaling for regular FFT imaginary part
         vmax_imag_fft = np.max(np.abs(imag_fft))
         im2 = ax2.imshow(imag_fft, origin='lower', cmap='RdBu_r', extent=extent,
-                        vmin=-vmax_imag_fft, vmax=vmax_imag_fft)
+                        vmin=-3*np.max(cut_left_fft), vmax=3*np.max(cut_right_fft))
         ax2.set_title(f'Im[FFT(δN(r))] at E={energy:.2f}', fontsize=14)
         ax2.set_xlabel('kx (1/a)', fontsize=12)
         ax2.set_ylabel('ky (1/a)', fontsize=12)
@@ -884,7 +884,7 @@ class QPIvisualiser:
         # Ensure symmetric color scaling for multi-atom real part
         vmax_R_MA = np.max(np.abs(real_R_MA))
         im4 = ax4.imshow(real_R_MA, origin='lower', cmap='RdBu_r', extent=extent,
-                        vmin=-vmax_R_MA, vmax=vmax_R_MA)
+                        vmin=-3*np.max(np.abs(cut_left_R_MA)), vmax=3*np.max(np.abs(cut_right_R_MA)))
         ax4.set_title(f'Re[δN_MA(q)] at E={energy:.2f}', fontsize=14)
         ax4.set_xlabel('kx (1/a)', fontsize=12)
         ax4.set_ylabel('ky (1/a)', fontsize=12)
@@ -895,7 +895,7 @@ class QPIvisualiser:
         # Ensure symmetric color scaling for multi-atom imaginary part
         vmax_imag_R_MA = np.max(np.abs(imag_R_MA))
         im5 = ax5.imshow(imag_R_MA, origin='lower', cmap='RdBu_r', extent=extent,
-                        vmin=-vmax_imag_R_MA, vmax=vmax_imag_R_MA)
+                        vmin=-0.1*vmax_imag_R_MA, vmax=0.1*vmax_imag_R_MA)
         ax5.set_title(f'Im[δN_MA(q)] at E={energy:.2f}', fontsize=14)
         ax5.set_xlabel('kx (1/a)', fontsize=12)
         ax5.set_ylabel('ky (1/a)', fontsize=12)
