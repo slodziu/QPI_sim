@@ -619,7 +619,7 @@ class QPIvisualiser:
         
         self.im1 = self.ax1.imshow(
             np.zeros((self.params.gridsize, self.params.gridsize)), 
-            origin='lower', cmap='seismic', extent=[0, self.params.L, 0, self.params.L]
+            origin='lower', cmap='RdGy', extent=[0, self.params.L, 0, self.params.L]
         )
         self.ax1.set_title("LDOS around impurities")
         self.ax1.set_xlabel('x (physical units)')
@@ -696,7 +696,8 @@ class QPIvisualiser:
         """
         self.im1.set_data(LDOS)
         vmax = np.max(np.abs(LDOS))
-        self.im1.set_clim(vmin=-vmax, vmax=vmax)
+        scale=0.1
+        self.im1.set_clim(vmin=-scale*vmax, vmax=vmax)
         self.ax1.set_title(f"LDOS (E = {energy:.3f}, k_F = {k_F:.2f})")
         self.energy_text.set_text(f'E = {energy:.2f}\nk_F = {k_F:.2f}')
         
@@ -772,9 +773,9 @@ class QPIvisualiser:
             self.sim.impurities.positions
         )
         
-        # Create 2x3 subplot figure
-        fig = plt.figure(figsize=(24, 16), dpi=100)
-        gs = fig.add_gridspec(2, 3, hspace=0.3, wspace=0.3)
+        # Create 2x3 subplot figure with tighter layout
+        fig = plt.figure(figsize=(22, 12), dpi=100)
+        gs = fig.add_gridspec(2, 3, hspace=0.2, wspace=0.25, top=0.95, bottom=0.08, left=0.06, right=0.98)
         
         # Get k-space extent
         dk = 2 * np.pi / self.params.L
@@ -917,14 +918,9 @@ class QPIvisualiser:
         ax6.legend(loc='best', fontsize=11)
         ax6.grid(True, alpha=0.3)
         
-        # Add overall title with number of impurities
-        n_imp = len(self.sim.impurities.positions)
-        fig.suptitle(f'Fourier Analysis with Azimuthal Integration - {n_imp} Impurities | E={energy:.2f}', 
-                     fontsize=18, fontweight='bold', y=0.995)
-        
-        # Save figure
-        fourier_filename = os.path.join(frames_dir, f'fourier_analysis_E{energy:.2f}.png')
-        fig.savefig(fourier_filename, dpi=150, bbox_inches='tight')
+        # Save figure with tight layout (no suptitle for compact output)
+        fourier_filename = os.path.join(frames_dir, f'fourier_analysis_{frame_idx+1:03d}.png')
+        fig.savefig(fourier_filename, dpi=150, bbox_inches='tight', pad_inches=0.1)
         plt.close(fig)
     
     def create_animation(self, filename: str = 'qpi_animation.mp4', frames_dir: str = None):
@@ -965,22 +961,27 @@ class QPIvisualiser:
         
         if frames_dir is not None:
             print(f"Saving individual frames to {frames_dir}/")
+            
+            # Create subfolders for different frame types
+            qpi_frames_dir = os.path.join(frames_dir, "qpi")
+            fourier_frames_dir = os.path.join(frames_dir, "fourier")
+            os.makedirs(qpi_frames_dir, exist_ok=True)
+            os.makedirs(fourier_frames_dir, exist_ok=True)
+            
             for frame_idx in range(self.params.n_frames):
                 # Calculate energy for this frame
                 energy = self.params.E_min + (self.params.E_max - self.params.E_min) * frame_idx / (self.params.n_frames - 1)
                 
                 # Save standard QPI frame
                 self.animate_frame(frame_idx)
-                frame_filename = os.path.join(frames_dir, f'qpi_{frame_idx+1}.png')
+                frame_filename = os.path.join(qpi_frames_dir, f'qpi_{frame_idx+1:03d}.png')
                 self.fig.savefig(frame_filename, dpi=150, bbox_inches='tight')
                 
-            # Save only one Fourier analysis figure from middle energy
-            mid_frame_idx = self.params.n_frames // 2
-            mid_energy = self.params.E_min + (self.params.E_max - self.params.E_min) * mid_frame_idx / (self.params.n_frames - 1)
-            self.save_fourier_analysis_figure(mid_energy, frames_dir, mid_frame_idx)
+                # Save Fourier analysis figure for each energy
+                self.save_fourier_analysis_figure(energy, fourier_frames_dir, frame_idx)
                 
-            print(f"✓ Saved {self.params.n_frames} QPI frames")
-            print(f"✓ Saved 1 Fourier analysis frame at mid-energy E={mid_energy:.2f}")
+            print(f"✓ Saved {self.params.n_frames} QPI frames to {qpi_frames_dir}")
+            print(f"✓ Saved {self.params.n_frames} Fourier analysis frames to {fourier_frames_dir}")
             
             # Reset extracted points after saving frames so animation builds them up fresh
             self.sim.extracted_k = []
@@ -994,6 +995,225 @@ class QPIvisualiser:
         ani.save(filename, writer=writer, **writer_args)
         
         return ani
+    
+    def create_fourier_animation(self, filename: str = 'qpi_fourier_animation.mp4', frames_dir: str = None):
+        """
+        Create and save animation from fourier analysis frames.
+        
+        Args:
+            filename: Path for output animation file (MP4 or GIF)
+            frames_dir: Directory containing frames (fourier frames should be in frames_dir/fourier/)
+            
+        Returns:
+            None (creates animation from existing frames)
+        """
+        import os
+        import glob
+        from PIL import Image
+        
+        if frames_dir is None:
+            print("Error: frames_dir must be provided for fourier animation")
+            return
+            
+        # Look for fourier analysis frames in the fourier subfolder
+        fourier_frames_dir = os.path.join(frames_dir, "fourier")
+        if not os.path.exists(fourier_frames_dir):
+            print(f"Error: Fourier frames directory not found: {fourier_frames_dir}")
+            return
+            
+        # Look for fourier analysis frames (numbered sequentially)
+        fourier_frames = []
+        for i in range(1, 101):  # Look for up to 100 frames
+            frame_path = os.path.join(fourier_frames_dir, f'fourier_analysis_{i:03d}.png')
+            if os.path.exists(frame_path):
+                fourier_frames.append(frame_path)
+            else:
+                break
+        
+        if not fourier_frames:
+            print(f"Error: No fourier analysis frames found in {fourier_frames_dir}")
+            return
+            
+        print(f"Creating fourier analysis animation from {len(fourier_frames)} frames...")
+        
+        # Force MP4 creation and improve ffmpeg handling
+        if filename.endswith('.gif'):
+            filename = filename.replace('.gif', '.mp4')
+        elif not filename.endswith('.mp4'):
+            filename = filename + '.mp4'
+        
+        # Try ffmpeg first
+        import subprocess
+        ffmpeg_cmd = [
+            'ffmpeg', '-y',  # -y to overwrite output file
+            '-framerate', '5',  # 5 fps
+            '-i', os.path.join(fourier_frames_dir, 'fourier_analysis_%03d.png'),
+            '-c:v', 'libx264',
+            '-pix_fmt', 'yuv420p',
+            '-crf', '18',  # High quality
+            '-movflags', '+faststart',  # Optimize for web streaming
+            filename
+        ]
+        
+        try:
+            result = subprocess.run(ffmpeg_cmd, check=True, capture_output=True, text=True)
+            print(f"✓ Fourier analysis MP4 saved as: {filename}")
+            return
+        except subprocess.CalledProcessError as e:
+            print(f"ffmpeg failed: {e.stderr}")
+            print("Falling back to matplotlib animation...")
+        except FileNotFoundError:
+            print("ffmpeg not found, using matplotlib animation...")
+        
+        # Fallback to matplotlib animation for MP4
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib.animation as animation
+            
+            # Create figure for animation
+            fig = plt.figure(figsize=(24, 16))
+            ax = fig.add_subplot(111)
+            ax.axis('off')
+            
+            def animate_fourier(frame_idx):
+                ax.clear()
+                ax.axis('off')
+                img = plt.imread(fourier_frames[frame_idx])
+                ax.imshow(img)
+                return [ax]
+            
+            ani = animation.FuncAnimation(
+                fig, animate_fourier, frames=len(fourier_frames),
+                interval=200, blit=False
+            )
+            
+            # Use matplotlib's ffmpeg writer
+            Writer = animation.writers['ffmpeg']
+            writer = Writer(fps=5, metadata=dict(artist='QPI_sim'), bitrate=1800)
+            ani.save(filename, writer=writer)
+            plt.close(fig)
+            print(f"✓ Fourier analysis MP4 saved as: {filename}")
+            return
+            
+        except Exception as e:
+            print(f"Matplotlib animation failed: {e}")
+            print("Falling back to GIF...")
+            
+        # Final fallback to GIF
+        filename = filename.replace('.mp4', '.gif')
+        self._create_gif_from_frames(fourier_frames, filename)
+    
+    def create_qpi_only_animation(self, filename: str = 'qpi_only_animation.mp4', frames_dir: str = None):
+        """
+        Create and save animation from QPI-only frames.
+        
+        Args:
+            filename: Path for output animation file (MP4 or GIF)
+            frames_dir: Directory containing frames (QPI frames should be in frames_dir/qpi/)
+            
+        Returns:
+            None (creates animation from existing frames)
+        """
+        import os
+        import subprocess
+        
+        if frames_dir is None:
+            print("Error: frames_dir must be provided for QPI animation")
+            return
+            
+        # Look for QPI frames in the qpi subfolder
+        qpi_frames_dir = os.path.join(frames_dir, "qpi")
+        if not os.path.exists(qpi_frames_dir):
+            print(f"Error: QPI frames directory not found: {qpi_frames_dir}")
+            return
+            
+        # Check if QPI frames exist
+        sample_frame = os.path.join(qpi_frames_dir, 'qpi_001.png')
+        if not os.path.exists(sample_frame):
+            print(f"Error: No QPI frames found in {qpi_frames_dir}")
+            return
+            
+        print(f"Creating QPI-only animation from frames in {qpi_frames_dir}...")
+        
+        # Force MP4 creation
+        if filename.endswith('.gif'):
+            filename = filename.replace('.gif', '.mp4')
+        elif not filename.endswith('.mp4'):
+            filename = filename + '.mp4'
+        
+        # Use ffmpeg to create MP4 from QPI frames
+        ffmpeg_cmd = [
+            'ffmpeg', '-y',  # -y to overwrite output file
+            '-framerate', '5',  # 5 fps
+            '-i', os.path.join(qpi_frames_dir, 'qpi_%03d.png'),
+            '-c:v', 'libx264',
+            '-pix_fmt', 'yuv420p',
+            '-crf', '18',  # High quality
+            '-movflags', '+faststart',  # Optimize for web streaming
+            filename
+        ]
+        
+        try:
+            result = subprocess.run(ffmpeg_cmd, check=True, capture_output=True, text=True)
+            print(f"✓ QPI-only MP4 saved as: {filename}")
+        except subprocess.CalledProcessError as e:
+            print(f"ffmpeg failed for QPI animation: {e.stderr}")
+            print("Falling back to matplotlib animation...")
+            
+            try:
+                import matplotlib.pyplot as plt
+                import matplotlib.animation as animation
+                import glob
+                
+                # Get all QPI frames
+                qpi_frame_files = sorted(glob.glob(os.path.join(qpi_frames_dir, 'qpi_*.png')))
+                
+                # Create figure for animation
+                fig = plt.figure(figsize=(24, 8))
+                ax = fig.add_subplot(111)
+                ax.axis('off')
+                
+                def animate_qpi(frame_idx):
+                    ax.clear()
+                    ax.axis('off')
+                    img = plt.imread(qpi_frame_files[frame_idx])
+                    ax.imshow(img)
+                    return [ax]
+                
+                ani = animation.FuncAnimation(
+                    fig, animate_qpi, frames=len(qpi_frame_files),
+                    interval=200, blit=False
+                )
+                
+                # Use matplotlib's ffmpeg writer
+                Writer = animation.writers['ffmpeg']
+                writer = Writer(fps=5, metadata=dict(artist='QPI_sim'), bitrate=1800)
+                ani.save(filename, writer=writer)
+                plt.close(fig)
+                print(f"✓ QPI-only MP4 saved as: {filename}")
+                
+            except Exception as e:
+                print(f"QPI animation creation failed: {e}")
+        except FileNotFoundError:
+            print("ffmpeg not found for QPI animation")
+    
+    def _create_gif_from_frames(self, frame_paths, filename):
+        """Helper function to create GIF from frame paths."""
+        from PIL import Image
+        
+        images = []
+        for frame_path in frame_paths:
+            img = Image.open(frame_path)
+            images.append(img)
+        
+        images[0].save(
+            filename,
+            save_all=True,
+            append_images=images[1:],
+            duration=200,  # 200ms per frame = 5 fps
+            loop=0
+        )
+        print(f"✓ Fourier analysis animation saved as: {filename}")
     
     def save_mid_energy_snapshot(self, filename: str = 'qpi_snapshot.png'):
         """
