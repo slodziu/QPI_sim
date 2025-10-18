@@ -57,10 +57,18 @@ def run_simulation(config_name: str):
         
         # Generate filenames
         anim_filename = os.path.join(config_output_dir, f"qpi_{config.name}.mp4")
+        fourier_anim_filename = os.path.join(config_output_dir, f"qpi_{config.name}_fourier.mp4")
         snapshot_filename = os.path.join(config_output_dir, f"qpi_{config.name}_snapshot.png")
         
         # Create animation with individual frames
         ani = visualiser.create_animation(anim_filename, frames_dir=frames_dir)
+        
+        # Create fourier analysis animation from fourier subfolder
+        visualiser.create_fourier_animation(fourier_anim_filename, frames_dir=frames_dir)
+        
+        # Also create QPI-only animation from QPI subfolder
+        qpi_only_filename = os.path.join(config_output_dir, f"qpi_{config.name}_only.mp4")
+        visualiser.create_qpi_only_animation(qpi_only_filename, frames_dir=frames_dir)
         
         # Save snapshot at mid-energy
         visualiser.save_mid_energy_snapshot(snapshot_filename)
@@ -70,8 +78,12 @@ def run_simulation(config_name: str):
         print(f"Extracted {len(simulation.extracted_k)} dispersion points")
         if len(simulation.extracted_E) > 0:
             print(f"Energy range: {min(simulation.extracted_E):.2f} to {max(simulation.extracted_E):.2f}")
-        print(f"Animation saved as: {anim_filename}")
+        print(f"Main QPI animation saved as: {anim_filename}")
+        print(f"QPI-only animation saved as: {qpi_only_filename}")
+        print(f"Fourier analysis animation saved as: {fourier_anim_filename}")
         print(f"Snapshot saved as: {snapshot_filename}")
+        print(f"QPI frames saved to: {os.path.join(frames_dir, 'qpi')}")
+        print(f"Fourier frames saved to: {os.path.join(frames_dir, 'fourier')}")
         
     except ValueError as e:
         print(f"Error: {e}")

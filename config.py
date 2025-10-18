@@ -92,7 +92,7 @@ RANDOM_10_IMPURITIES = SimulationConfig(
     gridsize=512,
     n_frames=10,
     E_min=5.0,
-    E_max=50.0,
+    E_max=25.0,
     V_s=1.5,  
 )
 
@@ -102,7 +102,7 @@ RANDOM_30_IMPURITIES = SimulationConfig(
     gridsize=1024,  # Larger grid for better spacing
     n_frames=20,    # Reduced frames for faster computation
     E_min=5.0,
-    E_max=50.0,
+    E_max=25.0,
     V_s=1.5,       # Much weaker impurities for numerical stability
 )
 
