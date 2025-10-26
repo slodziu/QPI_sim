@@ -777,10 +777,27 @@ class QPIvisualiser:
         fig = plt.figure(figsize=(22, 12), dpi=100)
         gs = fig.add_gridspec(2, 3, hspace=0.2, wspace=0.25, top=0.95, bottom=0.08, left=0.06, right=0.98)
         
-        # Get k-space extent
+        # Get k-space extent - this must match the coordinates used in azimuthal integration
         dk = 2 * np.pi / self.params.L
         k_actual_max = dk * self.params.gridsize / 2
+        
+        # Calculate crop based on max energy for better visibility
+        max_energy = self.params.E_max
+        max_k_F = self.sim.energy_to_kF(max_energy)
+        max_ring_radius = 2 * max_k_F  # Rings appear at 2*k_F
+        k_crop = 1.7 * max_ring_radius  # Crop to 1.2 times max ring radius
+        
+        # Use the actual k-space coordinates for proper scaling
         extent = [-k_actual_max, k_actual_max, -k_actual_max, k_actual_max]
+        
+        # Calculate crop indices for actual data cropping
+        center = self.params.gridsize // 2
+        crop_radius_pixels = int(k_crop / dk)
+        crop_start = max(0, center - crop_radius_pixels)
+        crop_end = min(self.params.gridsize, center + crop_radius_pixels)
+        
+        # Crop extent to match cropped data
+        extent_crop = [-k_crop, k_crop, -k_crop, k_crop]
         
         # Extract real and imaginary parts
         real_fft = np.real(fft_complex)
@@ -842,10 +859,12 @@ class QPIvisualiser:
         
         # Panel 1: Real part of FFT
         ax1 = fig.add_subplot(gs[0, 0])
+        # Crop the data for better visibility
+        real_fft_crop = real_fft[crop_start:crop_end, crop_start:crop_end]
         # Ensure symmetric color scaling for regular FFT real part
-        vmax_real_fft = np.max(np.abs(real_fft))
-        im1 = ax1.imshow(real_fft, origin='lower', cmap='RdBu_r', extent=extent,
-                        vmin=-3*np.max(cut_left_fft), vmax=3*np.max(cut_right_fft))
+        vmax_real_fft = np.max(np.abs(real_fft_crop))
+        im1 = ax1.imshow(real_fft_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
+                        vmin=-5*np.max(cut_left_fft), vmax=5*np.max(cut_right_fft))
         ax1.set_title(f'Re[FFT(δN(r))] at E={energy:.2f}', fontsize=14)
         ax1.set_xlabel('kx (1/a)', fontsize=12)
         ax1.set_ylabel('ky (1/a)', fontsize=12)
@@ -853,10 +872,12 @@ class QPIvisualiser:
         
         # Panel 2: Imaginary part of FFT
         ax2 = fig.add_subplot(gs[0, 1])
+        # Crop the data for better visibility
+        imag_fft_crop = imag_fft[crop_start:crop_end, crop_start:crop_end]
         # Ensure symmetric color scaling for regular FFT imaginary part
-        vmax_imag_fft = np.max(np.abs(imag_fft))
-        im2 = ax2.imshow(imag_fft, origin='lower', cmap='RdBu_r', extent=extent,
-                        vmin=-3*np.max(cut_left_fft), vmax=3*np.max(cut_right_fft))
+        vmax_imag_fft = np.max(np.abs(imag_fft_crop))
+        im2 = ax2.imshow(imag_fft_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
+                        vmin=-5*np.max(cut_left_fft), vmax=5*np.max(cut_right_fft))
         ax2.set_title(f'Im[FFT(δN(r))] at E={energy:.2f}', fontsize=14)
         ax2.set_xlabel('kx (1/a)', fontsize=12)
         ax2.set_ylabel('ky (1/a)', fontsize=12)
@@ -882,10 +903,12 @@ class QPIvisualiser:
         
         # Panel 4: Real part of R_MA
         ax4 = fig.add_subplot(gs[1, 0])
+        # Crop the data for better visibility
+        real_R_MA_crop = real_R_MA[crop_start:crop_end, crop_start:crop_end]
         # Ensure symmetric color scaling for multi-atom real part
-        vmax_R_MA = np.max(np.abs(real_R_MA))
-        im4 = ax4.imshow(real_R_MA, origin='lower', cmap='RdBu_r', extent=extent,
-                        vmin=-3*np.max(np.abs(cut_left_R_MA)), vmax=3*np.max(np.abs(cut_right_R_MA)))
+        vmax_R_MA = np.max(np.abs(real_R_MA_crop))
+        im4 = ax4.imshow(real_R_MA_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
+                        vmin=-5*np.max(np.abs(cut_left_R_MA)), vmax=5*np.max(np.abs(cut_right_R_MA)))
         ax4.set_title(f'Re[δN_MA(q)] at E={energy:.2f}', fontsize=14)
         ax4.set_xlabel('kx (1/a)', fontsize=12)
         ax4.set_ylabel('ky (1/a)', fontsize=12)
@@ -893,9 +916,11 @@ class QPIvisualiser:
         
         # Panel 5: Imaginary part of R_MA
         ax5 = fig.add_subplot(gs[1, 1])
+        # Crop the data for better visibility
+        imag_R_MA_crop = imag_R_MA[crop_start:crop_end, crop_start:crop_end]
         # Ensure symmetric color scaling for multi-atom imaginary part
-        vmax_imag_R_MA = np.max(np.abs(imag_R_MA))
-        im5 = ax5.imshow(imag_R_MA, origin='lower', cmap='RdBu_r', extent=extent,
+        vmax_imag_R_MA = np.max(np.abs(imag_R_MA_crop))
+        im5 = ax5.imshow(imag_R_MA_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-0.1*vmax_imag_R_MA, vmax=0.1*vmax_imag_R_MA)
         ax5.set_title(f'Im[δN_MA(q)] at E={energy:.2f}', fontsize=14)
         ax5.set_xlabel('kx (1/a)', fontsize=12)
