@@ -856,7 +856,7 @@ class QPIvisualiser:
         
         # Create q-vector array for plotting (use bin centers)
         q_plot = (q_bins[:-1] + q_bins[1:]) / 2
-        
+        scale = 0.7
         # Panel 1: Real part of FFT
         ax1 = fig.add_subplot(gs[0, 0])
         # Crop the data for better visibility
@@ -864,7 +864,7 @@ class QPIvisualiser:
         # Ensure symmetric color scaling for regular FFT real part
         vmax_real_fft = np.max(np.abs(real_fft_crop))
         im1 = ax1.imshow(real_fft_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
-                        vmin=-5*np.max(cut_left_fft), vmax=5*np.max(cut_right_fft))
+                        vmin=-scale*np.max(real_fft_crop), vmax=scale*np.max(real_fft_crop))
         ax1.set_title(f'Re[FFT(δN(r))] at E={energy:.2f}', fontsize=14)
         ax1.set_xlabel('kx (1/a)', fontsize=12)
         ax1.set_ylabel('ky (1/a)', fontsize=12)
@@ -877,7 +877,7 @@ class QPIvisualiser:
         # Ensure symmetric color scaling for regular FFT imaginary part
         vmax_imag_fft = np.max(np.abs(imag_fft_crop))
         im2 = ax2.imshow(imag_fft_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
-                        vmin=-5*np.max(cut_left_fft), vmax=5*np.max(cut_right_fft))
+                        vmin=-scale*np.max(imag_fft_crop), vmax=scale*np.max(imag_fft_crop))
         ax2.set_title(f'Im[FFT(δN(r))] at E={energy:.2f}', fontsize=14)
         ax2.set_xlabel('kx (1/a)', fontsize=12)
         ax2.set_ylabel('ky (1/a)', fontsize=12)
@@ -1258,6 +1258,195 @@ class QPIvisualiser:
         
         self.fig.savefig(filename, dpi=150, bbox_inches='tight')
         print(f"✓ Saved snapshot at E={mid_energy:.2f} to {filename}")
+    
+    def save_greens_function_plot(self, filename: str = 'greens_function.png', energy: Optional[float] = None):
+        """
+        Save a 1D line plot showing Real and -Imaginary parts of the Green's function along k_Y=0.
+        
+        Creates a 2-panel vertical plot with 1D line cuts:
+        - Top panel: Re[G(k_x,0,E)] along k_Y=0
+        - Bottom panel: -Im[G(k_x,0,E)] along k_Y=0
+        
+        Args:
+            filename: Path for output image file
+            energy: Energy at which to compute Green's function (if None, uses mid-energy)
+        """
+        if energy is None:
+            energy = (self.params.E_min + self.params.E_max) / 2
+        
+        # Calculate Green's function at specified energy
+        G0 = self.sim.greens.calculate_G0(energy)
+        
+        # Get k-space coordinates for proper axis labels
+        dk = 2 * np.pi / self.params.L
+        gridsize = self.params.gridsize
+        
+        # Create k_x array (k_y = 0 cut is along the middle row)
+        center = gridsize // 2
+        k_indices = np.arange(gridsize)
+        k_x = (k_indices - center) * dk
+        
+        # Extract 1D cuts along k_Y = 0 (middle row)
+        real_G_cut = np.real(G0[center, :])  # k_Y = 0 cut
+        imag_G_cut = np.imag(G0[center, :])
+        neg_imag_G_cut = -imag_G_cut  # Plot -Im[G] as in the reference image
+        
+        # Create figure with 2 vertical subplots
+        fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(10, 8), dpi=150)
+        
+        # Top panel: Re[G] along k_Y=0
+        ax_top.plot(k_x, real_G_cut, 'b-', linewidth=2)
+        ax_top.set_title(f'Re(G)', fontsize=16, fontweight='bold')
+        ax_top.set_ylabel('Re(G)', fontsize=14)
+        ax_top.grid(True, alpha=0.3)
+        ax_top.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+        ax_top.axvline(x=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+        
+        # Bottom panel: -Im[G] along k_Y=0
+        ax_bottom.plot(k_x, neg_imag_G_cut, 'r-', linewidth=2)
+        ax_bottom.set_title(f'-Im(G)', fontsize=16, fontweight='bold')
+        ax_bottom.set_xlabel('k', fontsize=14)
+        ax_bottom.set_ylabel('-Im(G)', fontsize=14)
+        ax_bottom.grid(True, alpha=0.3)
+        ax_bottom.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+        ax_bottom.axvline(x=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+        
+        # Set consistent x-axis limits for both panels
+        k_max_display = np.max(np.abs(k_x)) * 0.8  # Show 80% of the full range
+        ax_top.set_xlim(-k_max_display, k_max_display)
+        ax_bottom.set_xlim(-k_max_display, k_max_display)
+        
+        # Add energy information as text
+        fig.suptitle(f'Green\'s Function 1D Cut (k_y=0) at E = {energy:.2f}', fontsize=18, fontweight='bold')
+        
+        # Adjust layout to prevent overlap
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.92)
+        
+        # Save the figure
+        fig.savefig(filename, dpi=150, bbox_inches='tight', facecolor='white')
+        plt.close(fig)
+        
+        print(f"✓ Saved Green's function 1D cut plot at E={energy:.2f} to {filename}")
+    
+    def create_greens_function_animation(self, filename: str = 'greens_function_animation.mp4', frames_dir: str = None):
+        """
+        Create an animated version of the Green's function 1D cuts sweeping through energy.
+        
+        Args:
+            filename: Path for output animation file (MP4 or GIF)
+            frames_dir: Directory to save individual frames (if None, frames not saved)
+            
+        Returns:
+            Animation object
+        """
+        from matplotlib.animation import FuncAnimation
+        import os
+        
+        print(f"Creating Green's function animation with {self.params.n_frames} frames...")
+        
+        if frames_dir:
+            os.makedirs(frames_dir, exist_ok=True)
+        
+        # Set up the figure for animation
+        fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(12, 8), dpi=100)
+        
+        # Get k-space coordinates
+        dk = 2 * np.pi / self.params.L
+        gridsize = self.params.gridsize
+        center = gridsize // 2
+        k_indices = np.arange(gridsize)
+        k_x = (k_indices - center) * dk
+        k_max_display = np.max(np.abs(k_x)) * 0.8
+        
+        # Initialize empty line objects
+        line_real, = ax_top.plot([], [], 'b-', linewidth=2, label='Re[G]')
+        line_imag, = ax_bottom.plot([], [], 'r-', linewidth=2, label='-Im[G]')
+        
+        # Set up axes
+        ax_top.set_xlim(-k_max_display, k_max_display)
+        ax_bottom.set_xlim(-k_max_display, k_max_display)
+        
+        ax_top.set_title('ReG', fontsize=16, fontweight='bold')
+        ax_top.set_ylabel('ReG', fontsize=14)
+        ax_top.grid(True, alpha=0.3)
+        ax_top.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+        ax_top.axvline(x=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+        
+        ax_bottom.set_title('-ImG', fontsize=16, fontweight='bold')
+        ax_bottom.set_xlabel('k', fontsize=14)
+        ax_bottom.set_ylabel('-ImG', fontsize=14)
+        ax_bottom.grid(True, alpha=0.3)
+        ax_bottom.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+        ax_bottom.axvline(x=0, color='black', linestyle='-', linewidth=0.5, alpha=0.5)
+        
+        # Text for energy display
+        energy_text = ax_top.text(0.02, 0.98, '', transform=ax_top.transAxes, fontsize=14,
+                                 verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+        
+        # Pre-calculate y-axis limits by computing Green's function at min and max energies
+        G0_min = self.sim.greens.calculate_G0(self.params.E_min)
+        G0_max = self.sim.greens.calculate_G0(self.params.E_max)
+        
+        real_min = min(np.min(np.real(G0_min[center, :])), np.min(np.real(G0_max[center, :])))
+        real_max = max(np.max(np.real(G0_min[center, :])), np.max(np.real(G0_max[center, :])))
+        imag_min = min(np.min(-np.imag(G0_min[center, :])), np.min(-np.imag(G0_max[center, :])))
+        imag_max = max(np.max(-np.imag(G0_min[center, :])), np.max(-np.imag(G0_max[center, :])))
+        
+        # Add some padding to y-limits
+        real_range = real_max - real_min
+        imag_range = imag_max - imag_min
+        padding_real = real_range * 0.1
+        padding_imag = imag_range * 0.1
+        
+        ax_top.set_ylim(real_min - padding_real, real_max + padding_real)
+        ax_bottom.set_ylim(imag_min - padding_imag, imag_max + padding_imag)
+        
+        # Animation function
+        def animate_greens_frame(frame_idx):
+            energy = self.params.E_min + (self.params.E_max - self.params.E_min) * frame_idx / (self.params.n_frames - 1)
+            k_F = self.sim.energy_to_kF(energy)
+            
+            # Calculate Green's function at this energy
+            G0 = self.sim.greens.calculate_G0(energy)
+            
+            # Extract 1D cuts along k_Y = 0
+            real_G_cut = np.real(G0[center, :])
+            neg_imag_G_cut = -np.imag(G0[center, :])
+            
+            # Update line data
+            line_real.set_data(k_x, real_G_cut)
+            line_imag.set_data(k_x, neg_imag_G_cut)
+            
+            # Update energy text
+            energy_text.set_text(f'E = {energy:.2f}\nk_F = {k_F:.2f}')
+            
+            # Update figure title
+            fig.suptitle(f'Green\'s Function 1D Cut (k_Y=0) - Energy Sweep', fontsize=18, fontweight='bold')
+            
+            # Save frame if requested
+            if frames_dir:
+                frame_filename = os.path.join(frames_dir, f'greens_frame_{frame_idx+1:03d}.png')
+                fig.savefig(frame_filename, dpi=100, bbox_inches='tight', facecolor='white')
+            
+            return [line_real, line_imag, energy_text]
+        
+        # Create animation
+        ani = FuncAnimation(
+            fig, animate_greens_frame, frames=self.params.n_frames,
+            interval=200, blit=False, repeat=True
+        )
+        
+        # Save animation
+        if filename.endswith('.gif'):
+            ani.save(filename, writer='pillow', fps=5, dpi=100)
+        else:
+            ani.save(filename, writer='ffmpeg', fps=5, bitrate=2000, dpi=100)
+        
+        plt.close(fig)
+        print(f"✓ Green's function animation saved as: {filename}")
+        
+        return ani
 
 
 def main():
@@ -1289,6 +1478,25 @@ def main():
     
     snapshot_filename = os.path.join(outputs_dir, 'qpi_greens_function_snapshot.png')
     visualiser.save_mid_energy_snapshot(snapshot_filename)
+    
+    # Save Green's function plot at mid-energy
+    greens_filename = os.path.join(outputs_dir, 'greens_function_mid_energy.png')
+    visualiser.save_greens_function_plot(greens_filename)
+    
+    # Save Green's function plots at different energies for comparison
+    low_energy = params.E_min + 0.1 * (params.E_max - params.E_min)
+    high_energy = params.E_min + 0.9 * (params.E_max - params.E_min)
+    
+    greens_low_filename = os.path.join(outputs_dir, f'greens_function_E_{low_energy:.1f}.png')
+    visualiser.save_greens_function_plot(greens_low_filename, energy=low_energy)
+    
+    greens_high_filename = os.path.join(outputs_dir, f'greens_function_E_{high_energy:.1f}.png')
+    visualiser.save_greens_function_plot(greens_high_filename, energy=high_energy)
+    
+    # Create animated Green's function plot - this is POGGERS! 
+    greens_anim_filename = os.path.join(outputs_dir, 'greens_function_animation.mp4')
+    greens_frames_dir = os.path.join(outputs_dir, 'greens_function_frames')
+    greens_ani = visualiser.create_greens_function_animation(greens_anim_filename, frames_dir=greens_frames_dir)
     
     total_points = len(simulation.extracted_k)
     
