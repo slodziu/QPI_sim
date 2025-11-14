@@ -1,0 +1,16 @@
+newmtl band_3
+Ka 0.2 0.2 0.2
+Kd 0.898 0.224 0.208
+Ks 0.3 0.3 0.3
+Ns 32
+d 0.8
+# Band: Band 3, Color: #E53935
+
+newmtl band_4
+Ka 0.2 0.2 0.2
+Kd 1.000 0.439 0.263
+Ks 0.3 0.3 0.3
+Ns 32
+d 0.8
+# Band: Band 4, Color: #FF7043
+

@@ -21,7 +21,7 @@ class SystemParameters:
     Attributes:
         gridsize: Number of grid points in each spatial dimension
         L: Physical system size in real space
-        t: Hopping parameter (unused in parabolic dispersion)
+        t: Hopping parameter 
         mu: Chemical potential
         eta: Energy broadening parameter for Green's function
         V_s: Impurity potential strength
@@ -35,6 +35,12 @@ class SystemParameters:
         low_freq_suppress_radius: Radius for DC suppression in FFT
         low_freq_transition_radius: Transition width for DC suppression
         subtract_radial_average: Whether to subtract radial average (currently unused)
+        
+        # Tight-binding specific parameters
+        model_type: Model type ("parabolic", "square_lattice", "graphene", etc.)
+        t_prime: Next-nearest neighbor hopping (for applicable models)
+        use_all_bands: Whether to sum over all bands (for multi-band models)
+        band_index: Which band to use if not using all bands
     """
     gridsize: int = 512
     L: float = 50.0
@@ -56,6 +62,17 @@ class SystemParameters:
     low_freq_transition_radius: int = 3
     subtract_radial_average: bool = False
     
+    # Tight-binding specific parameters
+    model_type: str = "parabolic"  # Default to parabolic for backward compatibility
+    t_prime: float = 0.0  # Next-nearest neighbor hopping
+    use_all_bands: bool = False  # Whether to sum over all bands
+    band_index: int = 0  # Which band to use if not using all bands
+    
+    # Advanced tight-binding parameters
+    ty: float = 0.6  # Hopping in y-direction (for anisotropic models)
+    t_z: float = 0.5  # Out-of-plane hopping (for 3D models)
+    kz_slice: float = 0.0  # kz value for 2D slice visualization
+    
     @property
     def a(self) -> float:
         """Lattice spacing."""
@@ -63,8 +80,12 @@ class SystemParameters:
     
     @property
     def k_F_max(self) -> float:
-        """Maximum Fermi wavevector."""
-        return np.sqrt(self.E_max)
+        """Maximum Fermi wavevector - model dependent."""
+        if self.model_type == "parabolic":
+            return np.sqrt(max(abs(self.E_min), abs(self.E_max)))
+        else:
+            # For tight-binding, use Brillouin zone scale
+            return np.pi / self.a  # Brillouin zone boundary
 
 
 class SignalProcessing:
@@ -99,25 +120,27 @@ class SignalProcessing:
 
 class GreensFunction:
     """
-    Green's function calculations for parabolic dispersion.
+    Green's function calculations for tight-binding models.
     
     Computes the bare Green's function G₀(r,r',E) in real space using FFT,
-    with the dispersion relation ε(k) = k² - μ.
+    with support for arbitrary tight-binding dispersion relations.
     """
     
-    def __init__(self, params: SystemParameters):
+    def __init__(self, params: SystemParameters, model=None):
         """
         Initialize Green's function calculator.
         
         Args:
             params: System parameters including gridsize, broadening, etc.
+            model: Tight-binding model (if None, uses parabolic for backward compatibility)
         """
         self.params = params
+        self.model = model
         self._setup_k_space()
         self._G0_cache = {}
         
     def _setup_k_space(self):
-        """Initialize k-space grids and parabolic dispersion relation."""
+        """Initialize k-space grids and dispersion relation."""
         kx = 2*np.pi*np.fft.fftfreq(self.params.gridsize, d=self.params.a)
         ky = 2*np.pi*np.fft.fftfreq(self.params.gridsize, d=self.params.a)
         KX, KY = np.meshgrid(kx, ky)
@@ -125,12 +148,18 @@ class GreensFunction:
         self.KX_rot = KX
         self.KY_rot = KY
         
-        self.epsilon_k = (KX**2 + KY**2) - self.params.mu
+        if self.model is not None:
+            # Use tight-binding model for dispersion
+            self.eigenvalues, self.eigenvectors = self.model.get_band_structure(KX, KY)
+        else:
+            # Backward compatibility: parabolic dispersion
+            self.epsilon_k = (KX**2 + KY**2) - self.params.mu
+            self.eigenvalues = self.epsilon_k[np.newaxis, ...]  # Add band dimension
         
         self.kx, self.ky = kx, ky
         self.dk = kx[1] - kx[0]
         
-    def calculate_G0(self, energy: float) -> np.ndarray:
+    def calculate_G0(self, energy: float, band_index: int = None) -> np.ndarray:
         """
         Calculate bare Green's function in real space with caching.
         
@@ -139,24 +168,57 @@ class GreensFunction:
         
         Args:
             energy: Energy at which to compute Green's function
+            band_index: Which band to use (if None, uses params.band_index or backward compatibility)
             
         Returns:
             Complex 2D array of G₀(r,r') in real space
         """
-        energy_key = round(energy, 6)
-        if energy_key in self._G0_cache:
-            return self._G0_cache[energy_key]
+        if band_index is None:
+            band_index = getattr(self.params, 'band_index', 0)
             
-        Gk = 1.0 / (energy - self.epsilon_k + 1j*self.params.eta)
+        cache_key = (round(energy, 6), band_index)
+        if cache_key in self._G0_cache:
+            return self._G0_cache[cache_key]
+            
+        if self.model is not None:
+            # Use tight-binding eigenvalues
+            epsilon_k = self.eigenvalues[band_index]
+            Gk = 1.0 / (energy - epsilon_k + self.params.mu + 1j*self.params.eta)
+        else:
+            # Backward compatibility: parabolic dispersion
+            Gk = 1.0 / (energy - self.epsilon_k + 1j*self.params.eta)
         
         dk = self.dk
         normalization = (dk / (2 * np.pi))**2 * self.params.gridsize**2
         
         G0 = normalization * np.fft.fftshift(np.fft.ifft2(Gk))
         
-        self._G0_cache[energy_key] = G0
+        self._G0_cache[cache_key] = G0
         
         return G0
+
+    def calculate_multiband_G0(self, energy: float) -> np.ndarray:
+        """
+        Calculate Green's function summing over all bands.
+        
+        Args:
+            energy: Energy at which to compute Green's function
+            
+        Returns:
+            Sum over all bands of G₀(r,r')
+        """
+        if self.model is None or not getattr(self.params, 'use_all_bands', False):
+            # Single band or backward compatibility
+            return self.calculate_G0(energy)
+            
+        G0_total = np.zeros((self.params.gridsize, self.params.gridsize), dtype=complex)
+        
+        n_bands = self.eigenvalues.shape[0]
+        for band_idx in range(n_bands):
+            G0_band = self.calculate_G0(energy, band_idx)
+            G0_total += G0_band
+            
+        return G0_total
     
     def calculate_T_matrix(self, G0: np.ndarray, imp_pos: Tuple[int, int]) -> complex:
         """
@@ -496,16 +558,19 @@ class QPISimulation:
     and dispersion extraction across multiple energies.
     """
     
-    def __init__(self, params: SystemParameters, impurity_positions: List[Tuple[int, int]]):
+    def __init__(self, params: SystemParameters, impurity_positions: List[Tuple[int, int]], 
+                 model=None):
         """
         Initialize QPI simulation.
         
         Args:
             params: System parameters
             impurity_positions: List of (row, col) positions for impurities
+            model: Tight-binding model (if None, backward compatibility with parabolic)
         """
         self.params = params
-        self.greens = GreensFunction(params)
+        self.model = model
+        self.greens = GreensFunction(params, model)
         self.impurities = ImpuritySystem(impurity_positions)
         self.analyzer = QPIAnalyzer(params)
         self.analyzer.impurity_positions = impurity_positions  # Pass positions to analyzer
@@ -515,15 +580,29 @@ class QPISimulation:
     
     def energy_to_kF(self, E: float) -> float:
         """
-        Convert energy to Fermi wavevector for parabolic dispersion.
+        Convert energy to Fermi wavevector.
+        
+        For parabolic dispersion: k_F = √E
+        For tight-binding: this is approximate and may not be meaningful
         
         Args:
             E: Energy value
             
         Returns:
-            Fermi wavevector k_F = √E
+            Fermi wavevector (approximate for tight-binding)
         """
-        return np.sqrt(E)
+        if self.model is None:
+            # Parabolic dispersion: ε(k) = k² 
+            return np.sqrt(max(0, E))  # Avoid sqrt of negative numbers
+        else:
+            # For tight-binding, this is approximate
+            # Use energy scale to estimate reasonable k-space range
+            if hasattr(self.model, 't'):
+                # Use hopping scale as energy scale
+                energy_scale = abs(self.model.t) if self.model.t != 0 else 1.0
+                return np.sqrt(max(0, abs(E) / energy_scale))  
+            else:
+                return np.sqrt(max(0, abs(E)))  # Fallback
     
     def run_single_energy(self, energy: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Optional[float]]:
         """
@@ -535,16 +614,29 @@ class QPISimulation:
         Returns:
             Tuple of (LDOS, FFT magnitude, FFT complex, peak_q)
         """
-        k_F = self.energy_to_kF(energy)
-        
-        G0 = self.greens.calculate_G0(energy)
+        if self.model is not None:
+            # Use tight-binding model
+            if getattr(self.params, 'use_all_bands', False):
+                G0 = self.greens.calculate_multiband_G0(energy)
+            else:
+                G0 = self.greens.calculate_G0(energy, getattr(self.params, 'band_index', 0))
+        else:
+            # Backward compatibility: parabolic dispersion
+            G0 = self.greens.calculate_G0(energy)
         
         LDOS = self.impurities.calculate_LDOS(G0, self.greens)
         
         LDOS_processed = self.analyzer.process_LDOS(LDOS)
         fft_complex, fft_display = self.analyzer.calculate_FFT(LDOS_processed)
         
-        k_display_max = max(2 * self.params.k_F_max * 1.3, 8.0)
+        # Model-dependent k-space display range
+        if self.model is not None:
+            # For tight-binding, use reasonable fraction of BZ
+            k_display_max = self.params.k_F_max * 0.5  # Half of BZ for display
+        else:
+            # Backward compatibility: parabolic
+            k_display_max = max(2 * self.params.k_F_max * 1.3, 8.0)
+            
         center = self.params.gridsize // 2
         n_pixels = int(k_display_max / self.greens.dk)
         n_pixels = min(n_pixels, self.params.gridsize//2)
@@ -569,14 +661,19 @@ class QPISimulation:
         if peak_q is not None and peak_q > 0:
             current_energy = getattr(self, 'current_energy', self.params.E_min)
             
-            k_F_expected = np.sqrt(current_energy)
+            # Use energy_to_kF method to handle tight-binding properly
+            k_F_expected = self.energy_to_kF(current_energy)
             
             expected_2kF = 2 * k_F_expected
             tolerance_2kF = 0.6 * expected_2kF
             
-            if peak_q >= 0.3 * expected_2kF and peak_q <= 3.0 * expected_2kF:
+            if expected_2kF > 0 and peak_q >= 0.3 * expected_2kF and peak_q <= 3.0 * expected_2kF:
                 k_F_extracted = peak_q / 2.0
-                E_extracted = k_F_extracted**2
+                # For tight-binding, energy extraction is approximate
+                if self.model is None:
+                    E_extracted = k_F_extracted**2  # Parabolic
+                else:
+                    E_extracted = current_energy  # Use current energy for tight-binding
                 
                 is_new_point = True
                 if len(self.extracted_k) > 0:
@@ -646,9 +743,9 @@ class QPIvisualiser:
         self.ax4.set_title('Dispersion: Theory vs Extracted')
         self.ax4.grid(True, alpha=0.3)
         
+        # Plot theoretical dispersion based on model type - store the line objects
         k_theory = np.linspace(-self.params.k_F_max * 1.2, self.params.k_F_max * 1.2, 400)
-        E_theory = k_theory**2
-        self.ax4.plot(k_theory, E_theory, 'b-', linewidth=2, label='Theory: E = k²')
+        self.theory_lines = self._plot_theoretical_dispersion(k_theory)
         
         self.extracted_scatter = self.ax4.scatter(
             [], [], c='red', s=50, alpha=0.7, label='From q=2k_F peaks'
@@ -656,13 +753,76 @@ class QPIvisualiser:
         
         self.ax4.legend()
         self.ax4.set_xlim(-self.params.k_F_max * 1.2, self.params.k_F_max * 1.2)
-        self.ax4.set_ylim(0, self.params.E_max * 1.05)
+        
+        # Set appropriate y-limits based on energy range
+        if hasattr(self.sim, 'model') and self.sim.model is not None:
+            # For tight-binding, use the actual energy range
+            y_min = min(self.params.E_min, 0) - 0.5
+            y_max = max(self.params.E_max, 0) + 0.5
+            self.ax4.set_ylim(y_min, y_max)
+        else:
+            # Backward compatibility: parabolic (only positive energies)
+            self.ax4.set_ylim(0, self.params.E_max * 1.05)
         
         self.energy_text = self.ax1.text(
             0.02, 0.98, '', transform=self.ax1.transAxes, fontsize=14,
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8)
         )
     
+    def _plot_theoretical_dispersion(self, k_theory):
+        """
+        Plot theoretical dispersion relation based on the model type.
+        
+        Returns:
+            List of line objects for the theoretical curves
+        """
+        theory_lines = []
+        
+        if hasattr(self.sim, 'model') and self.sim.model is not None:
+            # Get model information
+            model = self.sim.model
+            
+            if hasattr(model, 't'):  # Tight-binding model
+                # Create small k-space grid for band structure calculation
+                ky_vals = np.zeros_like(k_theory)  # Along kx axis for 1D cut
+                
+                try:
+                    # Get band structure along kx direction
+                    eigenvalues, _ = model.get_band_structure(k_theory[np.newaxis, :], ky_vals[np.newaxis, :])
+                    
+                    # Plot each band
+                    n_bands = eigenvalues.shape[0]
+                    colors = ['blue', 'green', 'red', 'orange'] * (n_bands // 4 + 1)
+                    
+                    for band_idx in range(min(n_bands, 4)):  # Limit to 4 bands for clarity
+                        E_band = eigenvalues[band_idx, 0, :] + self.params.mu  # Add chemical potential
+                        
+                        # Plot all energies, both positive and negative
+                        if len(E_band) > 0:
+                            band_name = f'Band {band_idx}' if n_bands > 1 else 'Theory'
+                            line, = self.ax4.plot(k_theory, E_band, 
+                                                color=colors[band_idx], linewidth=2, 
+                                                label=f'{band_name}: {model.__class__.__name__}')
+                            theory_lines.append(line)
+                    
+                except Exception as e:
+                    # Fallback to parabolic
+                    E_theory = k_theory**2
+                    line, = self.ax4.plot(k_theory, E_theory, 'b-', linewidth=2, label='Theory: E = k² (fallback)')
+                    theory_lines.append(line)
+            else:
+                # Unknown model, use parabolic
+                E_theory = k_theory**2  
+                line, = self.ax4.plot(k_theory, E_theory, 'b-', linewidth=2, label='Theory: E = k²')
+                theory_lines.append(line)
+        else:
+            # No model (backward compatibility)
+            E_theory = k_theory**2
+            line, = self.ax4.plot(k_theory, E_theory, 'b-', linewidth=2, label='Theory: E = k²')
+            theory_lines.append(line)
+        
+        return theory_lines
+
     def animate_frame(self, frame_idx: int):
         """
         Animate a single frame.
@@ -682,7 +842,10 @@ class QPIvisualiser:
         self._update_momentum_plot(fft_display)
         self._update_dispersion_plot(peak_q)
         
+        # Return all artists that need to be redrawn (including theory lines for persistence)
         artists = [self.im1, self.im2, self.energy_text, self.extracted_scatter]
+        if hasattr(self, 'theory_lines'):
+            artists.extend(self.theory_lines)
         return artists
     
     def _update_real_space_plot(self, LDOS: np.ndarray, energy: float, k_F: float):
@@ -781,11 +944,26 @@ class QPIvisualiser:
         dk = 2 * np.pi / self.params.L
         k_actual_max = dk * self.params.gridsize / 2
         
-        # Calculate crop based on max energy for better visibility
-        max_energy = self.params.E_max
-        max_k_F = self.sim.energy_to_kF(max_energy)
-        max_ring_radius = 2 * max_k_F  # Rings appear at 2*k_F
-        k_crop = 1.7 * max_ring_radius  # Crop to 1.2 times max ring radius
+        # Calculate crop based on model-appropriate energy scales
+        max_energy = max(abs(self.params.E_min), abs(self.params.E_max))
+        
+        # Model-dependent k-space scaling
+        if hasattr(self.sim, 'model') and self.sim.model is not None:
+            # For tight-binding models, use hopping scale
+            if hasattr(self.sim.model, 't'):
+                # Typical k-space extent is π/a (Brillouin zone boundary)
+                k_max_physical = np.pi / self.params.a  # BZ boundary
+                max_ring_radius = k_max_physical * 0.5  # Reasonable QPI scale
+            else:
+                # Fallback
+                max_k_F = self.sim.energy_to_kF(max_energy) 
+                max_ring_radius = 2 * max_k_F
+        else:
+            # Backward compatibility: parabolic
+            max_k_F = self.sim.energy_to_kF(max_energy)
+            max_ring_radius = 2 * max_k_F  # Rings appear at 2*k_F
+        
+        k_crop = 1.5 * max_ring_radius  # Crop to reasonable range
         
         # Use the actual k-space coordinates for proper scaling
         extent = [-k_actual_max, k_actual_max, -k_actual_max, k_actual_max]
@@ -889,11 +1067,18 @@ class QPIvisualiser:
         ax3.plot(q_plot, cut_left_fft, 'r-', linewidth=2, label='θ=π (left)', alpha=0.8)
         ax3.axhline(y=0, color='gray', linestyle=':', linewidth=1, alpha=0.5)
         
-        # Add expected 2k_F peak position
-        k_F = np.sqrt(energy)
-        expected_2kF = 2 * k_F
-        if expected_2kF <= np.max(q_plot):
-            ax3.axvline(x=expected_2kF, color='black', linestyle='--', linewidth=2, alpha=0.8, label=f'2k_F = {expected_2kF:.2f}')
+        # Add expected 2k_F peak position (if meaningful)
+        if hasattr(self.sim, 'energy_to_kF'):
+            k_F = self.sim.energy_to_kF(energy)
+            expected_2kF = 2 * k_F
+            if expected_2kF > 0 and expected_2kF <= np.max(q_plot):
+                ax3.axvline(x=expected_2kF, color='black', linestyle='--', linewidth=2, alpha=0.8, label=f'2k_F ≈ {expected_2kF:.2f}')
+        else:
+            # Fallback for backward compatibility
+            k_F = np.sqrt(max(0, energy))
+            expected_2kF = 2 * k_F
+            if expected_2kF <= np.max(q_plot):
+                ax3.axvline(x=expected_2kF, color='black', linestyle='--', linewidth=2, alpha=0.8, label=f'2k_F = {expected_2kF:.2f}')
         
         ax3.set_xlabel('|q| (1/a)', fontsize=12)
         ax3.set_ylabel('Re[FFT(δN)] (azimuthally integrated)', fontsize=12)
@@ -1014,7 +1199,7 @@ class QPIvisualiser:
         
         ani = animation.FuncAnimation(
             self.fig, self.animate_frame, frames=self.params.n_frames, 
-            interval=200, blit=True
+            interval=200, blit=False
         )
         
         ani.save(filename, writer=writer, **writer_args)
@@ -1030,14 +1215,14 @@ class QPIvisualiser:
             frames_dir: Directory containing frames (fourier frames should be in frames_dir/fourier/)
             
         Returns:
-            None (creates animation from existing frames)
+            None (creates animation from existing frames, or skips if frames_dir is None)
         """
         import os
         import glob
         from PIL import Image
         
         if frames_dir is None:
-            print("Error: frames_dir must be provided for fourier animation")
+            # Skip animation creation if frames weren't saved
             return
             
         # Look for fourier analysis frames in the fourier subfolder
@@ -1460,12 +1645,24 @@ def main():
         gridsize=512,
         E_min=5.0,
         E_max=25.0,
-        n_frames=20
+        n_frames=20,
+        model_type="parabolic"  # Explicit backward compatibility
     )
     
     impurity_positions = [(params.gridsize//2, params.gridsize//2)]
     
-    simulation = QPISimulation(params, impurity_positions)
+    # Create model based on model_type (None for backward compatibility)
+    model = None
+    if hasattr(params, 'model_type') and params.model_type != "parabolic":
+        from model_factory import create_model
+        model_params = {
+            't': params.t,
+            't_prime': getattr(params, 't_prime', 0.0),
+            'a': params.a
+        }
+        model = create_model(params.model_type, **model_params)
+    
+    simulation = QPISimulation(params, impurity_positions, model)
     visualiser = QPIvisualiser(simulation)
     
     import os
