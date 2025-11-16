@@ -14,8 +14,7 @@ except ImportError:
 a = 0.41    # U-Te distance along a direction (shorter)
 b = 0.61    # Te-Te distance along b direction (longer)
 c = 1.39    # layer spacing along c axis (longest)
-# Note: In momentum space, shorter lattice → wider k-range
-# So kx range (π/a) > ky range (π/b) > kz range (π/c)
+
 
 # U parameters (verified against paper)
 muU = -0.355
@@ -115,79 +114,1050 @@ def verify_model_parameters():
         print("✗ Some parameters don't match - check implementation")
     print("=" * 40)
 
-def band_energies_on_slice(kz):
+def band_energies_on_slice(kz, resolution=300):
     """Compute band energies for all kx, ky at fixed kz"""
-    energies = np.zeros((nk, nk, 4))
+    # Create local momentum grid with proper resolution
+    nk_local = resolution  # Configurable resolution
+    kx_vals_local = np.linspace(-1*np.pi/a, 1*np.pi/a, nk_local)
+    ky_vals_local = np.linspace(-3*np.pi/b, 3*np.pi/b, nk_local)
     
-    for i, kx in enumerate(kx_vals):
-        for j, ky in enumerate(ky_vals):
+    energies = np.zeros((nk_local, nk_local, 4))
+    
+    # Original indexing: energies[kx_idx, ky_idx, band]
+    for i, kx in enumerate(kx_vals_local):
+        for j, ky in enumerate(ky_vals_local):
             H = H_full(kx, ky, kz)
             eigvals = np.linalg.eigvals(H)
             energies[i, j, :] = np.sort(np.real(eigvals))
     
     return energies
 
+def band_energies_with_eigenvectors(kz, resolution=300):
+    """Compute band energies and eigenvectors on a 2D slice at fixed kz."""
+    # Create 2D momentum grid matching the UTe2 Fermi surface range
+    nk = resolution  # Configurable resolution for better spectral weight calculation
+    # Use extended range to capture the full Fermi surface
+    kx_vals = np.linspace(-1*np.pi/a, 1*np.pi/a, nk)  # Extend kx range
+    ky_vals = np.linspace(-3*np.pi/b, 3*np.pi/b, nk)       # Keep full ky range
+    
+    # Pre-allocate arrays
+    energies = np.zeros((nk, nk, 4))
+    eigenvectors = np.zeros((nk, nk, 4, 4), dtype=complex)
+    
+    for i, kx in enumerate(kx_vals):
+        for j, ky in enumerate(ky_vals):
+            H = H_full(kx, ky, kz)
+            eigenvals, eigenvecs = np.linalg.eigh(H)
+            idx = np.argsort(eigenvals)
+            energies[i, j, :] = np.real(eigenvals[idx])
+            eigenvectors[i, j, :, :] = eigenvecs[:, idx]
+    
+    return energies, eigenvectors
+
+def compute_spectral_weights(kz, orbital_weights=None, energy_window=0.2, resolution=300):
+    """
+    Compute orbital-projected spectral weights for each band at given k-points.
+    
+    The spectral weight A(k,ω) = Σ_n |⟨orbital|ψ_n(k)⟩|² δ(ω - E_n(k))
+    For Fermi surface, we evaluate at ω = E_F = 0 with a small energy window.
+    
+    Parameters:
+    -----------
+    kz : float
+        kz value for the slice
+    orbital_weights : dict, optional
+        Weights for different orbitals {'U1': w1, 'U2': w2, 'Te1': w3, 'Te2': w4}
+        Default gives equal weight to all orbitals
+    energy_window : float
+        Energy window around Fermi level for spectral weight calculation
+    resolution : int
+        Grid resolution for momentum space
+    
+    Returns:
+    --------
+    spectral_weights : ndarray, shape (nk, nk)
+        Total spectral weight at each k-point (summed over relevant bands)
+    orbital_contributions : dict
+        Individual orbital contributions to spectral weight
+    """
+    if orbital_weights is None:
+        orbital_weights = {'U1': 1.0, 'U2': 1.0, 'Te1': 1.0, 'Te2': 1.0}
+    
+    # Get energies and eigenvectors
+    energies, eigenvectors = band_energies_with_eigenvectors(kz, resolution=resolution)
+    nk = energies.shape[0]
+    
+    # Initialize spectral weight arrays
+    total_spectral_weight = np.zeros((nk, nk))
+    orbital_contributions = {
+        'U1': np.zeros((nk, nk)),
+        'U2': np.zeros((nk, nk)),
+        'Te1': np.zeros((nk, nk)),
+        'Te2': np.zeros((nk, nk))
+    }
+    
+    orbital_names = ['U1', 'U2', 'Te1', 'Te2']
+    
+    print(f"Computing orbital-projected spectral weights at kz = {kz:.3f}...")
+    print(f"Energy window around E_F: ±{energy_window:.3f} eV")
+    
+    for i in range(nk):
+        if i % (nk//10) == 0:
+            print(f"  Progress: {i/nk*100:.1f}%")
+        for j in range(nk):
+            for band in range(4):
+                E_nk = energies[i, j, band]
+                
+                # Only include states near Fermi level
+                if abs(E_nk) <= energy_window:
+                    psi_nk = eigenvectors[i, j, :, band]  # Eigenvector for band n at k-point (i,j)
+                    
+                    # Weight by proximity to Fermi level for better contrast
+                    fermi_weight = 1.0 / (abs(E_nk) + 0.001)  # Inverse distance to EF
+                    
+                    # Calculate orbital-projected weights
+                    for orbital_idx, orbital_name in enumerate(orbital_names):
+                        # |⟨orbital|ψ_n(k)⟩|² weighted by proximity to Fermi level
+                        orbital_weight = np.abs(psi_nk[orbital_idx])**2 * fermi_weight
+                        
+                        # Apply user-defined orbital importance weighting
+                        weighted_contribution = orbital_weight * orbital_weights[orbital_name]
+                        # Add to orbital-specific contribution
+                        orbital_contributions[orbital_name][i, j] += weighted_contribution
+                        
+                        # Add to total spectral weight
+                        total_spectral_weight[i, j] += weighted_contribution
+    
+    return total_spectral_weight, orbital_contributions
+
+def calculate_gap_magnitude(kx, ky, kz, pairing_type='B1u', C0=1.0, C1=1.0, C2=1.0, C3=1.0):
+    """
+    Calculate superconducting gap magnitude |Δ_k| for different pairing symmetries.
+    
+    Parameters:
+    -----------
+    kx, ky, kz : array-like
+        Momentum components
+    pairing_type : str
+        Type of pairing symmetry: 'Au', 'B1u', 'B2u', 'B3u'
+    C0, C1, C2, C3 : float
+        Coupling constants for different symmetry components
+        
+    Returns:
+    --------
+    gap_magnitude : array
+        Magnitude of superconducting gap |Δ_k|
+    """
+    
+    # Define d-vectors for different pairing symmetries from the paper
+    if pairing_type == 'Au':
+        # IR d vector: Au [C1 sin(kx*a), C2 sin(ky*b), C3 sin(kz*c)]
+        dx = C1 * np.sin(kx * a)
+        dy = C2 * np.sin(ky * b) 
+        dz = C3 * np.sin(kz * c)
+        
+    elif pairing_type == 'B1u':
+        # B1u [C1 sin(ky*b), C2 sin(kx*a), C0 sin(kx*a)*sin(ky*b)*sin(kz*c)]
+        dx = C1 * np.sin(ky * b)
+        dy = C2 * np.sin(kx * a)
+        dz = C0 * np.sin(kx * a) * np.sin(ky * b) * np.sin(kz * c)
+        
+    elif pairing_type == 'B2u':
+        # B2u [C1 sin(kz*c), C0 sin(kx*a)*sin(ky*b)*sin(kz*c), C3 sin(kx*a)]
+        dx = C1 * np.sin(kz * c)
+        dy = C0 * np.sin(kx * a) * np.sin(ky * b) * np.sin(kz * c)
+        dz = C3 * np.sin(kx * a)
+        
+    elif pairing_type == 'B3u':
+        # B3u [C0 sin(kx*a)*sin(ky*b)*sin(kz*c), C2 sin(kz*c), C3 sin(ky*b)]
+        dx = C0 * np.sin(kx * a) * np.sin(ky * b) * np.sin(kz * c)
+        dy = C2 * np.sin(kz * c)
+        dz = C3 * np.sin(ky * b)
+        
+    else:
+        raise ValueError(f"Unknown pairing type: {pairing_type}")
+    
+    # Calculate gap magnitude |Δ_k| = |d_k|
+    gap_magnitude = np.sqrt(dx**2 + dy**2 + dz**2)
+    
+    return gap_magnitude
+
+def plot_main_fermi_contours(kx_vals, ky_vals, energies_fs, save_dir='outputs/ute2_debug'):
+    """Plot the main Fermi contours within -1π/a to 1π/a and -1π/b to 1π/b range."""
+    import matplotlib.pyplot as plt
+    import os
+    os.makedirs(save_dir, exist_ok=True)
+    
+    fig, ax = plt.subplots(figsize=(10, 8))
+    
+    # Extract contours for both bands
+    bands_to_plot = [2, 3]  # Band 3 and 4 (0-indexed)
+    colors = ['red', 'blue']
+    labels = ['Band 3', 'Band 4']
+    
+    for band_idx, color, label in zip(bands_to_plot, colors, labels):
+        energy_data = energies_fs[:, :, band_idx]
+        
+        if energy_data.min() <= 0 <= energy_data.max():
+            # Create contour
+            temp_fig, temp_ax = plt.subplots(figsize=(1, 1))
+            contour = temp_ax.contour(ky_vals, kx_vals, energy_data, levels=[0.0])
+            plt.close(temp_fig)
+            
+            # Extract and plot relevant contours
+            if len(contour.allsegs[0]) > 0:
+                contour_count = 0
+                for i, path in enumerate(contour.allsegs[0]):
+                    if len(path) > 0:
+                        # Convert to π/a and π/b units
+                        ky_array = path[:, 0] / (np.pi / b)
+                        kx_array = path[:, 1] / (np.pi / a)
+                        
+                        # Check if contour is within or overlaps our range of interest
+                        ky_in_range = (ky_array.min() <= 1) and (ky_array.max() >= -1)
+                        kx_in_range = (kx_array.min() <= 1) and (kx_array.max() >= -1)
+                        
+                        if ky_in_range and kx_in_range:
+                            # Plot the contour
+                            if contour_count == 0:
+                                ax.plot(ky_array, kx_array, color=color, linewidth=2, 
+                                       label=f'{label} Fermi Surface', alpha=0.8)
+                            else:
+                                ax.plot(ky_array, kx_array, color=color, linewidth=2, alpha=0.8)
+                            
+                            contour_count += 1
+                            print(f"{label} Contour {i+1}: ky ∈ [{ky_array.min():.3f}π/b, {ky_array.max():.3f}π/b], "
+                                  f"kx ∈ [{kx_array.min():.3f}π/a, {kx_array.max():.3f}π/a], {len(path)} points")
+    
+    # Set up the plot
+    ax.set_xlim(-1.2, 1.2)
+    ax.set_ylim(-1.2, 1.2)
+    ax.set_xlabel('ky (π/b units)', fontsize=12)
+    ax.set_ylabel('kx (π/a units)', fontsize=12)
+    ax.set_title('Main Fermi Contours (Bands 3 & 4)\nWithin ±1π/a and ±1π/b Range', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    
+    # Add reference lines
+    ax.axhline(y=0, color='k', linestyle='--', alpha=0.5)
+    ax.axvline(x=0, color='k', linestyle='--', alpha=0.5)
+    
+    # Add boundary box
+    ax.plot([-1, 1, 1, -1, -1], [-1, -1, 1, 1, -1], 'k--', alpha=0.5, linewidth=1)
+    
+    save_path = os.path.join(save_dir, 'main_fermi_contours_debug.png')
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=200, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Debug plot saved to: {save_path}")
+
+def extract_fermi_contour_points(kx_vals, ky_vals, energies_fs, bands_to_extract=[2, 3]):
+    """Extract Fermi contour points for specified bands and print them."""
+    print("\n=== FERMI CONTOUR POINTS ===")
+    
+    for band_idx in bands_to_extract:
+        print(f"\nBand {band_idx + 1} Fermi Contours:")
+        
+        # Extract energy data for this band
+        energy_data = energies_fs[:, :, band_idx].T  # Transpose to match ky,kx coordinate system
+        
+        # Check if band crosses Fermi level
+        if energy_data.min() <= 0 <= energy_data.max():
+            # Create contour to extract path data
+            import matplotlib.pyplot as plt
+            fig, ax = plt.subplots(figsize=(1, 1))
+            
+            # Debug: print array shapes
+            print(f"    Debug: ky_vals shape: {ky_vals.shape}, kx_vals shape: {kx_vals.shape}")
+            print(f"    Debug: energy_data shape: {energy_data.shape}")
+            
+            # Make sure we have the right orientation for contour
+            # Contour expects: contour(X, Y, Z) where Z.shape == (len(Y), len(X))
+            # So if energy_data[ky_idx, kx_idx], then Z should be energy_data
+            contour = ax.contour(ky_vals, kx_vals, energy_data, levels=[0.0])
+            plt.close(fig)
+            
+            # Extract contour paths
+            if len(contour.allsegs[0]) > 0:
+                for i, path in enumerate(contour.allsegs[0]):
+                    if len(path) > 0:
+                        print(f"  Contour {i+1}: {len(path)} points")
+                        
+                        # Convert to π/a and π/b units and print sample points
+                        print(f"    Sample points (in π/a, π/b units):")
+                        
+                        # Print every 10th point to avoid too much output
+                        sample_indices = range(0, len(path), max(1, len(path) // 10))
+                        for j in sample_indices:
+                            ky, kx = path[j]
+                            ky_pi_b = ky / (np.pi / b)
+                            kx_pi_a = kx / (np.pi / a)
+                            print(f"      Point {j}: ky={ky_pi_b:.3f}π/b, kx={kx_pi_a:.3f}π/a")
+                        
+                        # Also print the full contour as arrays for potential use
+                        print(f"    Full contour summary:")
+                        ky_array = path[:, 0] / (np.pi / b)
+                        kx_array = path[:, 1] / (np.pi / a)
+                        print(f"      ky range: {ky_array.min():.3f}π/b to {ky_array.max():.3f}π/b")
+                        print(f"      kx range: {kx_array.min():.3f}π/a to {kx_array.max():.3f}π/a")
+                        print(f"      Total points: {len(ky_array)}")
+            else:
+                print(f"    No contours found for Band {band_idx + 1}")
+        else:
+            print(f"    Band {band_idx + 1} does not cross Fermi level")
+            print(f"      Energy range: {energy_data.min():.3f} to {energy_data.max():.3f} eV")
+
+def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'], 
+                         save_dir='outputs/ute2_gap', resolution=300):
+    """
+    Plot 2D superconducting gap magnitude for different pairing symmetries.
+    
+    Parameters:
+    -----------
+    kz : float
+        kz value for the slice
+    pairing_types : list
+        List of pairing symmetries to plot
+    save_dir : str
+        Directory to save plots
+    resolution : int
+        Grid resolution
+    """
+    import os
+    os.makedirs(save_dir, exist_ok=True)
+    
+    print(f"\nComputing superconducting gap magnitudes at kz = {kz:.3f}...")
+    
+    # Create momentum grid with physical k-values
+    nk = resolution
+    kx_vals = np.linspace(-np.pi/a, np.pi/a, nk)
+    ky_vals = np.linspace(-np.pi/b, np.pi/b, nk)  # Reduced range for gap plots
+    KX, KY = np.meshgrid(kx_vals, ky_vals)
+    
+    # Calculate Fermi surface for overlay using same range as gap plots
+    energies_fs = np.zeros((nk, nk, 4))
+    for i, kx in enumerate(kx_vals):
+        for j, ky in enumerate(ky_vals):
+            H = H_full(kx, ky, kz)
+            eigvals = np.linalg.eigvals(H)
+            energies_fs[i, j, :] = np.sort(np.real(eigvals))
+    
+    # Create subplot layout
+    n_types = len(pairing_types)
+    if n_types <= 2:
+        fig, axes = plt.subplots(1, n_types, figsize=(8*n_types, 7))
+        if n_types == 1:
+            axes = [axes]
+    else:
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        axes = axes.flatten()
+    
+    # Colors for Fermi surface bands
+    fs_colors = ['#1E88E5', '#42A5F5', "#9635E5", "#FD0000"]
+    band_labels = ['Band 1', 'Band 2', 'Band 3', 'Band 4']
+    
+    for i, pairing_type in enumerate(pairing_types):
+        ax = axes[i]
+        
+        print(f"  Computing {pairing_type} gap magnitude...")
+        # Calculate gap magnitude for this pairing type
+        gap_mag = calculate_gap_magnitude(KX, KY, kz, pairing_type=pairing_type)
+        
+        # Plot gap magnitude - use same coordinate order as contour
+        im = ax.imshow(gap_mag.T, extent=[ky_vals.min(), ky_vals.max(), 
+                                         kx_vals.min(), kx_vals.max()],
+                      origin='lower', cmap='RdYlBu_r', alpha=0.8)
+        
+        # Highlight nodal regions FIRST (where gap is very small)
+        gap_threshold = 0.1 * np.max(gap_mag)  # 10% of maximum gap
+        nodal_mask = gap_mag < gap_threshold
+        if np.any(nodal_mask):
+            ax.contourf(KY, KX, gap_mag.T, levels=[0, gap_threshold],
+                       colors=['darkblue'], alpha=0.4)
+            ax.contour(KY, KX, gap_mag.T, levels=[gap_threshold],
+                      colors=['darkblue'], linewidths=2, alpha=0.8, linestyles='--')
+        
+        # Overlay Fermi surface contours - SAME scheme as plot_fs_2d
+        for band in range(4):
+            Z = energies_fs[:, :, band].T  # Same as plot_fs_2d
+            if Z.min() <= 0 <= Z.max():  # Only plot if band crosses Fermi level
+                # Use same contour call as plot_fs_2d: contour(KY, KX, Z)
+                ax.contour(KY, KX, Z, levels=[0], 
+                          colors=[fs_colors[band]], linewidths=3, alpha=1.0, zorder=8)
+        
+        # Find and mark gap nodes where gap≈0 AND Fermi surface crosses
+        # Use physics-based detection for different pairing types
+        if pairing_type == 'B2u':
+            # B2u at kz=0: [0, 0, C3*sin(kx*a)] -> nodes at kx = 0, ±π/a (vertical lines)
+            gap_node_threshold = 0.03 * np.max(gap_mag)  # 3% threshold for B2u
+        elif pairing_type == 'B3u':
+            # B3u at kz=0: [0, 0, C3*sin(ky*b)] -> nodes at ky = 0, ±π/b (horizontal lines)  
+            gap_node_threshold = 0.02 * np.max(gap_mag)  # 2% threshold for B3u
+        else:
+            gap_node_threshold = 0.05 * np.max(gap_mag)  # Default threshold
+        
+        total_gap_nodes = 0
+        gap_nodes_by_band = {}
+        
+        # Special handling for B2u - use global detection instead of line-based
+        if pairing_type == 'B2u':
+            # B2u can have gap nodes anywhere where gap is small, not just at exact theoretical lines
+            gap_node_threshold = 0.05 * np.max(gap_mag)  # More generous threshold for B2u
+            
+            fermi_bands = [2, 3]  # Band 3 and 4 (0-indexed)
+            
+            for band in fermi_bands:
+                Z = energies_fs[:, :, band].T  # Transpose to match gap_mag indexing
+                if Z.min() <= 0 <= Z.max():  # Double-check Fermi crossing
+                    # Use sensitive Fermi surface detection
+                    fermi_mask = np.abs(Z) < 0.02  # 20 meV threshold
+                    gap_node_mask = gap_mag < gap_node_threshold
+                    intersection = fermi_mask & gap_node_mask
+                    
+                    if np.any(intersection):
+                        ky_indices, kx_indices = np.where(intersection)
+                        band_nodes = 0
+                        
+                        # Group nearby points to avoid overcrowding
+                        selected_points = []
+                        min_distance = 15  # Minimum pixels between gap nodes
+                        
+                        for i in range(len(ky_indices)):
+                            ky_idx, kx_idx = ky_indices[i], kx_indices[i]
+                            
+                            # Check if this point is far enough from already selected points
+                            too_close = False
+                            for (prev_ky, prev_kx) in selected_points:
+                                if np.sqrt((ky_idx - prev_ky)**2 + (kx_idx - prev_kx)**2) < min_distance:
+                                    too_close = True
+                                    break
+                            
+                            if not too_close:
+                                selected_points.append((ky_idx, kx_idx))
+                                
+                                # Convert indices to physical coordinates
+                                ky_node = ky_vals[ky_idx]
+                                kx_node = kx_vals[kx_idx]
+                                
+                                # Print coordinates for debugging
+                                ky_pi_b = ky_node / (np.pi / b)
+                                kx_pi_a = kx_node / (np.pi / a)
+                                print(f"    B2u Band {band+1} gap node: ky={ky_pi_b:.3f}π/b, kx={kx_pi_a:.3f}π/a")
+                                
+                                # Add circle marker at gap node
+                                ax.scatter(ky_node, kx_node, s=100, c='yellow',
+                                         marker='o', edgecolors='red', linewidth=2,
+                                         alpha=0.9, zorder=10)
+                                total_gap_nodes += 1
+                                band_nodes += 1
+                        
+                        if band_nodes > 0:
+                            gap_nodes_by_band[f'Band {band+1}'] = band_nodes
+        
+        else:
+            # Standard point-based detection for other pairing types
+            fermi_bands = [2, 3]  # Band 3 and 4 (0-indexed)
+            
+            for band in fermi_bands:
+                Z = energies_fs[:, :, band].T  # Transpose to match gap_mag indexing
+                if Z.min() <= 0 <= Z.max():  # Double-check Fermi crossing
+                    # Use sensitive Fermi surface detection
+                    fermi_mask = np.abs(Z) < 0.01  # 10 meV threshold
+                    gap_node_mask = gap_mag < gap_node_threshold
+                    intersection = fermi_mask & gap_node_mask
+                    
+                    if np.any(intersection):
+                        ky_indices, kx_indices = np.where(intersection)
+                        band_nodes = 0
+                        
+                        # Physics-based grouping for specific pairing types
+                        selected_points = []
+                        if pairing_type == 'B3u':
+                            # B3u: nodes should be at horizontal lines (constant ky)
+                            min_distance = 12
+                        else:
+                            min_distance = 10
+                        
+                        for i in range(len(ky_indices)):
+                            ky_idx, kx_idx = ky_indices[i], kx_indices[i]
+                            
+                            # Check if this point is far enough from already selected points
+                            too_close = False
+                            for (prev_ky, prev_kx) in selected_points:
+                                if np.sqrt((ky_idx - prev_ky)**2 + (kx_idx - prev_kx)**2) < min_distance:
+                                    too_close = True
+                                    break
+                            
+                            if not too_close:
+                                selected_points.append((ky_idx, kx_idx))
+                                
+                                # Convert indices to physical coordinates
+                                ky_node = ky_vals[ky_idx]
+                                kx_node = kx_vals[kx_idx]
+                                
+                                # Print coordinates for debugging
+                                if pairing_type == 'B3u':
+                                    ky_pi_b = ky_node / (np.pi / b)
+                                    kx_pi_a = kx_node / (np.pi / a)
+                                    print(f"    B3u Band {band+1} gap node: ky={ky_pi_b:.3f}π/b, kx={kx_pi_a:.3f}π/a")
+                                
+                                # Add circle marker at gap node
+                                ax.scatter(ky_node, kx_node, s=100, c='yellow', 
+                                         marker='o', edgecolors='red', linewidth=2,
+                                         alpha=0.9, zorder=10)
+                                total_gap_nodes += 1
+                                band_nodes += 1
+                        
+                        if band_nodes > 0:
+                            gap_nodes_by_band[f'Band {band+1}'] = band_nodes
+        
+        if total_gap_nodes > 0:
+            band_info = ', '.join([f'{band}: {count}' for band, count in gap_nodes_by_band.items()])
+            print(f"    {pairing_type}: found {total_gap_nodes} gap nodes on Fermi surface ({band_info})")
+        else:
+            print(f"    {pairing_type}: no gap nodes found - checking gap structure...")
+            print(f"      Gap range: {np.min(gap_mag):.6f} to {np.max(gap_mag):.6f}")
+            print(f"      Gap threshold used: {gap_node_threshold:.6f}")
+            print(f"      Fermi surface energy range: {np.min(np.abs(energies_fs[:,:,2])):.6f} to {np.min(np.abs(energies_fs[:,:,3])):.6f}")
+        
+        # Set physical axis limits
+        ax.set_xlim(ky_vals.min(), ky_vals.max())
+        ax.set_ylim(kx_vals.min(), kx_vals.max())
+        
+        # Custom tick formatting to show π/a and π/b units
+        ky_ticks = np.linspace(ky_vals.min(), ky_vals.max(), 5)
+        kx_ticks = np.linspace(kx_vals.min(), kx_vals.max(), 5)
+        ky_labels = [f'{val/(np.pi/b):.1f}' for val in ky_ticks]
+        kx_labels = [f'{val/(np.pi/a):.1f}' for val in kx_ticks]
+        ax.set_xticks(ky_ticks)
+        ax.set_yticks(kx_ticks)
+        ax.set_xticklabels(ky_labels)
+        ax.set_yticklabels(kx_labels)
+        
+        ax.set_xlabel('ky (π/b)', fontsize=12)
+        ax.set_ylabel('kx (π/a)', fontsize=12)
+        ax.set_title(f'{pairing_type} Gap Magnitude |Δ_k|', fontsize=14)
+        ax.grid(True, alpha=0.3)
+        
+        # Add colorbar
+        cbar = plt.colorbar(im, ax=ax, shrink=0.8)
+        cbar.set_label('|Δ_k|', fontsize=12)
+        
+        print(f"    {pairing_type}: gap range 0 to {np.max(gap_mag):.3f}")
+        if np.any(nodal_mask):
+            print(f"    {pairing_type}: nodal regions marked in dark blue")
+        else:
+            print(f"    {pairing_type}: no gap nodes detected")
+    
+    # Hide unused subplots if necessary
+    if n_types < len(axes):
+        for j in range(n_types, len(axes)):
+            axes[j].set_visible(False)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    filename = f'gap_magnitude_2d_kz_{kz:.3f}.png'
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.show()
+    print(f"Gap magnitude plot saved: {filepath}")
+    
+    # Also create individual plots for each pairing type
+    for pairing_type in pairing_types:
+        fig_single, ax_single = plt.subplots(1, 1, figsize=(10, 8))
+        
+        # Calculate gap magnitude
+        gap_mag = calculate_gap_magnitude(KX, KY, kz, pairing_type=pairing_type)
+        
+        # Plot gap magnitude with physical k-values
+        im_single = ax_single.imshow(gap_mag.T, extent=[ky_vals.min(), ky_vals.max(), 
+                                               kx_vals.min(), kx_vals.max()],
+                                    origin='lower', cmap='RdYlBu_r', alpha=0.8)
+        gap_threshold = 0.1 * np.max(gap_mag)
+        nodal_mask = gap_mag < gap_threshold
+        if np.any(nodal_mask):
+            ax_single.contourf(ky_vals, kx_vals, gap_mag.T, levels=[0, gap_threshold],
+                             colors=['darkblue'], alpha=0.4)  # Reduce alpha
+        
+        # Overlay Fermi surface ON TOP
+        for band in range(4):
+            Z = energies_fs[:, :, band]  # No transpose needed now
+            if Z.min() <= 0 <= Z.max():
+                contour = ax_single.contour(ky_vals, kx_vals, Z, levels=[0], 
+                                          colors=[fs_colors[band]], linewidths=3, alpha=1.0, zorder=8)
+                # Add band labels
+                if len(contour.allsegs[0]) > 0:  # Check if contour has segments
+                    ax_single.plot([], [], color=fs_colors[band], linewidth=3, 
+                                 label=band_labels[band], alpha=1.0)
+        
+        # Find and mark gap nodes where gap≈0 AND Fermi surface crosses
+        # Use physics-based detection for different pairing types
+        if pairing_type == 'B2u':
+            # B2u at kz=0: [0, 0, C3*sin(kx*a)] -> nodes at kx = 0, ±π/a (vertical lines)
+            gap_node_threshold = 0.03 * np.max(gap_mag)  # 3% threshold for B2u
+        elif pairing_type == 'B3u':
+            # B3u at kz=0: [0, 0, C3*sin(ky*b)] -> nodes at ky = 0, ±π/b (horizontal lines)  
+            gap_node_threshold = 0.02 * np.max(gap_mag)  # 2% threshold for B3u
+        else:
+            gap_node_threshold = 0.05 * np.max(gap_mag)  # Default threshold
+        
+        gap_nodes_found = 0
+        gap_nodes_by_band = {}
+        
+        # Special handling for B2u line-type nodes
+        if pairing_type == 'B2u':
+            # B2u forms vertical node lines at kx ≈ 0, ±π/a
+            kx_node_positions = [0.0, np.pi/a, -np.pi/a]  # Theoretical node positions
+            
+            # Only check bands 3 and 4 since they're the only ones crossing Fermi level
+            fermi_bands = [2, 3]
+            
+            for kx_node in kx_node_positions:
+                # Find kx index closest to the theoretical node position
+                kx_idx = np.argmin(np.abs(kx_vals - kx_node))
+                
+                # Extract the vertical line at this kx
+                gap_line = gap_mag[kx_idx, :]  # gap along this vertical line
+                
+                # Check each Fermi surface band
+                for band in fermi_bands:
+                    Z_line = energies_fs[kx_idx, :, band]  # Energy along this line
+                    
+                    # Find where both gap is small AND energy crosses Fermi level
+                    gap_mask = gap_line < gap_node_threshold
+                    fermi_crossings = np.where(np.abs(Z_line) < 0.015)[0]  # More tolerant Fermi crossing
+                    
+                    # Find intersections
+                    for ky_idx in fermi_crossings:
+                        if ky_idx < len(gap_mask) and gap_mask[ky_idx]:  # Gap is small at Fermi crossing
+                            # Convert indices to physical coordinates
+                            ky_node = ky_vals[ky_idx]
+                            kx_node_actual = kx_vals[kx_idx]
+                            
+                            # Add gap node marker
+                            if gap_nodes_found == 0:  # Add to legend only once
+                                ax_single.scatter(ky_node, kx_node_actual, s=150, c='yellow',
+                                               marker='o', edgecolors='red', linewidth=2,
+                                               alpha=0.9, zorder=10, label='Gap nodes')
+                            else:
+                                ax_single.scatter(ky_node, kx_node_actual, s=150, c='yellow',
+                                               marker='o', edgecolors='red', linewidth=2,
+                                               alpha=0.9, zorder=10)
+                            gap_nodes_found += 1
+                            
+                            if f'Band {band+1}' not in gap_nodes_by_band:
+                                gap_nodes_by_band[f'Band {band+1}'] = 0
+                            gap_nodes_by_band[f'Band {band+1}'] += 1
+        
+        else:
+            # Standard point-based detection for other pairing types
+            fermi_bands = [2, 3]  # Band 3 and 4 (0-indexed)
+            
+            for band in fermi_bands:
+                Z = energies_fs[:, :, band].T  # Transpose to match gap_mag indexing
+                if Z.min() <= 0 <= Z.max():  # Double-check Fermi crossing
+                    band_gap_nodes = 0
+                    
+                    # Use sensitive Fermi surface detection
+                    fermi_mask = np.abs(Z) < 0.01  # 10 meV threshold  
+                    gap_node_mask = gap_mag < gap_node_threshold
+                    intersection = fermi_mask & gap_node_mask
+                    
+                    if np.any(intersection):
+                        ky_indices, kx_indices = np.where(intersection)
+                        
+                        # Physics-based grouping for specific pairing types
+                        selected_points = []
+                        if pairing_type == 'B3u':
+                            # B3u: nodes should be at horizontal lines (constant ky)
+                            min_distance = 10
+                        else:
+                            min_distance = 8
+                        
+                        for i in range(len(ky_indices)):
+                            ky_idx, kx_idx = ky_indices[i], kx_indices[i]
+                            
+                            # Check if this point is far enough from already selected points
+                            too_close = False
+                            for (prev_ky, prev_kx) in selected_points:
+                                if np.sqrt((ky_idx - prev_ky)**2 + (kx_idx - prev_kx)**2) < min_distance:
+                                    too_close = True
+                                    break
+                            
+                            if not too_close:
+                                selected_points.append((ky_idx, kx_idx))
+                                
+                                # Convert indices to physical coordinates
+                                ky_node = ky_vals[ky_idx]
+                                kx_node = kx_vals[kx_idx]
+                                
+                                # Print coordinates for debugging
+                                ky_pi_b = ky_node / (np.pi / b)
+                                kx_pi_a = kx_node / (np.pi / a)
+                                print(f"    B3u Band {band+1} gap node: ky={ky_pi_b:.3f}π/b, kx={kx_pi_a:.3f}π/a")
+                                
+                                # Add circle marker at gap node
+                                if gap_nodes_found == 0:  # Add to legend only once
+                                    ax_single.scatter(ky_node, kx_node, s=150, c='yellow', 
+                                                   marker='o', edgecolors='red', linewidth=2,
+                                                   alpha=0.9, zorder=10, label='Gap nodes')
+                                else:
+                                    ax_single.scatter(ky_node, kx_node, s=150, c='yellow', 
+                                                   marker='o', edgecolors='red', linewidth=2,
+                                                   alpha=0.9, zorder=10)
+                                gap_nodes_found += 1
+                                band_gap_nodes += 1
+                    
+                    if band_gap_nodes > 0:
+                        gap_nodes_by_band[f'Band {band+1}'] = band_gap_nodes
+        
+        if gap_nodes_found > 0:
+            band_info = ', '.join([f'{band}: {count}' for band, count in gap_nodes_by_band.items()])
+            print(f"    Found {gap_nodes_found} gap nodes on Fermi surface for {pairing_type} ({band_info})")
+        else:
+            print(f"    No gap nodes found on Fermi surface for {pairing_type}")
+            print(f"      Gap range: {np.min(gap_mag):.6f} to {np.max(gap_mag):.6f}")
+            print(f"      Gap threshold used: {gap_node_threshold:.6f}")
+            print(f"      Expected for {pairing_type}: 6 nodes total (3 per band)")
+        
+        # Set physical axis limits and custom tick formatting
+        ax_single.set_xlim(ky_vals.min(), ky_vals.max())
+        ax_single.set_ylim(kx_vals.min(), kx_vals.max())
+        
+        # Custom tick formatting to show π/a and π/b units
+        ky_ticks = np.linspace(ky_vals.min(), ky_vals.max(), 5)
+        kx_ticks = np.linspace(kx_vals.min(), kx_vals.max(), 5)
+        ky_labels = [f'{val/(np.pi/b):.1f}' for val in ky_ticks]
+        kx_labels = [f'{val/(np.pi/a):.1f}' for val in kx_ticks]
+        ax_single.set_xticks(ky_ticks)
+        ax_single.set_yticks(kx_ticks)
+        ax_single.set_xticklabels(ky_labels)
+        ax_single.set_yticklabels(kx_labels)
+        
+        ax_single.set_xlabel('ky (π/b)', fontsize=14)
+        ax_single.set_ylabel('kx (π/a)', fontsize=14)
+        ax_single.set_title(f'{pairing_type} Superconducting Gap |Δ_k| at kz = {kz:.1f}', fontsize=16)
+        ax_single.grid(True, alpha=0.3)
+        ax_single.legend(loc='upper right', fontsize=10)
+        
+        # Enhanced colorbar
+        cbar_single = plt.colorbar(im_single, ax=ax_single, shrink=0.8)
+        cbar_single.set_label('Gap Magnitude |Δ_k|', fontsize=12)
+        
+        plt.tight_layout()
+        
+        # Save individual plot
+        filename_single = f'gap_magnitude_{pairing_type}_kz_{kz:.3f}.png'
+        filepath_single = os.path.join(save_dir, filename_single)
+        plt.savefig(filepath_single, dpi=300, bbox_inches='tight')
+        plt.close(fig_single)
+        
+        print(f"Individual {pairing_type} plot saved: {filepath_single}")
+
 def plot_fs_2d(energies, kz_label, save_dir='outputs/ute2_fixed'):
     import os
     os.makedirs(save_dir, exist_ok=True)
     
-    plt.figure(figsize=(10, 8))
-    
     # Colors for different bands - U bands (0,1) vs Te bands (2,3)
-    colors = ['#1E88E5', '#42A5F5', '#E53935', '#FF7043']  # Blue for U, Red for Te
+    colors = ['#1E88E5', '#42A5F5',  "#9635E5", "#FD0000"]  # Blue for U, Red for Te
     band_labels = ['Band 1', 'Band 2', 'Band 3', 'Band 4']
     
-    # Convert momentum to units of π/a and π/b for plotting (with axis swap)
-    KX_units = KX / (np.pi/a)  # kx in π/a units
-    KY_units = KY / (np.pi/b)  # ky in π/b units
+    # Create momentum grids that match the energies array size - using physical k-values
+    nk_energies = energies.shape[0]  # Get actual size of energies array
+    kx_vals_local = np.linspace(-1*np.pi/a, 1*np.pi/a, nk_energies)
+    ky_vals_local = np.linspace(-3*np.pi/b, 3*np.pi/b, nk_energies)
+    KX_local, KY_local = np.meshgrid(kx_vals_local, ky_vals_local)
+    
+    # Keep physical k-values for plotting (no conversion)
+    KX_physical = KX_local  # Physical kx values
+    KY_physical = KY_local  # Physical ky values
     
     # Fermi level
     EF = 0.0
-    bands_plotted = 0
     
-    print(f"\\n2D Fermi surface at kz={kz_label}:")
+    # Create both extended and cropped versions
+    versions = [
+        {'xlim': (-3, 3), 'suffix': '_extended', 'title_suffix': ' (Extended)'},
+        {'xlim': (-1, 1), 'suffix': '_cropped', 'title_suffix': ' (Cropped)'}
+    ]
+    
+    for version in versions:
+        plt.figure(figsize=(10, 8))
+        bands_plotted = 0
+        
+        print(f"\\n2D Fermi surface at kz={kz_label}{version['title_suffix']}:")
+        
+        for band in range(4):
+            Z = energies[:, :, band].T
+            
+            # Only plot if band crosses the Fermi level
+            if Z.min() <= EF <= Z.max():
+                cs = plt.contour(KY_physical, KX_physical, Z, levels=[EF], 
+                               linewidths=2.5, colors=[colors[band]])
+                if len(cs.allsegs[0]) > 0:
+                    seg = cs.allsegs[0][0]
+                    if len(seg) > 0:
+                        mid = seg.shape[0]//2
+                        xlbl, ylbl = seg[mid,0], seg[mid,1]
+                        # Convert physical coordinates to π/b units for range check
+                        xlbl_units = xlbl / (np.pi/b)
+                        # Only add label if it's within the visible range
+                        if version['xlim'][0] <= xlbl_units <= version['xlim'][1]:
+                            plt.text(xlbl, ylbl, f"{band_labels[band]}", fontsize=9, 
+                                   color=colors[band], weight='bold', 
+                                   bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
+                        bands_plotted += 1
+                        print(f"  Plotted {band_labels[band]} Fermi surface at E=0.000 eV")
+            else:
+                print(f"  {band_labels[band]} does not cross Fermi level (range: {Z.min():.3f} to {Z.max():.3f} eV)")
+        
+        if bands_plotted == 0:
+            print("  Warning: No bands cross the Fermi level at this kz!")
+        
+        # Set physical axis limits
+        ky_lim_physical = [val * np.pi/b for val in version['xlim']]
+        kx_lim_physical = [-1 * np.pi/a, 1 * np.pi/a]
+        
+        plt.xlim(ky_lim_physical)
+        plt.ylim(kx_lim_physical)
+        
+        # Custom tick formatting to show π/a and π/b units
+        ky_ticks = np.linspace(ky_lim_physical[0], ky_lim_physical[1], 7)
+        kx_ticks = np.linspace(kx_lim_physical[0], kx_lim_physical[1], 5)
+        ky_labels = [f'{val/(np.pi/b):.1f}' for val in ky_ticks]
+        kx_labels = [f'{val/(np.pi/a):.1f}' for val in kx_ticks]
+        plt.xticks(ky_ticks, ky_labels)
+        plt.yticks(kx_ticks, kx_labels)
+        
+        plt.xlabel(r'$k_y$ (π/b)', fontsize=12)  # ky on x-axis
+        plt.ylabel(r'$k_x$ (π/a)', fontsize=12)  # kx on y-axis
+        plt.title(f'Fermi surface (E=0) at kz={kz_label}{version["title_suffix"]}', fontsize=14)
+        plt.grid(True, alpha=0.3)
+        
+        # Add legend
+        from matplotlib.lines import Line2D
+        legend_elements = [Line2D([0], [0], color=colors[i], lw=2, label=band_labels[i]) for i in range(4)]
+        plt.legend(handles=legend_elements, loc='upper right')
+        
+        plt.tight_layout()
+        
+        # Save with appropriate filename
+        filename = f'fermi_surface_kz_{kz_label}{version["suffix"]}.png'
+        filepath = os.path.join(save_dir, filename)
+        plt.savefig(filepath, dpi=300, bbox_inches='tight')
+        plt.show()
+        print(f"Saved plot to {filepath}")
+
+def plot_2d_with_spectral_weight(kz=0.0, weight_type='total', orbital_focus=None, 
+                                colormap='hot', alpha_contours=0.8, save_dir='outputs/ute2_spectral',
+                                energy_window=0.15):
+    """
+    Plot 2D Fermi surface with spectral weight information.
+    
+    Parameters:
+    -----------
+    kz : float
+        kz value for the slice
+    weight_type : str
+        'total' - show total spectral weight
+        'orbital' - show orbital-projected weight
+        'intensity' - weight by proximity to Fermi level
+    orbital_focus : dict, optional
+        Focus on specific orbitals: {'U1': 1, 'U2': 0, 'Te1': 1, 'Te2': 0}
+    colormap : str
+        Matplotlib colormap for spectral weight
+    alpha_contours : float
+        Transparency of Fermi surface contours
+    save_dir : str
+        Directory to save plots
+    """
+    import os
+    os.makedirs(save_dir, exist_ok=True)
+    
+    print(f"\nCalculating 2D slice with spectral weights at kz = {kz:.3f}...")
+    
+    # Calculate energies
+    energies = band_energies_on_slice(kz)
+    
+    # Set up orbital weights based on focus
+    if orbital_focus is None:
+        if weight_type == 'orbital':
+            # Default: focus on Te orbitals (more relevant for Fermi surface)
+            orbital_weights = {'U1': 0.2, 'U2': 0.2, 'Te1': 1.0, 'Te2': 1.0}
+        else:
+            orbital_weights = {'U1': 1.0, 'U2': 1.0, 'Te1': 1.0, 'Te2': 1.0}
+    else:
+        orbital_weights = orbital_focus
+    
+    # Compute spectral weights
+    spectral_weights = compute_spectral_weights(kz, orbital_weights)
+    
+    # Create the plot
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+    
+    # Create momentum grids for plotting - use physical k-values
+    nk = energies.shape[0]
+    kx_vals_plot = np.linspace(-1*np.pi/a, 1*np.pi/a, nk)
+    ky_vals_plot = np.linspace(-3*np.pi/b, 3*np.pi/b, nk)
+    KX_plot, KY_plot = np.meshgrid(kx_vals_plot, ky_vals_plot)
+    
+    # Plot 1: Traditional Fermi surface contours
+    ax1.set_title(f'Fermi surface (E=0) at kz={kz/np.pi*c:.2f}π/c')
+    ax1.grid(True, alpha=0.3)
+    
+    # Set physical axis limits and tick formatting for ax1
+    ky_lim_physical = [-3 * np.pi/b, 3 * np.pi/b]
+    kx_lim_physical = [-1 * np.pi/a, 1 * np.pi/a]
+    ax1.set_xlim(ky_lim_physical)
+    ax1.set_ylim(kx_lim_physical)
+    
+    # Custom tick formatting for ax1
+    ky_ticks_ax1 = np.linspace(ky_lim_physical[0], ky_lim_physical[1], 7)
+    kx_ticks_ax1 = np.linspace(kx_lim_physical[0], kx_lim_physical[1], 5)
+    ky_labels_ax1 = [f'{val/(np.pi/b):.1f}' for val in ky_ticks_ax1]
+    kx_labels_ax1 = [f'{val/(np.pi/a):.1f}' for val in kx_ticks_ax1]
+    ax1.set_xticks(ky_ticks_ax1)
+    ax1.set_yticks(kx_ticks_ax1)
+    ax1.set_xticklabels(ky_labels_ax1)
+    ax1.set_yticklabels(kx_labels_ax1)
+    ax1.set_xlabel('ky (π/b)')
+    ax1.set_ylabel('kx (π/a)')
+    
+    # Plot 2: Spectral weight visualization
+    ax2.set_title(f'Spectral weight at kz={kz/np.pi*c:.2f}π/c ({weight_type})')
+    ax2.grid(True, alpha=0.3)
+    
+    # Set same physical axis limits and tick formatting for ax2
+    ax2.set_xlim(ky_lim_physical)
+    ax2.set_ylim(kx_lim_physical)
+    ax2.set_xticks(ky_ticks_ax1)
+    ax2.set_yticks(kx_ticks_ax1)
+    ax2.set_xticklabels(ky_labels_ax1)
+    ax2.set_yticklabels(kx_labels_ax1)
+    ax2.set_xlabel('ky (π/b)')
+    ax2.set_ylabel('kx (π/a)')
+    
+    # Band colors and labels
+    band_colors = ['#1E88E5', '#42A5F5',  "#9635E5", "#FD0000"]  # Blue for U, Red/Orange for Te
+    band_labels = ['Band 1', 'Band 2', 'Band 3', 'Band 4']
+    
+    plotted_bands = []
+    EF = 0.0
     
     for band in range(4):
-        Z = energies[:, :, band].T
+        Z = energies[:, :, band].T  # Transpose for correct orientation
         
-        # Only plot if band crosses the Fermi level
+        # Only process bands that cross Fermi level
         if Z.min() <= EF <= Z.max():
-            cs = plt.contour(KY_units, KX_units, Z, levels=[EF], 
-                           linewidths=2.5, colors=[colors[band]])
-            if len(cs.allsegs[0]) > 0:
-                seg = cs.allsegs[0][0]
-                if len(seg) > 0:
-                    mid = seg.shape[0]//2
-                    xlbl, ylbl = seg[mid,0], seg[mid,1]
-                    plt.text(xlbl, ylbl, f"{band_labels[band]}", fontsize=9, 
-                           color=colors[band], weight='bold', 
-                           bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
-                    bands_plotted += 1
-                    print(f"  Plotted {band_labels[band]} Fermi surface at E=0.000 eV")
+            try:
+                # Plot Fermi surface contours using physical k-values
+                contour1 = ax1.contour(ky_vals_plot, kx_vals_plot, Z, levels=[EF], 
+                                     colors=[band_colors[band]], linewidths=2.5, alpha=alpha_contours)
+                
+                if len(contour1.collections) > 0:
+                    ax1.plot([], [], color=band_colors[band], linewidth=2.5, 
+                            label=band_labels[band])
+                    plotted_bands.append(band)
+                    
+                    # Calculate spectral weight visualization
+                    weight_data = spectral_weights[:, :, band].T  # Transpose for correct orientation
+                    
+                    if weight_type == 'intensity':
+                        # Weight by proximity to Fermi level (inverse of |E - EF|)
+                        fermi_proximity = 1.0 / (np.abs(Z) + 0.01)  # Add small constant to avoid division by zero
+                        weight_data = weight_data * fermi_proximity
+                    
+                    # Create spectral weight plot - show more structure
+                    if np.max(weight_data) > 0:
+                        weight_threshold = np.percentile(weight_data[weight_data > 0], 10)  # Top 90% of non-zero weights
+                        weight_data_masked = np.where(weight_data > weight_threshold, weight_data, np.nan)
+                        print(f"    {band_labels[band]}: weight range {np.min(weight_data[weight_data > 0]):.6f} to {np.max(weight_data):.6f}")
+                    else:
+                        weight_data_masked = weight_data
+                        print(f"    {band_labels[band]}: no significant spectral weight")
+                    
+                    # Plot spectral weight as colored contours using physical k-values
+                    if not np.all(np.isnan(weight_data_masked)):
+                        im = ax2.contourf(ky_vals_plot, kx_vals_plot, weight_data_masked, 
+                                        levels=15, cmap=colormap, alpha=0.8)
+                    
+                    # Overlay Fermi surface contours using physical k-values
+                    ax2.contour(ky_vals_plot, kx_vals_plot, Z, levels=[EF], 
+                              colors=[band_colors[band]], linewidths=2, alpha=alpha_contours)
+                    
+                    print(f"  Plotted {band_labels[band]} with spectral weights")
+            
+            except Exception as e:
+                print(f"  Could not plot band {band}: {e}")
         else:
-            print(f"  {band_labels[band]} does not cross Fermi level (range: {Z.min():.3f} to {Z.max():.3f} eV)")
+            print(f"  {band_labels[band]} does not cross Fermi level")
     
-    if bands_plotted == 0:
-        print("  Warning: No bands cross the Fermi level at this kz!")
+    # Add legends and colorbars
+    if plotted_bands:
+        ax1.legend(loc='upper right')
     
-    plt.xlabel(r'$k_y$ (π/b)', fontsize=12)  # ky on x-axis
-    plt.ylabel(r'$k_x$ (π/a)', fontsize=12)  # kx on y-axis
-    plt.title(f'Fermi surface (E=0) at kz={kz_label}', fontsize=14)
-    plt.xlim(-3, 3)  # Extended range for ky
-    plt.ylim(-1, 1)   # Standard range for kx
-    plt.grid(True, alpha=0.3)
+    # Add colorbar for spectral weights
+    if 'im' in locals():
+        cbar = plt.colorbar(im, ax=ax2, shrink=0.8)
+        cbar.set_label('Spectral Weight', rotation=270, labelpad=20)
     
-    # Add legend
-    from matplotlib.lines import Line2D
-    legend_elements = [Line2D([0], [0], color=colors[i], lw=2, label=band_labels[i]) for i in range(4)]
-    plt.legend(handles=legend_elements, loc='upper right')
+    # Add orbital weight information
+    weight_text = f"Orbital weights: U1={orbital_weights['U1']:.1f}, U2={orbital_weights['U2']:.1f}, " \
+                 f"Te1={orbital_weights['Te1']:.1f}, Te2={orbital_weights['Te2']:.1f}"
+    fig.text(0.02, 0.02, weight_text, fontsize=8, style='italic')
     
     plt.tight_layout()
     
-    filename = f'fermi_surface_kz_{kz_label}.png'
-    plt.savefig(os.path.join(save_dir, filename), dpi=300, bbox_inches='tight')
+    # Save the plot
+    filename = f"fermi_surface_spectral_weight_{weight_type}_kz_{kz/np.pi*c:.3f}.png"
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    print(f"Spectral weight plot saved: {filename}")
+    
     plt.show()
-    print(f"Saved plot to {os.path.join(save_dir, filename)}")
+
+def generate_spectral_weight_plots(save_dir='outputs/ute2_spectral'):
+    """Generate different types of orbital-projected spectral weight visualizations."""
+    print("\n" + "="*70)
+    print("GENERATING ORBITAL-PROJECTED SPECTRAL WEIGHT VISUALIZATIONS")
+    print("="*70)
+    
+    # Test different energy windows
+    energy_windows = [0.02, 0.05, 0.1]  # Different energy windows around Fermi level
+    
+    for i, energy_window in enumerate(energy_windows):
+        print(f"\n--- Energy window: ±{energy_window:.3f} eV around E_F ---")
+        
+        # 1. Total spectral weight (all orbitals)
+        print(f"\n{i+1}.1 Total spectral weight (equal orbital weights)")
+        plot_2d_with_spectral_weight(kz=0.0, weight_type='total', 
+                                    colormap='viridis', alpha_contours=0.9, 
+                                    save_dir=save_dir, energy_window=energy_window)
+        
+        # 2. Te orbital focused (relevant for Fermi surface in UTe2)
+        print(f"\n{i+1}.2 Te orbital contributions only")
+        plot_2d_with_spectral_weight(kz=0.0, weight_type='Te_only',
+                                    colormap='plasma', alpha_contours=0.8, 
+                                    save_dir=save_dir, energy_window=energy_window)
+        
+        # 3. U orbital focused (for comparison)
+        print(f"\n{i+1}.3 U orbital contributions only")
+        plot_2d_with_spectral_weight(kz=0.0, weight_type='U_only',
+                                    colormap='cool', alpha_contours=0.8, 
+                                    save_dir=save_dir, energy_window=energy_window)
+        
+        # 4. Te/U orbital ratio (shows which parts of FS are more Te-like vs U-like)
+        print(f"\n{i+1}.4 Te/U spectral weight ratio")
+        plot_2d_with_spectral_weight(kz=0.0, weight_type='orbital_ratio',
+                                    colormap='RdBu_r', alpha_contours=0.7, 
+                                    save_dir=save_dir, energy_window=energy_window)
+    
+    print("\n" + "="*70)
+    print("All spectral weight visualizations completed!")
+    print(f"Plots saved to: {save_dir}")
+    print("="*70)
 
 def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
     import os
@@ -207,7 +1177,7 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
     print(f"  3D grid: {nk3d} x {nk3d} x {nk3d} = {nk3d**3:,} points")
     
     # Colors for different bands - U bands (0,1) vs Te bands (2,3)
-    colors = ['#1E88E5', '#42A5F5', '#E53935', '#FF7043']  # Blue for U, Red for Te
+    colors = ['#1E88E5', '#42A5F5',  "#9635E5", "#FD0000"]  # Blue for U, Red for Te
     band_labels = ['Band 1', 'Band 2', 'Band 3', 'Band 4']
     alphas = [0.6, 0.6, 0.8, 0.8]  # Te bands slightly more opaque
     
@@ -374,7 +1344,7 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
             combined_mesh.export(combined_stl_filepath)
             
             total_faces = sum(len(mesh.faces) for mesh in all_meshes)
-            print(f"\n  ✓ Exported complete Fermi surface as {combined_stl_filename}")
+            print(f"\n  Exported complete Fermi surface as {combined_stl_filename}")
             print(f"    Combined {len(all_meshes)} surfaces with {total_faces:,} total faces")
             
             # Export as OBJ with colors/materials
@@ -525,6 +1495,20 @@ if __name__ == "__main__":
     
     # Generate only kz=0 2D plot
     plot_fs_2d(energies_kz0, kz0)
+    
+    # Extract and print Fermi contour points
+    # Create the coordinate arrays that match the energy data resolution
+    resolution = 300  # Same as in band_energies_on_slice
+    kx_vals_local = np.linspace(-1*np.pi/a, 1*np.pi/a, resolution)
+    ky_vals_local = np.linspace(-3*np.pi/b, 3*np.pi/b, resolution)
+    extract_fermi_contour_points(kx_vals_local, ky_vals_local, energies_kz0, bands_to_extract=[2, 3])
+    
+    # Plot the main 4 contours for debug
+    plot_main_fermi_contours(kx_vals_local, ky_vals_local, energies_kz0)
+    
+    # Generate superconducting gap magnitude plots
+    print("\nGenerating superconducting gap magnitude visualizations...")
+    plot_gap_magnitude_2d(kz=kz0, pairing_types=['B1u', 'B2u', 'B3u'], resolution=200)
     
     # Generate 3D plot
     plot_3d_fermi_surface()
