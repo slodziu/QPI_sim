@@ -11,9 +11,10 @@ except ImportError:
     print("trimesh not available - 3D export will be skipped")
 
 # Lattice constants (nm) - UTe2 orthorhombic structure
-a = 0.41    # U-Te distance along a direction (shorter)
-b = 0.61    # Te-Te distance along b direction (longer)
-c = 1.39    # layer spacing along c axis (longest)
+# Full lattice parameters for gap function calculations
+a = 0.407   # Lattice constant along a direction: 4.07 Å
+b = 0.583   # Lattice constant along b direction: 5.83 Å
+c = 1.378   # Lattice constant along c direction: 13.78 Å
 
 
 # U parameters (verified against paper)
@@ -230,7 +231,7 @@ def compute_spectral_weights(kz, orbital_weights=None, energy_window=0.2, resolu
     
     return total_spectral_weight, orbital_contributions
 
-def calculate_gap_magnitude(kx, ky, kz, pairing_type='B1u', C0=1.0, C1=1.0, C2=1.0, C3=1.0):
+def calculate_gap_magnitude(kx, ky, kz, pairing_type='B1u', C0=0.0, C1=0.0003, C2=0.0003, C3=0.0003):
     """
     Calculate superconducting gap magnitude |Δ_k| for different pairing symmetries.
     
@@ -241,12 +242,13 @@ def calculate_gap_magnitude(kx, ky, kz, pairing_type='B1u', C0=1.0, C1=1.0, C2=1
     pairing_type : str
         Type of pairing symmetry: 'Au', 'B1u', 'B2u', 'B3u'
     C0, C1, C2, C3 : float
-        Coupling constants for different symmetry components
+        Coupling constants for different symmetry components (in eV)
+        Default values: C0 = 0, C1 = C2 = C3 = 300 μeV = 0.0003 eV
         
     Returns:
     --------
     gap_magnitude : array
-        Magnitude of superconducting gap |Δ_k|
+        Magnitude of superconducting gap |Δ_k| (in eV)
     """
     
     # Define d-vectors for different pairing symmetries from the paper
@@ -257,20 +259,20 @@ def calculate_gap_magnitude(kx, ky, kz, pairing_type='B1u', C0=1.0, C1=1.0, C2=1
         dz = C3 * np.sin(kz * c)
         
     elif pairing_type == 'B1u':
-        # B1u [C1 sin(ky*b), C2 sin(kx*a), C0 sin(kx*a)*sin(ky*b)*sin(kz*c)]
+        # B1u: d ∝ (sin ky·b, sin kx·a, 0) → zeros at ky = 0, ±π/b, kx = 0, ±π/a
         dx = C1 * np.sin(ky * b)
         dy = C2 * np.sin(kx * a)
-        dz = C0 * np.sin(kx * a) * np.sin(ky * b) * np.sin(kz * c)
+        dz = 0  # Third component is zero for B1u
         
     elif pairing_type == 'B2u':
-        # B2u [C1 sin(kz*c), C0 sin(kx*a)*sin(ky*b)*sin(kz*c), C3 sin(kx*a)]
+        # B2u: d ∝ (sin kz·c, 0, sin kx·a) → zeros at kz = 0, ±π/c, kx = 0, ±π/a
         dx = C1 * np.sin(kz * c)
-        dy = C0 * np.sin(kx * a) * np.sin(ky * b) * np.sin(kz * c)
+        dy = 0  # Middle component is zero for B2u
         dz = C3 * np.sin(kx * a)
         
     elif pairing_type == 'B3u':
-        # B3u [C0 sin(kx*a)*sin(ky*b)*sin(kz*c), C2 sin(kz*c), C3 sin(ky*b)]
-        dx = C0 * np.sin(kx * a) * np.sin(ky * b) * np.sin(kz * c)
+        # B3u: d ∝ (0, sin kz·c, sin ky·b) → zeros at kz = 0, ±π/c, ky = 0, ±π/b
+        dx = 0  # First component is zero for B3u
         dy = C2 * np.sin(kz * c)
         dz = C3 * np.sin(ky * b)
         
@@ -347,8 +349,8 @@ def plot_main_fermi_contours(kx_vals, ky_vals, energies_fs, save_dir='outputs/ut
     
     save_path = os.path.join(save_dir, 'main_fermi_contours_debug.png')
     plt.tight_layout()
-    plt.savefig(save_path, dpi=200, bbox_inches='tight')
-    plt.close()
+    fig.savefig(save_path, dpi=200, bbox_inches='tight')
+    plt.close(fig)
     
     print(f"Debug plot saved to: {save_path}")
 
@@ -660,7 +662,7 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
     # Save the plot
     filename = f'gap_magnitude_2d_kz_{kz:.3f}.png'
     filepath = os.path.join(save_dir, filename)
-    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    fig.savefig(filepath, dpi=300, bbox_inches='tight')
     plt.show()
     print(f"Gap magnitude plot saved: {filepath}")
     
@@ -706,50 +708,65 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
         gap_nodes_found = 0
         gap_nodes_by_band = {}
         
-        # Special handling for B2u line-type nodes
+        # Special handling for B2u - use same global detection as in combined plot
         if pairing_type == 'B2u':
-            # B2u forms vertical node lines at kx ≈ 0, ±π/a
-            kx_node_positions = [0.0, np.pi/a, -np.pi/a]  # Theoretical node positions
+            # B2u can have gap nodes anywhere where gap is small, not just at exact theoretical lines
+            gap_node_threshold = 0.05 * np.max(gap_mag)  # More generous threshold for B2u
             
-            # Only check bands 3 and 4 since they're the only ones crossing Fermi level
-            fermi_bands = [2, 3]
+            fermi_bands = [2, 3]  # Band 3 and 4 (0-indexed)
             
-            for kx_node in kx_node_positions:
-                # Find kx index closest to the theoretical node position
-                kx_idx = np.argmin(np.abs(kx_vals - kx_node))
-                
-                # Extract the vertical line at this kx
-                gap_line = gap_mag[kx_idx, :]  # gap along this vertical line
-                
-                # Check each Fermi surface band
-                for band in fermi_bands:
-                    Z_line = energies_fs[kx_idx, :, band]  # Energy along this line
+            for band in fermi_bands:
+                Z = energies_fs[:, :, band].T  # Transpose to match gap_mag indexing
+                if Z.min() <= 0 <= Z.max():  # Double-check Fermi crossing
+                    # Use sensitive Fermi surface detection
+                    fermi_mask = np.abs(Z) < 0.02  # 20 meV threshold
+                    gap_node_mask = gap_mag < gap_node_threshold
+                    intersection = fermi_mask & gap_node_mask
                     
-                    # Find where both gap is small AND energy crosses Fermi level
-                    gap_mask = gap_line < gap_node_threshold
-                    fermi_crossings = np.where(np.abs(Z_line) < 0.015)[0]  # More tolerant Fermi crossing
-                    
-                    # Find intersections
-                    for ky_idx in fermi_crossings:
-                        if ky_idx < len(gap_mask) and gap_mask[ky_idx]:  # Gap is small at Fermi crossing
-                            # Convert indices to physical coordinates
-                            ky_node = ky_vals[ky_idx]
-                            kx_node_actual = kx_vals[kx_idx]
+                    if np.any(intersection):
+                        ky_indices, kx_indices = np.where(intersection)
+                        band_nodes = 0
+                        
+                        # Group nearby points to avoid overcrowding
+                        selected_points = []
+                        min_distance = 15  # Minimum pixels between gap nodes
+                        
+                        for i in range(len(ky_indices)):
+                            ky_idx, kx_idx = ky_indices[i], kx_indices[i]
                             
-                            # Add gap node marker
-                            if gap_nodes_found == 0:  # Add to legend only once
-                                ax_single.scatter(ky_node, kx_node_actual, s=150, c='yellow',
-                                               marker='o', edgecolors='red', linewidth=2,
-                                               alpha=0.9, zorder=10, label='Gap nodes')
-                            else:
-                                ax_single.scatter(ky_node, kx_node_actual, s=150, c='yellow',
-                                               marker='o', edgecolors='red', linewidth=2,
-                                               alpha=0.9, zorder=10)
-                            gap_nodes_found += 1
+                            # Check if this point is far enough from already selected points
+                            too_close = False
+                            for (prev_ky, prev_kx) in selected_points:
+                                if np.sqrt((ky_idx - prev_ky)**2 + (kx_idx - prev_kx)**2) < min_distance:
+                                    too_close = True
+                                    break
                             
-                            if f'Band {band+1}' not in gap_nodes_by_band:
-                                gap_nodes_by_band[f'Band {band+1}'] = 0
-                            gap_nodes_by_band[f'Band {band+1}'] += 1
+                            if not too_close:
+                                selected_points.append((ky_idx, kx_idx))
+                                
+                                # Convert indices to physical coordinates
+                                ky_node = ky_vals[ky_idx]
+                                kx_node = kx_vals[kx_idx]
+                                
+                                # Print coordinates for debugging
+                                ky_pi_b = ky_node / (np.pi / b)
+                                kx_pi_a = kx_node / (np.pi / a)
+                                print(f"    B2u Band {band+1} gap node: ky={ky_pi_b:.3f}π/b, kx={kx_pi_a:.3f}π/a")
+                                
+                                # Add circle marker at gap node
+                                if gap_nodes_found == 0:  # Add to legend only once
+                                    ax_single.scatter(ky_node, kx_node, s=150, c='yellow',
+                                                   marker='o', edgecolors='red', linewidth=2,
+                                                   alpha=0.9, zorder=10, label='Gap nodes')
+                                else:
+                                    ax_single.scatter(ky_node, kx_node, s=150, c='yellow',
+                                                   marker='o', edgecolors='red', linewidth=2,
+                                                   alpha=0.9, zorder=10)
+                                gap_nodes_found += 1
+                                band_nodes += 1
+                        
+                        if band_nodes > 0:
+                            gap_nodes_by_band[f'Band {band+1}'] = band_nodes
         
         else:
             # Standard point-based detection for other pairing types
@@ -851,7 +868,7 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
         # Save individual plot
         filename_single = f'gap_magnitude_{pairing_type}_kz_{kz:.3f}.png'
         filepath_single = os.path.join(save_dir, filename_single)
-        plt.savefig(filepath_single, dpi=300, bbox_inches='tight')
+        fig_single.savefig(filepath_single, dpi=300, bbox_inches='tight')
         plt.close(fig_single)
         
         print(f"Individual {pairing_type} plot saved: {filepath_single}")
@@ -884,7 +901,7 @@ def plot_fs_2d(energies, kz_label, save_dir='outputs/ute2_fixed'):
     ]
     
     for version in versions:
-        plt.figure(figsize=(10, 8))
+        fig = plt.figure(figsize=(10, 8))
         bands_plotted = 0
         
         print(f"\\n2D Fermi surface at kz={kz_label}{version['title_suffix']}:")
@@ -946,7 +963,7 @@ def plot_fs_2d(energies, kz_label, save_dir='outputs/ute2_fixed'):
         # Save with appropriate filename
         filename = f'fermi_surface_kz_{kz_label}{version["suffix"]}.png'
         filepath = os.path.join(save_dir, filename)
-        plt.savefig(filepath, dpi=300, bbox_inches='tight')
+        fig.savefig(filepath, dpi=300, bbox_inches='tight')
         plt.show()
         print(f"Saved plot to {filepath}")
 
@@ -1113,7 +1130,7 @@ def plot_2d_with_spectral_weight(kz=0.0, weight_type='total', orbital_focus=None
     # Save the plot
     filename = f"fermi_surface_spectral_weight_{weight_type}_kz_{kz/np.pi*c:.3f}.png"
     filepath = os.path.join(save_dir, filename)
-    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    fig.savefig(filepath, dpi=300, bbox_inches='tight')
     print(f"Spectral weight plot saved: {filename}")
     
     plt.show()
@@ -1159,49 +1176,125 @@ def generate_spectral_weight_plots(save_dir='outputs/ute2_spectral'):
     print(f"Plots saved to: {save_dir}")
     print("="*70)
 
-def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
+# Global cache for 3D band energies (to avoid recomputing for each pairing type)
+_cached_band_energies_3d = None
+_cached_kx_3d = None
+_cached_ky_3d = None
+_cached_kz_3d = None
+_cached_nk3d = None
+
+def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
+                         gap_node_pairing='B2u'):
+    """
+    Plot 3D Fermi surfaces with optional gap node visualization.
+    
+    Parameters:
+    -----------
+    save_dir : str
+        Directory to save output files
+    show_gap_nodes : bool
+        Whether to compute and display gap nodes
+    gap_node_pairing : str
+        Which pairing symmetry to show gap nodes for ('B1u', 'B2u', 'B3u', or 'all')
+    """
     import os
     os.makedirs(save_dir, exist_ok=True)
     
     print("Computing 3D Fermi surfaces using marching cubes...")
     
+    # Use global cache for band energies (computed once, reused for all pairing types)
+    global _cached_band_energies_3d, _cached_kx_3d, _cached_ky_3d, _cached_kz_3d, _cached_nk3d
+    
     # Create 3D momentum grid (reduced resolution for speed)
-    nk3d = 60  # Reduced resolution for faster computation
-    kx_3d = np.linspace(-np.pi/a, np.pi/a, nk3d)
-    ky_3d = np.linspace(-np.pi/b, np.pi/b, nk3d)  # Standard ky range for 3D
-    kz_3d = np.linspace(-np.pi/c, np.pi/c, nk3d)
+    nk3d = 129  # Reduced resolution for faster computation
     
-    # Create meshgrid
-    KX_3d, KY_3d, KZ_3d = np.meshgrid(kx_3d, ky_3d, kz_3d, indexing='ij')
-    
-    print(f"  3D grid: {nk3d} x {nk3d} x {nk3d} = {nk3d**3:,} points")
+    # Check if we have cached data
+    if _cached_band_energies_3d is not None and _cached_nk3d == nk3d:
+        print("  Using cached band energies (Fermi surface already computed)")
+        band_energies_3d = _cached_band_energies_3d
+        kx_3d = _cached_kx_3d
+        ky_3d = _cached_ky_3d
+        kz_3d = _cached_kz_3d
+    else:
+        print("  Computing band energies (first time)...")
+        kx_3d = np.linspace(-np.pi/a, np.pi/a, nk3d)
+        ky_3d = np.linspace(-np.pi/b, np.pi/b, nk3d)  # Standard ky range for 3D
+        kz_3d = np.linspace(-np.pi/c, np.pi/c, nk3d)
+        
+        # Create meshgrid
+        KX_3d, KY_3d, KZ_3d = np.meshgrid(kx_3d, ky_3d, kz_3d, indexing='ij')
+        
+        print(f"  3D grid: {nk3d} x {nk3d} x {nk3d} = {nk3d**3:,} points")
+        
+        # Compute band energies for the entire 3D grid using vectorized approach
+        print("  Computing band energies on 3D grid (vectorized)...")
+        
+        # Pre-allocate array
+        band_energies_3d = np.zeros((nk3d, nk3d, nk3d, 4))
+        
+        # Vectorized computation with progress tracking
+        total_slices = nk3d
+        for i, kx in enumerate(kx_3d):
+            # Compute entire kx slice at once
+            for j, ky in enumerate(ky_3d):
+                # Vectorize over kz direction
+                H_stack = np.array([H_full(kx, ky, kz) for kz in kz_3d])
+                eigvals_stack = np.array([np.sort(np.real(np.linalg.eigvals(H))) for H in H_stack])
+                band_energies_3d[i, j, :, :] = eigvals_stack
+            
+            # Progress update
+            progress = (i + 1) / total_slices * 100
+            print(f"    Progress: {progress:.1f}% ({i+1}/{total_slices} kx slices)")
+        
+        print("  Band energy computation complete!")
+        
+        # Cache for future calls
+        _cached_band_energies_3d = band_energies_3d
+        _cached_kx_3d = kx_3d
+        _cached_ky_3d = ky_3d
+        _cached_kz_3d = kz_3d
+        _cached_nk3d = nk3d
+        print("  Band energies cached for subsequent plots")
     
     # Colors for different bands - U bands (0,1) vs Te bands (2,3)
     colors = ['#1E88E5', '#42A5F5',  "#9635E5", "#FD0000"]  # Blue for U, Red for Te
     band_labels = ['Band 1', 'Band 2', 'Band 3', 'Band 4']
     alphas = [0.6, 0.6, 0.8, 0.8]  # Te bands slightly more opaque
     
-    # Compute band energies for the entire 3D grid using vectorized approach
-    print("  Computing band energies on 3D grid (vectorized)...")
+    # Compute 3D superconducting gap magnitude for different pairing symmetries
+    gap_magnitudes_3d = {}
     
-    # Pre-allocate array
-    band_energies_3d = np.zeros((nk3d, nk3d, nk3d, 4))
-    
-    # Vectorized computation with progress tracking
-    total_slices = nk3d
-    for i, kx in enumerate(kx_3d):
-        # Compute entire kx slice at once
-        for j, ky in enumerate(ky_3d):
-            # Vectorize over kz direction
-            H_stack = np.array([H_full(kx, ky, kz) for kz in kz_3d])
-            eigvals_stack = np.array([np.sort(np.real(np.linalg.eigvals(H))) for H in H_stack])
-            band_energies_3d[i, j, :, :] = eigvals_stack
+    if show_gap_nodes:
+        print("\n  Computing 3D superconducting gap magnitudes...")
         
-        # Progress update
-        progress = (i + 1) / total_slices * 100
-        print(f"    Progress: {progress:.1f}% ({i+1}/{total_slices} kx slices)")
-    
-    print("  Band energy computation complete!")
+        # Determine which pairing types to compute
+        if gap_node_pairing.lower() == 'all':
+            pairing_types = ['B1u', 'B2u', 'B3u']
+        else:
+            pairing_types = [gap_node_pairing]
+        
+        for pairing_type in pairing_types:
+            print(f"    Computing {pairing_type} gap...")
+            gap_3d = np.zeros((nk3d, nk3d, nk3d))
+            
+            for i, kx in enumerate(kx_3d):
+                for j, ky in enumerate(ky_3d):
+                    # Vectorize over kz direction
+                    gap_stack = np.array([calculate_gap_magnitude(
+                        np.array([[kx]]), np.array([[ky]]), kz, pairing_type=pairing_type)[0, 0] 
+                        for kz in kz_3d])
+                    gap_3d[i, j, :] = gap_stack
+                
+                if (i + 1) % 10 == 0:
+                    print(f"      {pairing_type}: {(i+1)/nk3d*100:.0f}% complete")
+            
+            gap_magnitudes_3d[pairing_type] = gap_3d
+            print(f"    {pairing_type} gap range: {np.min(gap_3d):.6f} to {np.max(gap_3d):.6f}")
+        
+        print("  3D gap computation complete!")
+    else:
+        pairing_types = []
+        print("\n  Gap node detection disabled")
     
     # Create the 3D plot
     fig = plt.figure(figsize=(14, 10))
@@ -1209,7 +1302,7 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
     
     # Use Fermi level (E=0) for all bands
     EF = 0.0
-    print(f"  Extracting Fermi surfaces at E={EF:.3f} eV using marching cubes...")
+    print(f"\n  Extracting Fermi surfaces at E={EF:.3f} eV using marching cubes...")
     
     surfaces_plotted = 0
     all_meshes = []  # Store all mesh objects for combined export
@@ -1224,15 +1317,24 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
         # Check if this band crosses the Fermi level
         if band_data.min() <= EF <= band_data.max():
             try:
-                # Extract isosurface using marching cubes with reduced complexity
+                # Apply light Gaussian smoothing to reduce noise/patchiness at high resolution
+                from scipy.ndimage import gaussian_filter
+                band_data_smooth = gaussian_filter(band_data, sigma=0.5)
+                
+                # Determine optimal step size based on grid resolution
+                # For high-res grids (>100), use step_size=2 to avoid over-dense meshes
+                optimal_step = 2 if nk3d > 100 else 1
+                
+                # Extract isosurface using marching cubes
                 verts, faces, normals, values = measure.marching_cubes(
-                    band_data, level=EF, 
+                    band_data_smooth, level=EF, 
                     spacing=(
                         kx_3d[1] - kx_3d[0],
                         ky_3d[1] - ky_3d[0], 
                         kz_3d[1] - kz_3d[0]
                     ),
-                    step_size=1  # Use every grid point
+                    step_size=optimal_step,  # Adaptive step size
+                    gradient_direction='ascent'  # Better normal calculation
                 )
                 
                 # Adjust vertices to actual k-space coordinates
@@ -1250,14 +1352,29 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
                 # Create the surface mesh
                 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
                 
-                # Only limit faces if there are way too many (>20k faces per band)
-                max_faces = 20000  # Much higher limit, only for extreme cases
+                # Handle face count intelligently to avoid gaps
+                max_faces = 30000  # Higher limit for high-res grids
                 faces_used = faces
+                
                 if len(faces) > max_faces:
-                    print(f"      Warning: {len(faces)} faces detected, subsampling to {max_faces} for performance")
-                    # Subsample faces uniformly
-                    face_indices = np.linspace(0, len(faces)-1, max_faces, dtype=int)
-                    faces_used = faces[face_indices]
+                    print(f"      Warning: {len(faces)} faces detected, reducing complexity")
+                    # Use trimesh decimation if available (better than random subsampling)
+                    if TRIMESH_AVAILABLE:
+                        try:
+                            import trimesh
+                            temp_mesh = trimesh.Trimesh(vertices=verts, faces=faces)
+                            # Simplify mesh while preserving shape
+                            simplified = temp_mesh.simplify_quadric_decimation(max_faces)
+                            verts = simplified.vertices
+                            faces_used = simplified.faces
+                            print(f"      Decimated to {len(faces_used)} faces using quadric decimation")
+                        except Exception as e:
+                            print(f"      Decimation failed, using all faces: {e}")
+                            faces_used = faces
+                    else:
+                        # If no trimesh, just use all faces (matplotlib can handle it)
+                        print(f"      Using all {len(faces)} faces (may be slow but complete)")
+                        faces_used = faces
                 else:
                     faces_used = faces
                 
@@ -1327,6 +1444,245 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
         y_test = np.outer(np.sin(u), np.sin(v)) * 0.5
         z_test = np.outer(np.ones(np.size(u)), np.cos(v)) * 0.5
         ax.plot_surface(x_test, y_test, z_test, alpha=0.3, color='gray')
+    
+    # Find and mark 3D gap nodes on Fermi surfaces using slice-based detection
+    # This approach is more robust: slice through 3D volume and use 2D detection method
+    all_gap_nodes = []  # Store all gap node coordinates for plotting after Fermi surfaces
+    
+    if show_gap_nodes and len(pairing_types) > 0:
+        print("\n  Detecting 3D gap nodes on Fermi surfaces (slice-based method)...")
+        
+        for pairing_type in pairing_types:
+            print(f"\n    Analyzing {pairing_type} gap nodes...")
+            gap_3d = gap_magnitudes_3d[pairing_type]
+            
+            # Set threshold based on pairing type
+            # Tighter thresholds to ensure nodes are accurately on Fermi surface
+            if pairing_type == 'B2u':
+                gap_threshold = 0.05 * np.max(gap_3d)
+                fermi_threshold = 0.010  # 10 meV - much tighter
+            elif pairing_type == 'B3u':
+                gap_threshold = 0.04 * np.max(gap_3d)
+                fermi_threshold = 0.008  # 8 meV - tightest for best accuracy
+            else:
+                gap_threshold = 0.05 * np.max(gap_3d)
+                fermi_threshold = 0.010  # 10 meV
+            
+            # Collect nodes from all slices
+            all_nodes_kx = []
+            all_nodes_ky = []
+            all_nodes_kz = []
+            all_nodes_gap = []
+            all_nodes_band = []
+            
+            # Slice through kz direction (most efficient for ky-kz nodal lines in B3u)
+            # For B2u, also specifically check kz = 0, ±π/c boundaries
+            n_slices = nk3d  # Use all kz slices
+            print(f"      Scanning {n_slices} kz slices...")
+            
+            # Track nodes at zone boundaries for B2u
+            boundary_kz_values = [0.0, np.pi/c, -np.pi/c]
+            nodes_at_boundaries = {kz: 0 for kz in boundary_kz_values}
+            
+            for band in [2, 3]:  # Bands 3 and 4
+                band_nodes_found = 0
+                
+                for iz, kz_val in enumerate(kz_3d):
+                    # Extract 2D slice at this kz
+                    energy_slice = band_energies_3d[:, :, iz, band]  # Shape: (nk3d, nk3d)
+                    gap_slice = gap_3d[:, :, iz]  # Shape: (nk3d, nk3d)
+                    
+                    # Check if this is a critical kz plane for B2u
+                    is_critical_kz = False
+                    if pairing_type == 'B2u':
+                        for boundary_kz in boundary_kz_values:
+                            if abs(kz_val - boundary_kz) < 0.1:  # Within tolerance
+                                is_critical_kz = True
+                                break
+                    
+                    # Check if Fermi surface crosses this slice
+                    if energy_slice.min() > fermi_threshold or energy_slice.max() < -fermi_threshold:
+                        continue
+                    
+                    # Find intersections in this 2D slice (like in 2D version)
+                    fermi_mask = np.abs(energy_slice) < fermi_threshold
+                    gap_mask = gap_slice < gap_threshold
+                    intersection = fermi_mask & gap_mask
+                    
+                    if np.any(intersection):
+                        # Get indices of intersection points
+                        ix_slice, iy_slice = np.where(intersection)
+                        
+                        # Apply 2D clustering within this slice (pixel-based like 2D version)
+                        selected_2d = []
+                        min_pixel_dist = 8  # Minimum pixels between nodes in same slice
+                        
+                        for i in range(len(ix_slice)):
+                            ix_pt, iy_pt = ix_slice[i], iy_slice[i]
+                            
+                            # Check distance to already selected points in this slice
+                            too_close = False
+                            for (prev_ix, prev_iy) in selected_2d:
+                                if np.sqrt((ix_pt - prev_ix)**2 + (iy_pt - prev_iy)**2) < min_pixel_dist:
+                                    too_close = True
+                                    break
+                            
+                            if not too_close:
+                                selected_2d.append((ix_pt, iy_pt))
+                                
+                                # Convert to physical coordinates
+                                kx_node = kx_3d[ix_pt]
+                                ky_node = ky_3d[iy_pt]
+                                gap_value = gap_slice[ix_pt, iy_pt]
+                                
+                                # Store this node
+                                all_nodes_kx.append(kx_node)
+                                all_nodes_ky.append(ky_node)
+                                all_nodes_kz.append(kz_val)
+                                all_nodes_gap.append(gap_value)
+                                all_nodes_band.append(band)
+                                band_nodes_found += 1
+                                
+                                # Track if this is at a critical kz boundary for B2u
+                                if pairing_type == 'B2u' and is_critical_kz:
+                                    for boundary_kz in boundary_kz_values:
+                                        if abs(kz_val - boundary_kz) < 0.1:
+                                            nodes_at_boundaries[boundary_kz] += 1
+                
+                if band_nodes_found > 0:
+                    print(f"      Band {band+1}: Found {band_nodes_found} nodes in slices")
+            
+            # Report B2u nodes at critical kz planes
+            if pairing_type == 'B2u':
+                print(f"      B2u nodes at critical kz planes:")
+                for boundary_kz, count in nodes_at_boundaries.items():
+                    kz_label = boundary_kz / (np.pi/c)
+                    print(f"        kz = {kz_label:.2f}π/c: {count} nodes")
+            
+            # Now perform 3D clustering on collected nodes from all slices
+            if len(all_nodes_kx) > 0:
+                all_nodes_kx = np.array(all_nodes_kx)
+                all_nodes_ky = np.array(all_nodes_ky)
+                all_nodes_kz = np.array(all_nodes_kz)
+                all_nodes_gap = np.array(all_nodes_gap)
+                all_nodes_band = np.array(all_nodes_band)
+                
+                print(f"      Total nodes from slices: {len(all_nodes_kx)}")
+                print(f"      Applying 3D clustering...")
+                
+                # 3D clustering with physical distance
+                # B2u needs smaller distance to preserve nodes at different kx positions
+                if pairing_type == 'B3u':
+                    min_distance_3d = 0.4  # Physical units
+                elif pairing_type == 'B2u':
+                    min_distance_3d = 0.20  # Reduced to preserve separate nodes
+                else:
+                    min_distance_3d = 0.3
+                
+                selected_indices = []
+                used = np.zeros(len(all_nodes_kx), dtype=bool)
+                
+                for i in range(len(all_nodes_kx)):
+                    if used[i]:
+                        continue
+                    
+                    # Find cluster
+                    cluster = [i]
+                    for j in range(i+1, len(all_nodes_kx)):
+                        if used[j]:
+                            continue
+                        dist = np.sqrt((all_nodes_kx[i] - all_nodes_kx[j])**2 +
+                                      (all_nodes_ky[i] - all_nodes_ky[j])**2 +
+                                      (all_nodes_kz[i] - all_nodes_kz[j])**2)
+                        if dist < min_distance_3d:
+                            cluster.append(j)
+                    
+                    # Pick node with smallest gap from cluster
+                    best_idx = cluster[0]
+                    best_gap = all_nodes_gap[cluster[0]]
+                    for idx in cluster:
+                        if all_nodes_gap[idx] < best_gap:
+                            best_gap = all_nodes_gap[idx]
+                            best_idx = idx
+                    
+                    # Mark cluster as used
+                    for idx in cluster:
+                        used[idx] = True
+                    
+                    selected_indices.append(best_idx)
+                
+                # Extract final nodes
+                final_kx = all_nodes_kx[selected_indices]
+                final_ky = all_nodes_ky[selected_indices]
+                final_kz = all_nodes_kz[selected_indices]
+                final_band = all_nodes_band[selected_indices]
+                
+                print(f"      After 3D clustering: {len(selected_indices)} nodes")
+                
+                # Show before/after by band
+                for band in [2, 3]:
+                    band_mask_before = all_nodes_band == band
+                    band_mask_after = final_band == band
+                    print(f"      Band {band+1}: {np.sum(band_mask_before)} detected → {np.sum(band_mask_after)} after clustering")
+                
+                # Group by band for plotting
+                for band in [2, 3]:
+                    band_mask = final_band == band
+                    if np.any(band_mask):
+                        kx_band = final_kx[band_mask]
+                        ky_band = final_ky[band_mask]
+                        kz_band = final_kz[band_mask]
+                        
+                        # Convert to plot coordinates
+                        x_nodes = ky_band / (np.pi/b)  # ky -> x-axis
+                        y_nodes = kx_band / (np.pi/a)  # kx -> y-axis
+                        z_nodes = kz_band / (np.pi/c)  # kz -> z-axis
+                        
+                        # Store for plotting
+                        all_gap_nodes.append({
+                            'x': x_nodes,
+                            'y': y_nodes,
+                            'z': z_nodes,
+                            'pairing': pairing_type,
+                            'band': band + 1
+                        })
+                        
+                        print(f"      Band {band+1}: {len(x_nodes)} gap nodes")
+                
+                print(f"    {pairing_type}: Total {len(selected_indices)} gap nodes visualized")
+            else:
+                print(f"    {pairing_type}: No gap nodes found on Fermi surfaces")
+                print(f"      Gap threshold: {gap_threshold:.6f}, Max gap: {np.max(gap_3d):.6f}")
+    
+    # Plot all gap nodes AFTER Fermi surfaces (ensures they appear on top)
+    if len(all_gap_nodes) > 0:
+        print("\n  Plotting gap nodes on top of Fermi surfaces...")
+        
+        # First reduce Fermi surface alpha slightly so nodes show through better
+        for collection in ax.collections:
+            if isinstance(collection, Poly3DCollection):
+                current_alpha = collection.get_alpha()
+                if current_alpha is not None:
+                    collection.set_alpha(current_alpha * 0.85)  # Slightly more transparent
+        
+        # Now plot nodes with maximum visibility settings
+        for node_set in all_gap_nodes:
+            # Plot each node individually with very high priority
+            for i in range(len(node_set['x'])):
+                ax.scatter([node_set['x'][i]], [node_set['y'][i]], [node_set['z'][i]],
+                         c='yellow',  # Always bright yellow
+                         marker='o', s=120, alpha=1.0,  # Larger, fully opaque
+                         edgecolors='black', linewidth=2.5,  # Thick black outline
+                         zorder=1000,  # Extremely high zorder
+                         depthshade=False)  # Disable depth shading
+            
+            # Add one invisible point for the legend
+            ax.scatter([], [], [],
+                     c='yellow', marker='o', s=120, alpha=1.0,
+                     edgecolors='black', linewidth=2.5,
+                     label=f"{node_set['pairing']} gap nodes (Band {node_set['band']})")
+        
+        print(f"    Plotted {sum(len(n['x']) for n in all_gap_nodes)} total gap nodes with maximum visibility")
     
     # Export combined Fermi surface as single STL file
     if TRIMESH_AVAILABLE and len(all_meshes) > 0:
@@ -1422,7 +1778,13 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
     ax.set_xlabel(r'$k_y$ (π/b)', fontsize=12)  # ky on x-axis
     ax.set_ylabel(r'$k_x$ (π/a)', fontsize=12)  # kx on y-axis
     ax.set_zlabel(r'$k_z$ (π/c)', fontsize=12)
-    ax.set_title('3D Fermi Surface of UTe₂ (Physical Proportions)', fontsize=14, pad=20)
+    
+    # Set title based on whether gap nodes are shown
+    if show_gap_nodes and len(pairing_types) > 0:
+        pairing_str = ', '.join(pairing_types)
+        ax.set_title(f'3D Fermi Surface of UTe₂ - {pairing_str} Gap Nodes', fontsize=14, pad=20)
+    else:
+        ax.set_title('3D Fermi Surface of UTe₂ (Physical Proportions)', fontsize=14, pad=20)
     
     # Add legend with U/Te distinction
     from matplotlib.lines import Line2D
@@ -1453,17 +1815,49 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
     ax.set_ylim(-kx_range, kx_range)  # kx on y-axis (appears wider due to lattice)
     ax.set_zlim(-kz_range, kz_range)  # kz on z-axis
     
+    # Scale the 3D box to reflect actual physical dimensions in reciprocal space
+    # The actual k-space ranges are: kx: ±π/a, ky: ±π/b, kz: ±π/c
+    # Physical size is proportional to 1/lattice_parameter, so bigger 1/a means wider axis
+    # Lattice parameters: a=4.07 Å, b=5.83 Å, c=13.78 Å
+    # So reciprocal space: π/a > π/b > π/c (kx axis is widest)
+    # Ratios: (π/a)/(π/c) = c/a ≈ 3.39, (π/b)/(π/c) = c/b ≈ 2.36, (π/a)/(π/b) = b/a ≈ 1.43
+    
+    # Set box aspect ratio to physical proportions
+    # Order: [x-axis (ky), y-axis (kx), z-axis (kz)]
+    aspect_ky = c / b  # π/b range relative to π/c
+    aspect_kx = c / a  # π/a range relative to π/c (widest)
+    aspect_kz = 1.0    # π/c range (reference)
+    
+    ax.set_box_aspect([aspect_ky, aspect_kx, aspect_kz])
+    
+    print(f"\n  3D plot aspect ratios (physical):")
+    print(f"    ky-axis (x): {aspect_ky:.2f} (π/b range = {2*np.pi/b:.3f})")
+    print(f"    kx-axis (y): {aspect_kx:.2f} (π/a range = {2*np.pi/a:.3f})")
+    print(f"    kz-axis (z): {aspect_kz:.2f} (π/c range = {2*np.pi/c:.3f})")
+    print(f"  Note: kx-axis appears widest because a is smallest lattice parameter")
+    
     # Improve view angle to match reference image style
     ax.view_init(elev=20, azim=30)  # Slightly elevated view from front-right
     
     # Add multiple saved views for different perspectives
     plt.tight_layout()
     
+    # Determine save directory and filename based on gap node settings
+    if show_gap_nodes and len(pairing_types) > 0:
+        # Create subdirectory for each pairing type
+        pairing_dir = os.path.join(save_dir, gap_node_pairing.lower())
+        os.makedirs(pairing_dir, exist_ok=True)
+        actual_save_dir = pairing_dir
+        base_filename = f'fermi_surface_3d_{gap_node_pairing}_gap_nodes'
+    else:
+        actual_save_dir = save_dir
+        base_filename = 'fermi_surface_3d_marching_cubes'
+    
     # Save the main view
-    filename = 'fermi_surface_3d_marching_cubes.png'
-    filepath = os.path.join(save_dir, filename)
-    plt.savefig(filepath, dpi=300, bbox_inches='tight', facecolor='white')
-    print(f"Saved 3D plot (main view) to {filepath}")
+    filename = f'{base_filename}.png'
+    filepath = os.path.join(actual_save_dir, filename)
+    fig.savefig(filepath, dpi=300, bbox_inches='tight', facecolor='white')
+    print(f"\nSaved 3D plot (main view) to {filepath}")
     
     # Save additional perspective views
     perspectives = [
@@ -1476,11 +1870,11 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed'):
     
     for view in perspectives:
         ax.view_init(elev=view['elev'], azim=view['azim'])
-        view_filename = f'fermi_surface_3d_{view["name"]}.png'
-        view_filepath = os.path.join(save_dir, view_filename)
-        plt.savefig(view_filepath, dpi=300, bbox_inches='tight', facecolor='white')
+        view_filename = f'{base_filename}_{view["name"]}.png'
+        view_filepath = os.path.join(actual_save_dir, view_filename)
+        fig.savefig(view_filepath, dpi=300, bbox_inches='tight', facecolor='white')
     
-    print(f"Saved {len(perspectives)} additional perspective views")
+    print(f"Saved {len(perspectives)} additional perspective views to {actual_save_dir}")
     plt.show()
 
 # Main execution
@@ -1508,10 +1902,25 @@ if __name__ == "__main__":
     
     # Generate superconducting gap magnitude plots
     print("\nGenerating superconducting gap magnitude visualizations...")
-    plot_gap_magnitude_2d(kz=kz0, pairing_types=['B1u', 'B2u', 'B3u'], resolution=200)
+    # Skip B1u as it has no nodes at kz=0
+    plot_gap_magnitude_2d(kz=kz0, pairing_types=['B2u', 'B3u'], resolution=200)
     
-    # Generate 3D plot
-    plot_3d_fermi_surface()
+    # Generate 3D plot without gap nodes
+    print("\n" + "="*70)
+    print("Generating 3D Fermi Surface (no gap nodes)")
+    print("="*70)
+    plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False)
+    
+    # Generate 3D plots with gap nodes for each pairing symmetry
+    # Skip B1u as it has no nodes in the relevant energy range
+    print("\n" + "="*70)
+    print("Generating 3D Fermi Surface with Gap Nodes (B2u and B3u only)")
+    print("="*70)
+    
+    for pairing in ['B2u', 'B3u']:
+        print(f"\n--- {pairing} Gap Nodes ---")
+        plot_3d_fermi_surface(save_dir='outputs/ute2_gap', show_gap_nodes=True, 
+                             gap_node_pairing=pairing)
     
     # Save energies to file
     import os
