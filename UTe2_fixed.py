@@ -1184,7 +1184,7 @@ _cached_kz_3d = None
 _cached_nk3d = None
 
 def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
-                         gap_node_pairing='B2u'):
+                         gap_node_pairing='B3u'):
     """
     Plot 3D Fermi surfaces with optional gap node visualization.
     
@@ -1476,13 +1476,23 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
             all_nodes_band = []
             
             # Slice through kz direction (most efficient for ky-kz nodal lines in B3u)
-            # For B2u, also specifically check kz = 0, ±π/c boundaries
+            # For B2u, nodal planes at kz = 0, ±π/c are critical
             n_slices = nk3d  # Use all kz slices
-            print(f"      Scanning {n_slices} kz slices...")
             
-            # Track nodes at zone boundaries for B2u
-            boundary_kz_values = [0.0, np.pi/c, -np.pi/c]
-            nodes_at_boundaries = {kz: 0 for kz in boundary_kz_values}
+            # For B2u, ensure we check the exact nodal planes
+            critical_kz_indices = []
+            if pairing_type == 'B2u':
+                # Find indices closest to kz = 0, ±π/c
+                idx_0 = np.argmin(np.abs(kz_3d - 0.0))
+                idx_plus = np.argmin(np.abs(kz_3d - np.pi/c))
+                idx_minus = np.argmin(np.abs(kz_3d - (-np.pi/c)))
+                critical_kz_indices = [idx_0, idx_plus, idx_minus]
+                print(f"      B2u critical kz planes:")
+                print(f"        kz ≈ 0: kz_3d[{idx_0}] = {kz_3d[idx_0]:.4f}")
+                print(f"        kz ≈ +π/c: kz_3d[{idx_plus}] = {kz_3d[idx_plus]:.4f}")
+                print(f"        kz ≈ -π/c: kz_3d[{idx_minus}] = {kz_3d[idx_minus]:.4f}")
+            
+            print(f"      Scanning {n_slices} kz slices...")
             
             for band in [2, 3]:  # Bands 3 and 4
                 band_nodes_found = 0
@@ -1493,19 +1503,19 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
                     gap_slice = gap_3d[:, :, iz]  # Shape: (nk3d, nk3d)
                     
                     # Check if this is a critical kz plane for B2u
-                    is_critical_kz = False
-                    if pairing_type == 'B2u':
-                        for boundary_kz in boundary_kz_values:
-                            if abs(kz_val - boundary_kz) < 0.1:  # Within tolerance
-                                is_critical_kz = True
-                                break
+                    is_critical_kz = (pairing_type == 'B2u' and iz in critical_kz_indices)
+                    
+                    # Use more generous threshold at critical planes to ensure we catch all nodes
+                    effective_fermi_threshold = fermi_threshold
+                    if is_critical_kz:
+                        effective_fermi_threshold = fermi_threshold * 2.0  # Double the tolerance at critical planes
                     
                     # Check if Fermi surface crosses this slice
-                    if energy_slice.min() > fermi_threshold or energy_slice.max() < -fermi_threshold:
+                    if energy_slice.min() > effective_fermi_threshold or energy_slice.max() < -effective_fermi_threshold:
                         continue
                     
                     # Find intersections in this 2D slice (like in 2D version)
-                    fermi_mask = np.abs(energy_slice) < fermi_threshold
+                    fermi_mask = np.abs(energy_slice) < effective_fermi_threshold
                     gap_mask = gap_slice < gap_threshold
                     intersection = fermi_mask & gap_mask
                     
@@ -1543,21 +1553,12 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
                                 all_nodes_band.append(band)
                                 band_nodes_found += 1
                                 
-                                # Track if this is at a critical kz boundary for B2u
-                                if pairing_type == 'B2u' and is_critical_kz:
-                                    for boundary_kz in boundary_kz_values:
-                                        if abs(kz_val - boundary_kz) < 0.1:
-                                            nodes_at_boundaries[boundary_kz] += 1
+                                # Track nodes at critical kz planes for B2u
+                                if is_critical_kz:
+                                    print(f"        Found node at kz={kz_val:.4f}, kx={kx_node:.4f}, ky={ky_node:.4f} (Band {band+1})")
                 
                 if band_nodes_found > 0:
                     print(f"      Band {band+1}: Found {band_nodes_found} nodes in slices")
-            
-            # Report B2u nodes at critical kz planes
-            if pairing_type == 'B2u':
-                print(f"      B2u nodes at critical kz planes:")
-                for boundary_kz, count in nodes_at_boundaries.items():
-                    kz_label = boundary_kz / (np.pi/c)
-                    print(f"        kz = {kz_label:.2f}π/c: {count} nodes")
             
             # Now perform 3D clustering on collected nodes from all slices
             if len(all_nodes_kx) > 0:
