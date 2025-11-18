@@ -338,7 +338,7 @@ def plot_main_fermi_contours(kx_vals, ky_vals, energies_fs, save_dir='outputs/ut
     ax.set_ylabel('kx (π/a units)', fontsize=12)
     ax.set_title('Main Fermi Contours (Bands 3 & 4)\nWithin ±1π/a and ±1π/b Range', fontsize=14)
     ax.grid(True, alpha=0.3)
-    ax.legend()
+    # ax.legend()
     
     # Add reference lines
     ax.axhline(y=0, color='k', linestyle='--', alpha=0.5)
@@ -954,9 +954,9 @@ def plot_fs_2d(energies, kz_label, save_dir='outputs/ute2_fixed'):
         plt.grid(True, alpha=0.3)
         
         # Add legend
-        from matplotlib.lines import Line2D
-        legend_elements = [Line2D([0], [0], color=colors[i], lw=2, label=band_labels[i]) for i in range(4)]
-        plt.legend(handles=legend_elements, loc='upper right')
+        # from matplotlib.lines import Line2D
+        # legend_elements = [Line2D([0], [0], color=colors[i], lw=2, label=band_labels[i]) for i in range(4)]
+        # plt.legend(handles=legend_elements, loc='upper right')
         
         plt.tight_layout()
         
@@ -1184,7 +1184,7 @@ _cached_kz_3d = None
 _cached_nk3d = None
 
 def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
-                         gap_node_pairing='B3u'):
+                         gap_node_pairing='B3u', orientation='standard'):
     """
     Plot 3D Fermi surfaces with optional gap node visualization.
     
@@ -1196,26 +1196,49 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
         Whether to compute and display gap nodes
     gap_node_pairing : str
         Which pairing symmetry to show gap nodes for ('B1u', 'B2u', 'B3u', or 'all')
+    orientation : str
+        View orientation: 'standard' (kx-ky-kz) or 'alt' (kx vertical, ky-kz horizontal)
     """
     import os
+    import pickle
+    import hashlib
     os.makedirs(save_dir, exist_ok=True)
     
     print("Computing 3D Fermi surfaces using marching cubes...")
-    
-    # Use global cache for band energies (computed once, reused for all pairing types)
-    global _cached_band_energies_3d, _cached_kx_3d, _cached_ky_3d, _cached_kz_3d, _cached_nk3d
+    if orientation == 'alt':
+        print("  Using alternative orientation: kx vertical, ky-kz horizontal")
     
     # Create 3D momentum grid (reduced resolution for speed)
     nk3d = 129  # Reduced resolution for faster computation
     
-    # Check if we have cached data
-    if _cached_band_energies_3d is not None and _cached_nk3d == nk3d:
-        print("  Using cached band energies (Fermi surface already computed)")
-        band_energies_3d = _cached_band_energies_3d
-        kx_3d = _cached_kx_3d
-        ky_3d = _cached_ky_3d
-        kz_3d = _cached_kz_3d
+    # Create cache filename based on grid parameters and lattice constants
+    cache_key = f"{nk3d}_{a:.6f}_{b:.6f}_{c:.6f}"
+    cache_hash = hashlib.md5(cache_key.encode()).hexdigest()[:8]
+    # Use global cache directory for band energies (shared across all plots)
+    cache_dir = os.path.join('outputs', 'global_cache')
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_file = os.path.join(cache_dir, f'band_energies_3d_{cache_hash}.pkl')
+    
+    # Try to load from disk cache
+    if os.path.exists(cache_file):
+        print(f"  Loading cached band energies from {cache_file}")
+        try:
+            with open(cache_file, 'rb') as f:
+                cache_data = pickle.load(f)
+            band_energies_3d = cache_data['band_energies_3d']
+            kx_3d = cache_data['kx_3d']
+            ky_3d = cache_data['ky_3d']
+            kz_3d = cache_data['kz_3d']
+            print(f"  ✓ Successfully loaded cached 3D band energies ({band_energies_3d.shape})")
+        except Exception as e:
+            print(f"  ⚠ Failed to load cache file: {e}")
+            print("  Computing fresh band energies...")
+            cache_file = None  # Force recomputation
     else:
+        cache_file = None
+    
+    # Compute if no valid cache
+    if cache_file is None or 'band_energies_3d' not in locals():
         print("  Computing band energies (first time)...")
         kx_3d = np.linspace(-np.pi/a, np.pi/a, nk3d)
         ky_3d = np.linspace(-np.pi/b, np.pi/b, nk3d)  # Standard ky range for 3D
@@ -1248,20 +1271,40 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
         
         print("  Band energy computation complete!")
         
-        # Cache for future calls
+        # Save to disk cache for future use
+        cache_data = {
+            'band_energies_3d': band_energies_3d,
+            'kx_3d': kx_3d,
+            'ky_3d': ky_3d,
+            'kz_3d': kz_3d,
+            'nk3d': nk3d,
+            'lattice_params': {'a': a, 'b': b, 'c': c},
+            'cache_key': cache_key
+        }
+        
+        cache_file = os.path.join(cache_dir, f'band_energies_3d_{cache_hash}.pkl')
+        try:
+            with open(cache_file, 'wb') as f:
+                pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            print(f"  ✓ Band energies cached to disk: {cache_file}")
+            print(f"    Cache size: {os.path.getsize(cache_file) / (1024*1024):.1f} MB")
+        except Exception as e:
+            print(f"  ⚠ Failed to save cache: {e}")
+        
+        # Also update global cache for this session
+        global _cached_band_energies_3d, _cached_kx_3d, _cached_ky_3d, _cached_kz_3d, _cached_nk3d
         _cached_band_energies_3d = band_energies_3d
         _cached_kx_3d = kx_3d
         _cached_ky_3d = ky_3d
         _cached_kz_3d = kz_3d
         _cached_nk3d = nk3d
-        print("  Band energies cached for subsequent plots")
     
     # Colors for different bands - U bands (0,1) vs Te bands (2,3)
     colors = ['#1E88E5', '#42A5F5',  "#9635E5", "#FD0000"]  # Blue for U, Red for Te
     band_labels = ['Band 1', 'Band 2', 'Band 3', 'Band 4']
     alphas = [0.6, 0.6, 0.8, 0.8]  # Te bands slightly more opaque
     
-    # Compute 3D superconducting gap magnitude for different pairing symmetries
+    # Compute 3D superconducting gap magnitude for different pairing symmetries with caching
     gap_magnitudes_3d = {}
     
     if show_gap_nodes:
@@ -1273,23 +1316,114 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
         else:
             pairing_types = [gap_node_pairing]
         
-        for pairing_type in pairing_types:
-            print(f"    Computing {pairing_type} gap...")
-            gap_3d = np.zeros((nk3d, nk3d, nk3d))
-            
-            for i, kx in enumerate(kx_3d):
-                for j, ky in enumerate(ky_3d):
-                    # Vectorize over kz direction
-                    gap_stack = np.array([calculate_gap_magnitude(
-                        np.array([[kx]]), np.array([[ky]]), kz, pairing_type=pairing_type)[0, 0] 
-                        for kz in kz_3d])
-                    gap_3d[i, j, :] = gap_stack
+        # Set up gap magnitude caching
+        import json
+        # Gap magnitudes can be specific to save_dir since they're plot-specific
+        gap_cache_dir = os.path.join(save_dir, 'cache')
+        os.makedirs(gap_cache_dir, exist_ok=True)
+        
+        # Create gap cache key based on grid and lattice parameters
+        gap_cache_key = f"{nk3d}_{a:.6f}_{b:.6f}_{c:.6f}"
+        gap_cache_hash = hashlib.md5(gap_cache_key.encode()).hexdigest()[:8]
+        gap_cache_file = os.path.join(gap_cache_dir, f'gap_magnitudes_3d_{gap_cache_hash}.npz')
+        gap_metadata_file = os.path.join(gap_cache_dir, f'gap_magnitudes_3d_metadata_{gap_cache_hash}.json')
+        
+        # Try to load gap magnitudes from cache
+        cached_gaps = {}
+        if os.path.exists(gap_cache_file) and os.path.exists(gap_metadata_file):
+            print("  Checking gap magnitude cache...")
+            try:
+                with open(gap_metadata_file, 'r') as f:
+                    cached_gap_metadata = json.load(f)
                 
-                if (i + 1) % 10 == 0:
-                    print(f"      {pairing_type}: {(i+1)/nk3d*100:.0f}% complete")
+                # Verify cache parameters match current setup
+                if (cached_gap_metadata.get('nk3d') == nk3d and
+                    cached_gap_metadata.get('lattice_params', {}).get('a') == a and
+                    cached_gap_metadata.get('lattice_params', {}).get('b') == b and
+                    cached_gap_metadata.get('lattice_params', {}).get('c') == c):
+                    
+                    gap_cache_data = np.load(gap_cache_file)
+                    cached_pairing_types = cached_gap_metadata.get('pairing_types', [])
+                    
+                    # Load cached gap magnitudes that we need
+                    for pairing_type in pairing_types:
+                        if f'gap_{pairing_type}' in gap_cache_data:
+                            cached_gaps[pairing_type] = gap_cache_data[f'gap_{pairing_type}']
+                            print(f"    ✓ Loaded cached {pairing_type} gap magnitude")
+                
+            except Exception as e:
+                print(f"    ⚠ Failed to load gap cache: {e}")
+        
+        # Determine which gaps need to be computed
+        missing_gaps = [p for p in pairing_types if p not in cached_gaps]
+        
+        if missing_gaps:
+            print(f"    Computing missing gap magnitudes: {missing_gaps}")
             
-            gap_magnitudes_3d[pairing_type] = gap_3d
-            print(f"    {pairing_type} gap range: {np.min(gap_3d):.6f} to {np.max(gap_3d):.6f}")
+            for pairing_type in missing_gaps:
+                print(f"      Computing {pairing_type} gap...")
+                gap_3d = np.zeros((nk3d, nk3d, nk3d))
+                
+                for i, kx in enumerate(kx_3d):
+                    for j, ky in enumerate(ky_3d):
+                        # Vectorize over kz direction
+                        gap_stack = np.array([calculate_gap_magnitude(
+                            np.array([[kx]]), np.array([[ky]]), kz, pairing_type=pairing_type)[0, 0] 
+                            for kz in kz_3d])
+                        gap_3d[i, j, :] = gap_stack
+                    
+                    if (i + 1) % 10 == 0:
+                        print(f"        {pairing_type}: {(i+1)/nk3d*100:.0f}% complete")
+                
+                cached_gaps[pairing_type] = gap_3d
+                print(f"      {pairing_type} gap range: {np.min(gap_3d):.6f} to {np.max(gap_3d):.6f}")
+            
+            # Save newly computed gaps to cache
+            if missing_gaps:
+                try:
+                    # Load existing cache if it exists
+                    if os.path.exists(gap_cache_file):
+                        existing_cache = dict(np.load(gap_cache_file))
+                    else:
+                        existing_cache = {}
+                    
+                    # Add new gap magnitudes
+                    for pairing_type in missing_gaps:
+                        existing_cache[f'gap_{pairing_type}'] = cached_gaps[pairing_type]
+                    
+                    # Save combined cache
+                    np.savez_compressed(gap_cache_file, **existing_cache)
+                    
+                    # Update metadata
+                    if os.path.exists(gap_metadata_file):
+                        with open(gap_metadata_file, 'r') as f:
+                            existing_metadata = json.load(f)
+                        all_pairing_types = list(set(existing_metadata.get('pairing_types', []) + missing_gaps))
+                    else:
+                        all_pairing_types = missing_gaps
+                    
+                    gap_metadata = {
+                        'nk3d': nk3d,
+                        'lattice_params': {'a': a, 'b': b, 'c': c},
+                        'pairing_types': sorted(all_pairing_types),
+                        'cache_key': gap_cache_key
+                    }
+                    
+                    with open(gap_metadata_file, 'w') as f:
+                        json.dump(gap_metadata, f, indent=2)
+                    
+                    print(f"      ✓ Gap magnitudes cached to disk: {gap_cache_file}")
+                    print(f"        Cache size: {os.path.getsize(gap_cache_file) / (1024*1024):.1f} MB")
+                    print(f"        Cached pairing types: {sorted(all_pairing_types)}")
+                    
+                except Exception as e:
+                    print(f"      ⚠ Failed to save gap cache: {e}")
+        
+        # Use cached gaps (both loaded and newly computed)
+        gap_magnitudes_3d = cached_gaps
+        
+        if not missing_gaps:
+            print("    ✓ All gap magnitudes loaded from cache!")
         
         print("  3D gap computation complete!")
     else:
@@ -1345,9 +1479,16 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
                 # Convert to units of π/a, π/b, π/c for plotting with axis swap
                 # Apply physically correct scaling based on lattice parameter ratios
                 # kx range is naturally wider due to smaller lattice parameter a
-                x_plot = verts[:, 1] / (np.pi/b)  # ky -> x-axis
-                y_plot = verts[:, 0] / (np.pi/a)  # kx -> y-axis (naturally wider due to a < b)
-                z_plot = verts[:, 2] / (np.pi/c)  # kz -> z-axis
+                if orientation == 'alt':
+                    # Alternative orientation: kx vertical, ky-kz horizontal
+                    x_plot = verts[:, 1] / (np.pi/b)  # ky -> x-axis
+                    y_plot = verts[:, 2] / (np.pi/c)  # kz -> y-axis  
+                    z_plot = verts[:, 0] / (np.pi/a)  # kx -> z-axis (vertical)
+                else:
+                    # Standard orientation: kx-ky plane, kz vertical
+                    x_plot = verts[:, 1] / (np.pi/b)  # ky -> x-axis
+                    y_plot = verts[:, 0] / (np.pi/a)  # kx -> y-axis (naturally wider due to a < b)
+                    z_plot = verts[:, 2] / (np.pi/c)  # kz -> z-axis
                 
                 # Create the surface mesh
                 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -1634,10 +1775,17 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
                         ky_band = final_ky[band_mask]
                         kz_band = final_kz[band_mask]
                         
-                        # Convert to plot coordinates
-                        x_nodes = ky_band / (np.pi/b)  # ky -> x-axis
-                        y_nodes = kx_band / (np.pi/a)  # kx -> y-axis
-                        z_nodes = kz_band / (np.pi/c)  # kz -> z-axis
+                        # Convert to plot coordinates based on orientation
+                        if orientation == 'alt':
+                            # Alternative orientation: kx vertical, ky-kz horizontal
+                            x_nodes = ky_band / (np.pi/b)  # ky -> x-axis
+                            y_nodes = kz_band / (np.pi/c)  # kz -> y-axis
+                            z_nodes = kx_band / (np.pi/a)  # kx -> z-axis (vertical)
+                        else:
+                            # Standard orientation: kx-ky plane, kz vertical
+                            x_nodes = ky_band / (np.pi/b)  # ky -> x-axis
+                            y_nodes = kx_band / (np.pi/a)  # kx -> y-axis
+                            z_nodes = kz_band / (np.pi/c)  # kz -> z-axis
                         
                         # Store for plotting
                         all_gap_nodes.append({
@@ -1776,22 +1924,29 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
         print("\n  STL/OBJ export skipped (trimesh not available)")
     
     # Set labels and title with proper k-space units
-    ax.set_xlabel(r'$k_y$ (π/b)', fontsize=12)  # ky on x-axis
-    ax.set_ylabel(r'$k_x$ (π/a)', fontsize=12)  # kx on y-axis
-    ax.set_zlabel(r'$k_z$ (π/c)', fontsize=12)
+    if orientation == 'alt':
+        # Alternative orientation: kx vertical, ky-kz horizontal
+        ax.set_xlabel(r'$k_y$ (π/b)', fontsize=12)  # ky on x-axis
+        ax.set_ylabel(r'$k_z$ (π/c)', fontsize=12)  # kz on y-axis
+        ax.set_zlabel(r'$k_x$ (π/a)', fontsize=12)  # kx on z-axis (vertical)
+    else:
+        # Standard orientation: kx-ky plane, kz vertical
+        ax.set_xlabel(r'$k_y$ (π/b)', fontsize=12)  # ky on x-axis
+        ax.set_ylabel(r'$k_x$ (π/a)', fontsize=12)  # kx on y-axis
+        ax.set_zlabel(r'$k_z$ (π/c)', fontsize=12)  # kz on z-axis
     
     # Set title based on whether gap nodes are shown
     if show_gap_nodes and len(pairing_types) > 0:
         pairing_str = ', '.join(pairing_types)
         ax.set_title(f'3D Fermi Surface of UTe₂ - {pairing_str} Gap Nodes', fontsize=14, pad=20)
     else:
-        ax.set_title('3D Fermi Surface of UTe₂ (Physical Proportions)', fontsize=14, pad=20)
+        ax.set_title('3D Fermi Surface of UTe₂', fontsize=14, pad=20)
     
     # Add legend with U/Te distinction
-    from matplotlib.lines import Line2D
-    legend_elements = [Line2D([0], [0], color=colors[i], lw=3, alpha=alphas[i], 
-                             label=band_labels[i]) for i in range(4)]
-    ax.legend(handles=legend_elements, loc='upper right', fontsize=10)
+    # from matplotlib.lines import Line2D
+    # legend_elements = [Line2D([0], [0], color=colors[i], lw=3, alpha=alphas[i], 
+    #                          label=band_labels[i]) for i in range(4)]
+    # ax.legend(handles=legend_elements, loc='upper right', fontsize=10)
     
     # Make background cleaner
     ax.xaxis.pane.fill = False
@@ -1824,18 +1979,33 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
     # Ratios: (π/a)/(π/c) = c/a ≈ 3.39, (π/b)/(π/c) = c/b ≈ 2.36, (π/a)/(π/b) = b/a ≈ 1.43
     
     # Set box aspect ratio to physical proportions
-    # Order: [x-axis (ky), y-axis (kx), z-axis (kz)]
-    aspect_ky = c / b  # π/b range relative to π/c
-    aspect_kx = c / a  # π/a range relative to π/c (widest)
-    aspect_kz = 1.0    # π/c range (reference)
-    
-    ax.set_box_aspect([aspect_ky, aspect_kx, aspect_kz])
-    
-    print(f"\n  3D plot aspect ratios (physical):")
-    print(f"    ky-axis (x): {aspect_ky:.2f} (π/b range = {2*np.pi/b:.3f})")
-    print(f"    kx-axis (y): {aspect_kx:.2f} (π/a range = {2*np.pi/a:.3f})")
-    print(f"    kz-axis (z): {aspect_kz:.2f} (π/c range = {2*np.pi/c:.3f})")
-    print(f"  Note: kx-axis appears widest because a is smallest lattice parameter")
+    # Set aspect ratios based on orientation and lattice parameters
+    if orientation == 'alt':
+        # Alternative: kx vertical (z), ky-kz horizontal (x,y)
+        aspect_x = c / b  # ky (x-axis) relative to kz
+        aspect_y = 1.0    # kz (y-axis) is reference
+        aspect_z = c / a  # kx (z-axis) relative to kz (tallest because a is smallest)
+        
+        ax.set_box_aspect([aspect_x, aspect_y, aspect_z])
+        
+        print(f"\n  3D plot aspect ratios (alternative orientation):") 
+        print(f"    ky-axis (x): {aspect_x:.2f} (π/b range = {2*np.pi/b:.3f})")
+        print(f"    kz-axis (y): {aspect_y:.2f} (π/c range = {2*np.pi/c:.3f})")
+        print(f"    kx-axis (z): {aspect_z:.2f} (π/a range = {2*np.pi/a:.3f})")
+        print(f"  Note: kx-axis (vertical) appears tallest because a is smallest lattice parameter")
+    else:
+        # Standard: kx-ky horizontal (x,y), kz vertical (z)
+        aspect_ky = c / b  # π/b range relative to π/c
+        aspect_kx = c / a  # π/a range relative to π/c (widest)
+        aspect_kz = 1.0    # π/c range (reference)
+        
+        ax.set_box_aspect([aspect_ky, aspect_kx, aspect_kz])
+        
+        print(f"\n  3D plot aspect ratios (physical):")
+        print(f"    ky-axis (x): {aspect_ky:.2f} (π/b range = {2*np.pi/b:.3f})")
+        print(f"    kx-axis (y): {aspect_kx:.2f} (π/a range = {2*np.pi/a:.3f})")
+        print(f"    kz-axis (z): {aspect_kz:.2f} (π/c range = {2*np.pi/c:.3f})")
+        print(f"  Note: kx-axis appears widest because a is smallest lattice parameter")
     
     # Improve view angle to match reference image style
     ax.view_init(elev=20, azim=30)  # Slightly elevated view from front-right
@@ -1853,6 +2023,8 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
     else:
         actual_save_dir = save_dir
         base_filename = 'fermi_surface_3d_marching_cubes'
+        if orientation == 'alt':
+            base_filename += '_alt_orientation'
     
     # Save the main view
     filename = f'{base_filename}.png'
@@ -1904,7 +2076,7 @@ if __name__ == "__main__":
     # Generate superconducting gap magnitude plots
     print("\nGenerating superconducting gap magnitude visualizations...")
     # Skip B1u as it has no nodes at kz=0
-    plot_gap_magnitude_2d(kz=kz0, pairing_types=['B2u', 'B3u'], resolution=200)
+    plot_gap_magnitude_2d(kz=kz0, pairing_types=['B1u' , 'B2u', 'B3u'], resolution=200)
     
     # Generate 3D plot without gap nodes
     print("\n" + "="*70)
@@ -1920,10 +2092,23 @@ if __name__ == "__main__":
     
     for pairing in ['B2u', 'B3u']:
         print(f"\n--- {pairing} Gap Nodes ---")
-        plot_3d_fermi_surface(save_dir='outputs/ute2_gap', show_gap_nodes=True, 
+        plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
                              gap_node_pairing=pairing)
     
-    # Save energies to file
+    # Generate 3D plots with alternative orientation (kx vertical, ky-kz horizontal)
+    print("\n" + "="*70)
+    print("Generating 3D Fermi Surface - Alternative Orientation")
+    print("(kx vertical, ky-kz horizontal plane)")
+    print("="*70)
+    
+    # Standard view without gap nodes
+    plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False, orientation='alt')
+    
+    # With gap nodes for each pairing symmetry
+    for pairing in ['B2u', 'B3u']:
+        print(f"\n--- {pairing} Gap Nodes (Alternative Orientation) ---")
+        plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
+                             gap_node_pairing=pairing, orientation='alt')    # Save energies to file
     import os
     output_dir = 'outputs/ute2_fixed'
     os.makedirs(output_dir, exist_ok=True)
