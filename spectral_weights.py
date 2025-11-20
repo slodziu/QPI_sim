@@ -349,21 +349,19 @@ def test_fermi_surface_and_spectral_weights():
             if best_3:
                 target_points.append((ky_vals[best_3[0]], kx_vals[best_3[1]]))
             
-            # P4: Target in far positive ky region, negative kx
+            # P4: Same as P3 but go to same kx point as origin (symmetric scattering)
             ky_positive_far = np.where((ky_vals > 1.8*np.pi/b) & (ky_vals < 2.8*np.pi/b))[0]
-            kx_negative_selected = kx_negative_indices[-40:-10]  # Not too deep negative
-            best_4 = find_local_maximum(U_linear, ky_positive_far, kx_negative_selected)
+            # Find point at same kx as origin but in positive ky region
+            origin_kx_vicinity = np.where(abs(kx_vals - origin_point[1]) < 0.1*np.pi/a)[0]
+            best_4 = find_local_maximum(U_linear, ky_positive_far, origin_kx_vicinity)
             if best_4:
                 target_points.append((ky_vals[best_4[0]], kx_vals[best_4[1]]))
+            else:
+                # Fallback: use exact same kx as origin
+                target_points.append((2.0*np.pi/b, origin_point[1]))
             
-            # P5: Target in wrap-around region (far negative ky, representing periodicity)
-            ky_negative_far = np.where(ky_vals < -2.7*np.pi/b)[0]
-            if len(ky_negative_far) > 0:
-                kx_mixed = np.concatenate([kx_negative_indices[-20:], kx_positive_near[:10]])
-                best_5 = find_local_maximum(U_linear, ky_negative_far, kx_mixed)
-                if best_5:
-                    target_points.append((ky_vals[best_5[0]], kx_vals[best_5[1]]))
-            
+            # P5: Connect first origin to second origin (inter-origin connection)
+            target_points.append(origin_2_point)
             # P6: From origin 2 to same point as P2 (demonstrating Fermi surface nesting)
             target_6_point = target_points[1] if len(target_points) > 1 else (0, 0.5*np.pi/a)
             
@@ -385,12 +383,18 @@ def test_fermi_surface_and_spectral_weights():
                     ax_vectors.annotate('', xy=target, xytext=origin_point,
                                       arrowprops=dict(arrowstyle='->', color=vector_colors[i], 
                                                     lw=3, alpha=0.9))
-                    # Label the vector
-                    mid_x = (origin_point[0] + target[0]) / 2
-                    mid_y = (origin_point[1] + target[1]) / 2
-                    ax_vectors.text(mid_x, mid_y, vector_labels[i], 
-                                  color=vector_colors[i], fontsize=12, fontweight='bold',
-                                  bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
+                    # Label the vector near the end but offset to not hide arrow tip
+                    # Use different offsets for each vector to avoid overlaps
+                    if i == 1:  # P2 - offset more to avoid overlap with P6
+                        offset_x = -0.15 * np.pi / b  # Negative offset for P2
+                        offset_y = 0.1 * np.pi / a
+                    else:
+                        offset_x = 0.1 * np.pi / b  # Standard offset for others
+                        offset_y = 0.05 * np.pi / a
+                    ax_vectors.text(target[0] + offset_x, target[1] + offset_y, vector_labels[i], 
+                                  color='black', fontsize=12, fontweight='bold',
+                                  bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8),
+                                  ha='center', va='center')
             
             # Plot vector 6 (from second origin) - make it white with black outline for visibility
             ax_vectors.annotate('', xy=target_6_point, xytext=origin_2_point,
@@ -405,9 +409,13 @@ def test_fermi_surface_and_spectral_weights():
                                             lw=4, alpha=1.0, zorder=2))
             mid_x_6 = (origin_2_point[0] + target_6_point[0]) / 2
             mid_y_6 = (origin_2_point[1] + target_6_point[1]) / 2
-            ax_vectors.text(mid_x_6, mid_y_6, 'P₆', 
-                          color='white', fontsize=14, fontweight='bold',
-                          bbox=dict(boxstyle='round,pad=0.3', facecolor='black', alpha=0.9, edgecolor='white'))
+            # Position P6 label near endpoint but offset opposite to P2 to avoid overlap
+            offset_x_6 = 0.15 * np.pi / b  # Positive offset for P6 (opposite to P2)
+            offset_y_6 = -0.1 * np.pi / a   # Negative offset in kx direction
+            ax_vectors.text(target_6_point[0] + offset_x_6, target_6_point[1] + offset_y_6, 'P₆', 
+                          color='black', fontsize=12, fontweight='bold',
+                          bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8),
+                          ha='center', va='center')
             
             # Mark origin points
             ax_vectors.plot(origin_point[0], origin_point[1], 'ko', markersize=8, markerfacecolor='yellow', markeredgecolor='black')
@@ -455,6 +463,17 @@ def test_fermi_surface_and_spectral_weights():
             vector_6_kx = target_6_point[1] - origin_2_point[1]
             vector_6_ky = target_6_point[0] - origin_2_point[0]
             print(f"P6: ({vector_6_kx/(np.pi/a):.3f}π/a, {vector_6_ky/(np.pi/b):.3f}π/b)")
+            
+            # Also print in 2π/a and 2π/b units
+            print(f"\nScattering Vectors in (kx, ky) format using 2π units:")
+            for i, target in enumerate(target_points[:5]):
+                if target:
+                    vector_kx = target[1] - origin_point[1]  # kx component
+                    vector_ky = target[0] - origin_point[0]  # ky component
+                    print(f"P{i+1}: ({vector_kx/(2*np.pi/a):.3f}, {vector_ky/(2*np.pi/b):.3f})")
+            
+            # Vector 6 from different origin in 2π units
+            print(f"P6: ({vector_6_kx/(2*np.pi/a):.3f}, {vector_6_ky/(2*np.pi/b):.3f})")
         
         print(f"Te orbital weight range: {np.min(Te_weight):.6f} to {np.max(Te_weight):.6f}")
         print(f"U orbital weight range: {np.min(U_weight):.6f} to {np.max(U_weight):.6f}")
