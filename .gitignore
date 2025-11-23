@@ -50,3 +50,9 @@ debug_*.png
 # OS
 .DS_Store
 Thumbs.db
+
+# Cache files (large binary files)
+**/cache/
+*.pkl
+outputs/**/cache/
+outputs/global_cache/

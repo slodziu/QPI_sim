@@ -16,6 +16,11 @@ a = 0.407   # Lattice constant along a direction: 4.07 Å
 b = 0.583   # Lattice constant along b direction: 5.83 Å
 c = 1.378   # Lattice constant along c direction: 13.78 Å
 
+# (0-11) plane crystallographic parameters
+# c* ≈ 0.76 nm is the projected lattice spacing in the (0-11) plane
+# This is NOT the reciprocal lattice parameter, but the effective spacing
+c_star = 0.76  # nm, projected lattice spacing in (0-11) plane
+
 
 # U parameters (verified against paper)
 muU = -0.355
@@ -155,7 +160,7 @@ def band_energies_with_eigenvectors(kz, resolution=300):
     
     return energies, eigenvectors
 
-def compute_spectral_weights(kz, orbital_weights=None, energy_window=0.2, resolution=300):
+def compute_spectral_weights(kz, orbital_weights=None, energy_window=0.05, resolution=300):
     """
     Compute orbital-projected spectral weights for each band at given k-points.
     
@@ -214,7 +219,7 @@ def compute_spectral_weights(kz, orbital_weights=None, energy_window=0.2, resolu
                     psi_nk = eigenvectors[i, j, :, band]  # Eigenvector for band n at k-point (i,j)
                     
                     # Weight by proximity to Fermi level for better contrast
-                    fermi_weight = 1.0 / (abs(E_nk) + 0.001)  # Inverse distance to EF
+                    fermi_weight = np.exp(- (E_nk / energy_window)**2 )
                     
                     # Calculate orbital-projected weights
                     for orbital_idx, orbital_name in enumerate(orbital_names):
@@ -1183,6 +1188,485 @@ _cached_ky_3d = None
 _cached_kz_3d = None
 _cached_nk3d = None
 
+def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
+                                     gap_node_pairing='B3u', angle_deg=24.0):
+    """
+    Project 3D Fermi surface onto (0-11) crystallographic plane.
+    
+    Creates a proper crystallographic projection showing kx vs kc* where:
+    - y-axis: kx (in π/a units)  
+    - x-axis: kc* (projected coordinate in π/c* units)
+    - Shows both Fermi surface bands combined like in 3D plots
+    - Can overlay B2u and B3u gap nodes
+    
+    Parameters:
+    -----------
+    save_dir : str
+        Directory to save output files
+    show_gap_nodes : bool
+        Whether to compute and display gap nodes
+    gap_node_pairing : str
+        Which pairing symmetry to show gap nodes for ('B2u', 'B3u', 'both')
+    angle_deg : float
+        Angle between normal to (0-11) plane and b-axis (default: 24°)
+    """
+    import os
+    import pickle
+    import hashlib
+    
+    print(f"\n" + "="*70)
+    print(f"GENERATING (0-11) PLANE PROJECTION - CRYSTALLOGRAPHIC VIEW")
+    print(f"Angle: {angle_deg}° between normal and b-axis")
+    print("="*70)
+    
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Use the same 3D computation as plot_3d_fermi_surface
+    nk3d = 129  # Same resolution as 3D plots
+    
+    # Create cache filename based on grid parameters (use extended ky for projection)
+    cache_key = f"{nk3d}_{a:.6f}_{b:.6f}_{c:.6f}_extended_ky"  # Different cache for extended ky
+    cache_hash = hashlib.md5(cache_key.encode()).hexdigest()[:8]
+    cache_dir = os.path.join('outputs', 'global_cache')
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_file = os.path.join(cache_dir, f'band_energies_3d_projection_{cache_hash}.pkl')
+    
+    # Load or compute 3D band energies
+    if os.path.exists(cache_file):
+        print("Loading 3D band energies from cache...")
+        with open(cache_file, 'rb') as f:
+            cache_data = pickle.load(f)
+            band_energies_3d = cache_data['band_energies_3d']
+            kx_3d = cache_data['kx_3d'] 
+            ky_3d = cache_data['ky_3d']
+            kz_3d = cache_data['kz_3d']
+        print("Using cached 3D band energies")
+    else:
+        print("Computing 3D band energies with extended ky range for projection...")
+        # Extended ky range for projection to capture full Fermi surface
+        kx_3d = np.linspace(-np.pi/a, np.pi/a, nk3d)
+        ky_3d = np.linspace(-3*np.pi/b, 3*np.pi/b, nk3d)  # Extended ky range for projection
+        kz_3d = np.linspace(-np.pi/c, np.pi/c, nk3d)
+        
+        band_energies_3d = np.zeros((nk3d, nk3d, nk3d, 4))
+        
+        for i, kx in enumerate(kx_3d):
+            if i % (nk3d//10) == 0:
+                print(f"  Progress: {i}/{nk3d} ({100*i/nk3d:.1f}%)")
+            for j, ky in enumerate(ky_3d):
+                for k, kz in enumerate(kz_3d):
+                    H = H_full(kx, ky, kz)
+                    eigvals = np.linalg.eigvals(H)
+                    band_energies_3d[i, j, k, :] = np.sort(np.real(eigvals))
+        
+        # Cache the results
+        cache_data = {
+            'band_energies_3d': band_energies_3d,
+            'kx_3d': kx_3d,
+            'ky_3d': ky_3d, 
+            'kz_3d': kz_3d
+        }
+        with open(cache_file, 'wb') as f:
+            pickle.dump(cache_data, f)
+        print(f"Cached 3D band energies to {cache_file}")
+    
+    # Define (0-11) plane transformation
+    angle_rad = np.deg2rad(angle_deg)
+    
+    print(f"Projection setup:")
+    print(f"  x-axis: kc* = ky*sin({angle_deg}°) + kz*cos({angle_deg}°)")
+    print(f"  y-axis: kx (unchanged)")
+    print(f"  Note: c* ~ {c_star:.2f} nm is the projected lattice spacing in (0-11) plane")
+    
+    # Project 3D Fermi surface to 2D using scatter points (original working method)
+    print("Projecting 3D Fermi surface to (0-11) plane...")
+    
+    # Extract Fermi surfaces using marching cubes (same as 3D plot)
+    EF = 0.0
+    colors = ['#1E88E5', '#42A5F5', "#9635E5", "#FD0000"] 
+    band_labels = ['Band 1', 'Band 2', 'Band 3', 'Band 4']
+    
+    fermi_surfaces = {}
+    
+    for band in [2, 3]:  # Only bands that cross Fermi level
+        try:
+            print(f"  Extracting Band {band+1} Fermi surface...")
+            verts, faces, normals, values = measure.marching_cubes(
+                band_energies_3d[:,:,:,band], level=EF, 
+                spacing=(kx_3d[1]-kx_3d[0], ky_3d[1]-ky_3d[0], kz_3d[1]-kz_3d[0])
+            )
+            
+            # Convert vertices to physical k-space coordinates (same as 3D plotting)
+            verts_physical = np.zeros_like(verts)
+            verts_physical[:, 0] = verts[:, 0] + kx_3d[0]  # kx
+            verts_physical[:, 1] = verts[:, 1] + ky_3d[0]  # ky  
+            verts_physical[:, 2] = verts[:, 2] + kz_3d[0]  # kz
+            
+            # Project to (0-11) coordinates
+            kx_fs = verts_physical[:, 0]
+            ky_fs = verts_physical[:, 1]
+            kz_fs = verts_physical[:, 2]
+            
+            # Projection transformation
+            kc_star = ky_fs * np.sin(angle_rad) + kz_fs * np.cos(angle_rad)
+            kx_unchanged = kx_fs
+            
+            fermi_surfaces[f'band_{band}'] = {
+                'kx': kx_unchanged / (np.pi/a),  # Convert to π/a units
+                'kc_star': kc_star / (np.pi/c_star),  # Convert to π/c* units using projected spacing
+                'color': colors[band],
+                'label': band_labels[band]
+            }
+            
+            print(f"    Found {len(verts)} Fermi surface points for Band {band+1}")
+            
+        except Exception as e:
+            print(f"    No Fermi surface found for Band {band+1}: {e}")
+    
+
+    
+    # Determine which pairing symmetries to plot
+    if show_gap_nodes and gap_node_pairing in ['B2u', 'B3u', 'both']:
+        pairing_types = [gap_node_pairing] if gap_node_pairing != 'both' else ['B2u', 'B3u']
+    else:
+        pairing_types = []
+    
+    # Create separate plots for each pairing symmetry (or combined if single type)
+    plots_to_make = pairing_types if gap_node_pairing == 'both' else [gap_node_pairing if show_gap_nodes else 'no_nodes']
+    
+    for plot_type in plots_to_make:
+        print(f"Creating plot for: {plot_type}")
+        
+        # Create new figure for this plot
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        # Plot Fermi surfaces using triangulated surfaces from scatter points
+        from matplotlib.tri import Triangulation
+        from matplotlib.collections import TriMesh
+        
+        for band_key, fs_data in fermi_surfaces.items():
+            print(f"  Creating triangulated surface for {fs_data['label']}...")
+            
+            # Get the scattered points
+            x_points = fs_data['kc_star']  # kc* coordinates
+            y_points = fs_data['kx']       # kx coordinates
+            
+            if len(x_points) > 3:  # Need at least 3 points for triangulation
+                try:
+                    # Create Delaunay triangulation of the scattered points
+                    tri = Triangulation(x_points, y_points)
+                    
+                    # Filter triangles that are too large (removes outliers)
+                    # Calculate triangle edge lengths and filter out very large triangles
+                    max_edge_length = 0.25  # Increased threshold for extended ky range
+                    triangles = tri.triangles
+                    
+                    # Calculate triangle edge lengths
+                    x_tri = x_points[triangles]
+                    y_tri = y_points[triangles]
+                    
+                    # Calculate all edge lengths for each triangle
+                    edge1 = np.sqrt((x_tri[:, 1] - x_tri[:, 0])**2 + (y_tri[:, 1] - y_tri[:, 0])**2)
+                    edge2 = np.sqrt((x_tri[:, 2] - x_tri[:, 1])**2 + (y_tri[:, 2] - y_tri[:, 1])**2)
+                    edge3 = np.sqrt((x_tri[:, 0] - x_tri[:, 2])**2 + (y_tri[:, 0] - y_tri[:, 2])**2)
+                    
+                    # Filter triangles where all edges are reasonable
+                    max_edges = np.maximum(np.maximum(edge1, edge2), edge3)
+                    good_triangles = max_edges < max_edge_length
+                    
+                    # Create filtered triangulation
+                    filtered_triangles = triangles[good_triangles]
+                    
+                    # Plot the triangulated surface using matplotlib collections
+                    from matplotlib.collections import TriMesh
+                    import matplotlib.colors as mcolors
+                    
+                    # Create a new triangulation with only the filtered triangles
+                    from matplotlib.tri import Triangulation as TriangulationClass
+                    filtered_tri = TriangulationClass(x_points, y_points, filtered_triangles)
+                    
+                    # Create one color per filtered triangle (more transparent)
+                    triangle_colors = np.tile(mcolors.to_rgba(fs_data['color'], alpha=0.3), 
+                                            (len(filtered_triangles), 1))
+                    
+                    # Create the triangle mesh
+                    triangle_mesh = TriMesh(filtered_tri, facecolors=triangle_colors, 
+                                          edgecolors='none', linewidth=0)
+                    ax.add_collection(triangle_mesh)
+                    
+                    # Add contour outline for clarity
+                    z_dummy = np.zeros(len(x_points))  
+                    ax.tricontour(x_points, y_points, z_dummy,
+                                levels=[0], colors=[fs_data['color']], 
+                                linewidths=2, alpha=1.0)
+                    
+                    # Add to legend
+                    ax.plot([], [], color=fs_data['color'], linewidth=4, alpha=0.8, 
+                           label=fs_data['label'])
+                    
+                    print(f"    {fs_data['label']}: {len(filtered_triangles)} triangles from {len(x_points)} points")
+                    
+                except Exception as e:
+                    print(f"    Failed to triangulate {fs_data['label']}: {e}")
+                    # Fallback to scatter plot
+                    ax.scatter(x_points, y_points, c=fs_data['color'], s=1, 
+                              alpha=0.6, label=fs_data['label'])
+            else:
+                print(f"    Too few points for {fs_data['label']} triangulation: {len(x_points)}")
+                # Fallback to scatter plot
+                ax.scatter(x_points, y_points, c=fs_data['color'], s=1, 
+                          alpha=0.6, label=fs_data['label'])
+        
+        # Add gap nodes for this specific pairing symmetry
+        if plot_type in ['B2u', 'B3u']:
+            print(f"  Computing and projecting {plot_type} gap nodes...")
+            
+            # Use EXACT same gap node detection as 3D plots (slice-based method)
+            print("  Using slice-based method (same as 3D plots)...")
+            
+            # Use standard k-space range for gap node detection (not extended ky)
+            # Gap nodes should only exist where Fermi surfaces exist
+            kx_gap = np.linspace(-np.pi/a, np.pi/a, nk3d)
+            ky_gap = np.linspace(-np.pi/b, np.pi/b, nk3d)  # Standard range
+            kz_gap = np.linspace(-np.pi/c, np.pi/c, nk3d)
+            
+            # Compute band energies on standard grid for gap node detection
+            print(f"    Computing band energies on standard k-grid for gap node detection...")
+            band_energies_gap = np.zeros((nk3d, nk3d, nk3d, 4))
+            
+            for i, kx in enumerate(kx_gap):
+                for j, ky in enumerate(ky_gap):
+                    for k, kz in enumerate(kz_gap):
+                        H = H_full(kx, ky, kz)
+                        eigvals = np.linalg.eigvals(H)
+                        band_energies_gap[i, j, k, :] = np.sort(np.real(eigvals))
+                
+                if (i + 1) % 20 == 0:
+                    print(f"      Band energies: {(i+1)/nk3d*100:.0f}% complete")
+            
+            # First compute 3D gap magnitude for this pairing type
+            gap_3d = np.zeros((nk3d, nk3d, nk3d))
+            print(f"    Computing {plot_type} gap magnitude on 3D grid...")
+            
+            for i, kx in enumerate(kx_gap):
+                for j, ky in enumerate(ky_gap):
+                    # Vectorize over kz direction
+                    gap_stack = np.array([calculate_gap_magnitude(
+                        np.array([[kx]]), np.array([[ky]]), kz, pairing_type=plot_type)[0, 0] 
+                        for kz in kz_gap])
+                    gap_3d[i, j, :] = gap_stack
+                
+                if (i + 1) % 20 == 0:
+                    print(f"      {plot_type} gap: {(i+1)/nk3d*100:.0f}% complete")
+            
+            print(f"      {plot_type} gap range: {np.min(gap_3d):.6f} to {np.max(gap_3d):.6f}")
+            
+            # Set threshold based on pairing type (same as 3D plot)
+            if plot_type == 'B2u':
+                gap_threshold = 0.05 * np.max(gap_3d)
+                fermi_threshold = 0.010  # 10 meV - same as 3D
+            elif plot_type == 'B3u':
+                gap_threshold = 0.04 * np.max(gap_3d)
+                fermi_threshold = 0.008  # 8 meV - same as 3D
+            else:
+                gap_threshold = 0.05 * np.max(gap_3d)
+                fermi_threshold = 0.010  # 10 meV
+            
+            # Collect nodes from all slices (same method as 3D plot)
+            all_nodes_kx = []
+            all_nodes_ky = []
+            all_nodes_kz = []
+            all_nodes_gap = []
+            all_nodes_band = []
+            
+            # For B2u, ensure we check the exact nodal planes
+            critical_kz_indices = []
+            if plot_type == 'B2u':
+                # Find indices closest to kz = 0, ±π/c
+                idx_0 = np.argmin(np.abs(kz_gap - 0.0))
+                idx_plus = np.argmin(np.abs(kz_gap - np.pi/c))
+                idx_minus = np.argmin(np.abs(kz_gap - (-np.pi/c)))
+                critical_kz_indices = [idx_0, idx_plus, idx_minus]
+            
+            print(f"      Scanning {nk3d} kz slices...")
+            
+            for band in [2, 3]:  # Bands 3 and 4
+                band_nodes_found = 0
+                
+                for iz, kz_val in enumerate(kz_gap):
+                    # Extract 2D slice at this kz from gap-specific energy data
+                    energy_slice = band_energies_gap[:, :, iz, band]  # Shape: (nk3d, nk3d)
+                    gap_slice = gap_3d[:, :, iz]  # Shape: (nk3d, nk3d)
+                    
+                    # Check if this is a critical kz plane for B2u
+                    is_critical_kz = (plot_type == 'B2u' and iz in critical_kz_indices)
+                    
+                    # Use more generous threshold at critical planes
+                    effective_fermi_threshold = fermi_threshold
+                    if is_critical_kz:
+                        effective_fermi_threshold = fermi_threshold * 2.0
+                    
+                    # Check if Fermi surface crosses this slice
+                    if energy_slice.min() > effective_fermi_threshold or energy_slice.max() < -effective_fermi_threshold:
+                        continue
+                    
+                    # Find intersections in this 2D slice
+                    fermi_mask = np.abs(energy_slice) < effective_fermi_threshold
+                    gap_mask = gap_slice < gap_threshold
+                    intersection = fermi_mask & gap_mask
+                    
+                    if np.any(intersection):
+                        # Get indices of intersection points
+                        ix_slice, iy_slice = np.where(intersection)
+                        
+                        # Apply 2D clustering within this slice
+                        selected_2d = []
+                        min_pixel_dist = 8  # Same as 3D plot
+                        
+                        for i in range(len(ix_slice)):
+                            ix_pt, iy_pt = ix_slice[i], iy_slice[i]
+                            
+                            # Check distance to already selected points in this slice
+                            too_close = False
+                            for (prev_ix, prev_iy) in selected_2d:
+                                if np.sqrt((ix_pt - prev_ix)**2 + (iy_pt - prev_iy)**2) < min_pixel_dist:
+                                    too_close = True
+                                    break
+                            
+                            if not too_close:
+                                selected_2d.append((ix_pt, iy_pt))
+                                
+                                # Convert to physical coordinates using gap k-space arrays
+                                kx_node = kx_gap[ix_pt]
+                                ky_node = ky_gap[iy_pt]
+                                gap_value = gap_slice[ix_pt, iy_pt]
+                                
+                                # Store this node
+                                all_nodes_kx.append(kx_node)
+                                all_nodes_ky.append(ky_node)
+                                all_nodes_kz.append(kz_val)
+                                all_nodes_gap.append(gap_value)
+                                all_nodes_band.append(band)
+                                band_nodes_found += 1
+            
+            # Apply 3D clustering (same as 3D plot)
+            if len(all_nodes_kx) > 0:
+                all_nodes_kx = np.array(all_nodes_kx)
+                all_nodes_ky = np.array(all_nodes_ky)
+                all_nodes_kz = np.array(all_nodes_kz)
+                all_nodes_gap = np.array(all_nodes_gap)
+                all_nodes_band = np.array(all_nodes_band)
+                
+                print(f"      Total nodes from slices: {len(all_nodes_kx)}")
+                print(f"      Applying 3D clustering...")
+                
+                # 3D clustering with physical distance (same as 3D plot)
+                if plot_type == 'B3u':
+                    min_distance_3d = 0.4  # Physical units
+                elif plot_type == 'B2u':
+                    min_distance_3d = 0.20  # Same as 3D plot
+                else:
+                    min_distance_3d = 0.3
+                
+                # Apply 3D clustering
+                clustered_indices = []
+                for i in range(len(all_nodes_kx)):
+                    kx_i, ky_i, kz_i = all_nodes_kx[i], all_nodes_ky[i], all_nodes_kz[i]
+                    
+                    # Check if this node is too close to any already selected nodes
+                    too_close = False
+                    for j in clustered_indices:
+                        kx_j, ky_j, kz_j = all_nodes_kx[j], all_nodes_ky[j], all_nodes_kz[j]
+                        distance_3d = np.sqrt((kx_i - kx_j)**2 + (ky_i - ky_j)**2 + (kz_i - kz_j)**2)
+                        if distance_3d < min_distance_3d:
+                            too_close = True
+                            break
+                    
+                    if not too_close:
+                        clustered_indices.append(i)
+                
+                # Keep only clustered nodes
+                final_kx_nodes = all_nodes_kx[clustered_indices]
+                final_ky_nodes = all_nodes_ky[clustered_indices]
+                final_kz_nodes = all_nodes_kz[clustered_indices]
+                
+                print(f"      After 3D clustering: {len(final_kx_nodes)} nodes")
+                print(f"    Found {len(final_kx_nodes)} {plot_type} gap nodes (same method as 3D plots)")
+                
+                # Project to (0-11) coordinates
+                # Apply projection transformation
+                kc_star_nodes = final_ky_nodes * np.sin(angle_rad) + final_kz_nodes * np.cos(angle_rad)
+                kx_proj_nodes = final_kx_nodes
+                
+                # Convert to plot units
+                kx_proj_nodes = kx_proj_nodes / (np.pi/a)  # π/a units
+                kc_star_nodes = kc_star_nodes / (np.pi/c_star)  # π/c* units using projected spacing
+                
+                # Plot ALL gap nodes (don't filter by range - show all 18 nodes)
+                ax.scatter(kc_star_nodes, kx_proj_nodes, 
+                          c='yellow', s=50, marker='o', edgecolors='black', linewidth=1,
+                          label=f'{plot_type} Gap Nodes', zorder=10)
+                print(f"    Projected all {len(kx_proj_nodes)} {plot_type} gap nodes to (0-11) plane")
+                
+                # Adjust plot limits to show all nodes if needed
+                if len(kx_proj_nodes) > 0:
+                    kc_min, kc_max = np.min(kc_star_nodes), np.max(kc_star_nodes)
+                    kx_min, kx_max = np.min(kx_proj_nodes), np.max(kx_proj_nodes)
+                    
+                    # Extend limits to ensure all nodes are visible with some padding
+                    current_kc_lim = max(1.0, abs(kc_min), abs(kc_max)) * 1.1
+                    current_kx_lim = max(1.0, abs(kx_min), abs(kx_max)) * 1.1
+            else:
+                print(f"    No {plot_type} gap nodes found")
+        
+        # Formatting
+        ax.set_xlabel('kc* (π/c* units)', fontsize=14)
+        ax.set_ylabel('kx (π/a units)', fontsize=14)
+        
+        # Set title based on plot type
+        if plot_type == 'no_nodes':
+            title_suffix = ''
+        else:
+            title_suffix = f' with {plot_type} Gap Nodes'
+            
+        ax.set_title(f'UTe₂ Fermi Surface - (0-11) Crystallographic Projection{title_suffix}\n' + 
+                    f'Angle: {angle_deg}° between normal and b-axis', fontsize=16, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+        ax.set_aspect('equal')
+        
+        # Set axis limits - use dynamic limits if gap nodes extend beyond ±1
+        if plot_type in ['B2u', 'B3u']:
+            # Use dynamic limits calculated above if they exist
+            try:
+                ax.set_xlim(-current_kc_lim, current_kc_lim)
+                ax.set_ylim(-current_kx_lim, current_kx_lim)
+                print(f"    Set dynamic limits: kc* ±{current_kc_lim:.1f}, kx ±{current_kx_lim:.1f}")
+            except:
+                # Fallback to standard limits
+                ax.set_xlim(-1.0, 1.0)
+                ax.set_ylim(-1.0, 1.0)
+        else:
+            # Standard limits for no gap nodes
+            ax.set_xlim(-1.0, 1.0)
+            ax.set_ylim(-1.0, 1.0)
+        
+        plt.tight_layout()
+        
+        # Save the plot
+        filename = f'fermi_surface_011_crystallographic_projection_{angle_deg}deg'
+        if plot_type != 'no_nodes':
+            filename += f'_{plot_type}_nodes'
+        filename += '.png'
+        
+        filepath = os.path.join(save_dir, filename)
+        fig.savefig(filepath, dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        print(f"  Saved plot to {filepath}")
+    
+    print("="*70)
+
 def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
                          gap_node_pairing='B3u', orientation='standard'):
     """
@@ -2094,6 +2578,29 @@ if __name__ == "__main__":
         print(f"\n--- {pairing} Gap Nodes ---")
         plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
                              gap_node_pairing=pairing)
+    
+    # Generate (0-11) crystallographic projections
+    print("\n" + "="*70)
+    print("Generating (0-11) Crystallographic Projections")
+    print("="*70)
+    
+    # Generate projection at 24° (standard angle from paper)
+    print("Generating clean Fermi surface projection...")
+    plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', 
+                                    show_gap_nodes=False, angle_deg=24.0)
+    
+    # Generate projections with gap nodes for both B2u and B3u
+    for pairing in ['B2u', 'B3u']:
+        print(f"Generating projection with {pairing} gap nodes...")
+        plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', 
+                                        show_gap_nodes=True, gap_node_pairing=pairing, 
+                                        angle_deg=24.0)
+    
+    # Generate combined projection with both B2u and B3u nodes
+    print("Generating projection with both B2u and B3u gap nodes...")
+    plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', 
+                                    show_gap_nodes=True, gap_node_pairing='both', 
+                                    angle_deg=24.0)
     
     # Generate 3D plots with alternative orientation (kx vertical, ky-kz horizontal)
     print("\n" + "="*70)
