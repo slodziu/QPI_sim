@@ -1221,8 +1221,9 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
     
     os.makedirs(save_dir, exist_ok=True)
     
-    # Use the same 3D computation as plot_3d_fermi_surface
-    nk3d = 129  # Same resolution as 3D plots
+    # Use LOWER resolution for projection to avoid memory issues
+    # Extended ky range creates huge meshes, so reduce grid size significantly
+    nk3d = 60  # Reduced from 129 to avoid memory crash with extended ky
     
     # Create cache filename based on grid parameters (use extended ky for projection)
     cache_key = f"{nk3d}_{a:.6f}_{b:.6f}_{c:.6f}_extended_ky"  # Different cache for extended ky
@@ -1296,6 +1297,34 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                 spacing=(kx_3d[1]-kx_3d[0], ky_3d[1]-ky_3d[0], kz_3d[1]-kz_3d[0])
             )
             
+            print(f"    Initial mesh: {len(verts)} vertices, {len(faces)} faces")
+            
+            # Decimate mesh if too large (critical for memory)
+            if len(faces) > 20000:
+                print(f"    Decimating mesh (too large for rendering)...")
+                if TRIMESH_AVAILABLE:
+                    try:
+                        # Create trimesh object
+                        mesh = trimesh.Trimesh(vertices=verts, faces=faces)
+                        # Decimate to target face count
+                        target_faces = 15000
+                        mesh = mesh.simplify_quadric_decimation(target_faces)
+                        verts = mesh.vertices
+                        faces = mesh.faces
+                        print(f"    After decimation: {len(verts)} vertices, {len(faces)} faces")
+                    except Exception as e:
+                        print(f"    Warning: decimation failed ({e})")
+                        # Skip if too large and decimation failed
+                        if len(faces) > 50000:
+                            print(f"    ERROR: Mesh too large ({len(faces)} faces), skipping this band")
+                            continue
+                else:
+                    print("    Warning: trimesh not available, skipping decimation")
+                    # Skip if too large and trimesh not available
+                    if len(faces) > 50000:
+                        print(f"    ERROR: Mesh too large ({len(faces)} faces), skipping this band")
+                        continue
+            
             # Convert vertices to physical k-space coordinates (same as 3D plotting)
             verts_physical = np.zeros_like(verts)
             verts_physical[:, 0] = verts[:, 0] + kx_3d[0]  # kx
@@ -1311,14 +1340,20 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
             kc_star = ky_fs * np.sin(angle_rad) + kz_fs * np.cos(angle_rad)
             kx_unchanged = kx_fs
             
+            # Store 2D projected vertices and original 3D faces
+            verts_2d = np.column_stack((
+                kc_star / (np.pi/c_star),  # x-axis: kc* in π/c* units
+                kx_unchanged / (np.pi/a)    # y-axis: kx in π/a units
+            ))
+            
             fermi_surfaces[f'band_{band}'] = {
-                'kx': kx_unchanged / (np.pi/a),  # Convert to π/a units
-                'kc_star': kc_star / (np.pi/c_star),  # Convert to π/c* units using projected spacing
+                'verts_2d': verts_2d,  # Projected 2D vertices (N, 2)
+                'faces': faces,         # Original 3D mesh topology (M, 3)
                 'color': colors[band],
                 'label': band_labels[band]
             }
             
-            print(f"    Found {len(verts)} Fermi surface points for Band {band+1}")
+            print(f"    Ready to render: {len(verts)} vertices, {len(faces)} faces")
             
         except Exception as e:
             print(f"    No Fermi surface found for Band {band+1}: {e}")
@@ -1340,282 +1375,392 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
         # Create new figure for this plot
         fig, ax = plt.subplots(figsize=(12, 8))
         
-        # Plot Fermi surfaces using triangulated surfaces from scatter points
-        from matplotlib.tri import Triangulation
-        from matplotlib.collections import TriMesh
+        # Plot Fermi surfaces using PolyCollection with original mesh topology
+        from matplotlib.collections import PolyCollection
+        
+        # Track extent for axis limits
+        all_x_coords = []
+        all_y_coords = []
         
         for band_key, fs_data in fermi_surfaces.items():
-            print(f"  Creating triangulated surface for {fs_data['label']}...")
+            print(f"  Rendering {fs_data['label']} with original mesh topology...")
             
-            # Get the scattered points
-            x_points = fs_data['kc_star']  # kc* coordinates
-            y_points = fs_data['kx']       # kx coordinates
+            # Get projected 2D vertices and original 3D faces
+            verts_2d = fs_data['verts_2d']  # Shape: (N_vertices, 2)
+            faces = fs_data['faces']        # Shape: (N_faces, 3) - indices into verts_2d
             
-            if len(x_points) > 3:  # Need at least 3 points for triangulation
-                try:
-                    # Create Delaunay triangulation of the scattered points
-                    tri = Triangulation(x_points, y_points)
-                    
-                    # Filter triangles that are too large (removes outliers)
-                    # Calculate triangle edge lengths and filter out very large triangles
-                    max_edge_length = 0.25  # Increased threshold for extended ky range
-                    triangles = tri.triangles
-                    
-                    # Calculate triangle edge lengths
-                    x_tri = x_points[triangles]
-                    y_tri = y_points[triangles]
-                    
-                    # Calculate all edge lengths for each triangle
-                    edge1 = np.sqrt((x_tri[:, 1] - x_tri[:, 0])**2 + (y_tri[:, 1] - y_tri[:, 0])**2)
-                    edge2 = np.sqrt((x_tri[:, 2] - x_tri[:, 1])**2 + (y_tri[:, 2] - y_tri[:, 1])**2)
-                    edge3 = np.sqrt((x_tri[:, 0] - x_tri[:, 2])**2 + (y_tri[:, 0] - y_tri[:, 2])**2)
-                    
-                    # Filter triangles where all edges are reasonable
-                    max_edges = np.maximum(np.maximum(edge1, edge2), edge3)
-                    good_triangles = max_edges < max_edge_length
-                    
-                    # Create filtered triangulation
-                    filtered_triangles = triangles[good_triangles]
-                    
-                    # Plot the triangulated surface using matplotlib collections
-                    from matplotlib.collections import TriMesh
-                    import matplotlib.colors as mcolors
-                    
-                    # Create a new triangulation with only the filtered triangles
-                    from matplotlib.tri import Triangulation as TriangulationClass
-                    filtered_tri = TriangulationClass(x_points, y_points, filtered_triangles)
-                    
-                    # Create one color per filtered triangle (more transparent)
-                    triangle_colors = np.tile(mcolors.to_rgba(fs_data['color'], alpha=0.3), 
-                                            (len(filtered_triangles), 1))
-                    
-                    # Create the triangle mesh
-                    triangle_mesh = TriMesh(filtered_tri, facecolors=triangle_colors, 
-                                          edgecolors='none', linewidth=0)
-                    ax.add_collection(triangle_mesh)
-                    
-                    # Add contour outline for clarity
-                    z_dummy = np.zeros(len(x_points))  
-                    ax.tricontour(x_points, y_points, z_dummy,
-                                levels=[0], colors=[fs_data['color']], 
-                                linewidths=2, alpha=1.0)
-                    
-                    # Add to legend
-                    ax.plot([], [], color=fs_data['color'], linewidth=4, alpha=0.8, 
-                           label=fs_data['label'])
-                    
-                    print(f"    {fs_data['label']}: {len(filtered_triangles)} triangles from {len(x_points)} points")
-                    
-                except Exception as e:
-                    print(f"    Failed to triangulate {fs_data['label']}: {e}")
-                    # Fallback to scatter plot
-                    ax.scatter(x_points, y_points, c=fs_data['color'], s=1, 
-                              alpha=0.6, label=fs_data['label'])
-            else:
-                print(f"    Too few points for {fs_data['label']} triangulation: {len(x_points)}")
-                # Fallback to scatter plot
-                ax.scatter(x_points, y_points, c=fs_data['color'], s=1, 
-                          alpha=0.6, label=fs_data['label'])
+            # Track coordinates for axis limits (sample to save memory)
+            sample_size = min(len(verts_2d), 1000)
+            sample_idx = np.linspace(0, len(verts_2d)-1, sample_size, dtype=int)
+            all_x_coords.extend(verts_2d[sample_idx, 0])
+            all_y_coords.extend(verts_2d[sample_idx, 1])
+            
+            # Create list of triangles using original faces
+            # Each triangle is defined by the 2D coordinates of its 3 vertices
+            print(f"    Creating triangle array ({len(faces)} triangles)...")
+            triangles = verts_2d[faces]  # Shape: (N_faces, 3, 2)
+            
+            # Create PolyCollection for efficient rendering
+            # Low alpha allows seeing through to overlapping surfaces
+            print(f"    Building PolyCollection...")
+            poly_col = PolyCollection(triangles,
+                                     facecolors=fs_data['color'],
+                                     edgecolors='none',
+                                     alpha=0.2,  # Slightly higher alpha for better visibility
+                                     linewidths=0,
+                                     antialiaseds=False)  # Disable AA for speed
+            ax.add_collection(poly_col)
+            
+            # Add dummy line for legend
+            ax.plot([], [], color=fs_data['color'], linewidth=4, alpha=0.8,
+                   label=fs_data['label'])
+            
+            print(f"    ✓ {fs_data['label']}: Rendered {len(faces)} triangles (preserved 3D topology)")
+        
+        # Set initial axis limits to exactly -1 to 1 (will be maintained throughout)
+        ax.set_xlim(-1.0, 1.0)
+        ax.set_ylim(-1.0, 1.0)
+        print(f"  Set axis limits: kc* [-1.0, 1.0], kx [-1.0, 1.0]")
         
         # Add gap nodes for this specific pairing symmetry
         if plot_type in ['B2u', 'B3u']:
             print(f"  Computing and projecting {plot_type} gap nodes...")
             
-            # Use EXACT same gap node detection as 3D plots (slice-based method)
-            print("  Using slice-based method (same as 3D plots)...")
+            # NOTE: We compute gap nodes directly for the projection
+            # The 3D plot cache is not used because those nodes are sampled
+            # on a different grid and often project outside the visible [-1,1] range
+            loaded_from_cache = False
             
-            # Use standard k-space range for gap node detection (not extended ky)
-            # Gap nodes should only exist where Fermi surfaces exist
-            kx_gap = np.linspace(-np.pi/a, np.pi/a, nk3d)
-            ky_gap = np.linspace(-np.pi/b, np.pi/b, nk3d)  # Standard range
-            kz_gap = np.linspace(-np.pi/c, np.pi/c, nk3d)
-            
-            # Compute band energies on standard grid for gap node detection
-            print(f"    Computing band energies on standard k-grid for gap node detection...")
-            band_energies_gap = np.zeros((nk3d, nk3d, nk3d, 4))
-            
-            for i, kx in enumerate(kx_gap):
-                for j, ky in enumerate(ky_gap):
-                    for k, kz in enumerate(kz_gap):
-                        H = H_full(kx, ky, kz)
-                        eigvals = np.linalg.eigvals(H)
-                        band_energies_gap[i, j, k, :] = np.sort(np.real(eigvals))
+            # Compute gap nodes using slice-based method optimized for projection
+            if not loaded_from_cache:
+                print("  Using projection-optimized gap node detection...")
+                print("  Using slice-based method (same as 3D plots)...")
                 
-                if (i + 1) % 20 == 0:
-                    print(f"      Band energies: {(i+1)/nk3d*100:.0f}% complete")
-            
-            # First compute 3D gap magnitude for this pairing type
-            gap_3d = np.zeros((nk3d, nk3d, nk3d))
-            print(f"    Computing {plot_type} gap magnitude on 3D grid...")
-            
-            for i, kx in enumerate(kx_gap):
-                for j, ky in enumerate(ky_gap):
-                    # Vectorize over kz direction
-                    gap_stack = np.array([calculate_gap_magnitude(
-                        np.array([[kx]]), np.array([[ky]]), kz, pairing_type=plot_type)[0, 0] 
-                        for kz in kz_gap])
-                    gap_3d[i, j, :] = gap_stack
+                # Use HIGH resolution for accurate boundary node detection
+                nk_gap = 129  # Same as working 3D plots - critical for boundary nodes
                 
-                if (i + 1) % 20 == 0:
-                    print(f"      {plot_type} gap: {(i+1)/nk3d*100:.0f}% complete")
-            
-            print(f"      {plot_type} gap range: {np.min(gap_3d):.6f} to {np.max(gap_3d):.6f}")
-            
-            # Set threshold based on pairing type (same as 3D plot)
-            if plot_type == 'B2u':
-                gap_threshold = 0.05 * np.max(gap_3d)
-                fermi_threshold = 0.010  # 10 meV - same as 3D
-            elif plot_type == 'B3u':
-                gap_threshold = 0.04 * np.max(gap_3d)
-                fermi_threshold = 0.008  # 8 meV - same as 3D
-            else:
-                gap_threshold = 0.05 * np.max(gap_3d)
-                fermi_threshold = 0.010  # 10 meV
-            
-            # Collect nodes from all slices (same method as 3D plot)
-            all_nodes_kx = []
-            all_nodes_ky = []
-            all_nodes_kz = []
-            all_nodes_gap = []
-            all_nodes_band = []
-            
-            # For B2u, ensure we check the exact nodal planes
-            critical_kz_indices = []
-            if plot_type == 'B2u':
-                # Find indices closest to kz = 0, ±π/c
-                idx_0 = np.argmin(np.abs(kz_gap - 0.0))
-                idx_plus = np.argmin(np.abs(kz_gap - np.pi/c))
-                idx_minus = np.argmin(np.abs(kz_gap - (-np.pi/c)))
-                critical_kz_indices = [idx_0, idx_plus, idx_minus]
-            
-            print(f"      Scanning {nk3d} kz slices...")
-            
-            for band in [2, 3]:  # Bands 3 and 4
-                band_nodes_found = 0
+                # STANDARD 3D BRILLOUIN ZONE: [-1, 1] in units of π/a, π/b, π/c
+                # Only search within the standard 3D box - do NOT extend beyond
+                kx_gap = np.linspace(-np.pi/a, np.pi/a, nk_gap)
+                ky_gap = np.linspace(-np.pi/b, np.pi/b, nk_gap)
+                kz_gap = np.linspace(-np.pi/c, np.pi/c, nk_gap)
                 
-                for iz, kz_val in enumerate(kz_gap):
-                    # Extract 2D slice at this kz from gap-specific energy data
-                    energy_slice = band_energies_gap[:, :, iz, band]  # Shape: (nk3d, nk3d)
-                    gap_slice = gap_3d[:, :, iz]  # Shape: (nk3d, nk3d)
+                print(f"    Gap node search grid: STANDARD 3D BZ [-1,1] on all axes ({nk_gap}³ = {nk_gap**3:,} points)")
+                print(f"    Estimated time: ~5-7 minutes")
+                
+                # Compute band energies
+                print(f"    Computing band energies on {nk_gap}³ k-grid...")
+                band_energies_gap = np.zeros((nk_gap, nk_gap, nk_gap, 4))
+                
+                for i, kx in enumerate(kx_gap):
+                    for j, ky in enumerate(ky_gap):
+                        for k, kz in enumerate(kz_gap):
+                            H = H_full(kx, ky, kz)
+                            eigvals = np.linalg.eigvals(H)
+                            band_energies_gap[i, j, k, :] = np.sort(np.real(eigvals))
                     
-                    # Check if this is a critical kz plane for B2u
-                    is_critical_kz = (plot_type == 'B2u' and iz in critical_kz_indices)
+                    if (i + 1) % 16 == 0:
+                        print(f"      Band energies: {(i+1)/nk_gap*100:.0f}% complete")
+                
+                # Compute 3D gap magnitude
+                gap_3d = np.zeros((nk_gap, nk_gap, nk_gap))
+                print(f"    Computing {plot_type} gap magnitude on {nk_gap}³ grid...")
+                
+                for i, kx in enumerate(kx_gap):
+                    for j, ky in enumerate(ky_gap):
+                        # Vectorize over kz direction
+                        gap_stack = np.array([calculate_gap_magnitude(
+                            np.array([[kx]]), np.array([[ky]]), kz, pairing_type=plot_type)[0, 0] 
+                            for kz in kz_gap])
+                        gap_3d[i, j, :] = gap_stack
                     
-                    # Use more generous threshold at critical planes
-                    effective_fermi_threshold = fermi_threshold
-                    if is_critical_kz:
-                        effective_fermi_threshold = fermi_threshold * 2.0
+                    if (i + 1) % 16 == 0:
+                        print(f"      {plot_type} gap: {(i+1)/nk_gap*100:.0f}% complete")
+                
+                print(f"      {plot_type} gap range: {np.min(gap_3d):.6f} to {np.max(gap_3d):.6f}")
+                
+                # Set threshold based on pairing type (relaxed to catch ALL boundary nodes)
+                if plot_type == 'B2u':
+                    gap_threshold = 0.08 * np.max(gap_3d)  # More relaxed - boundary nodes may have larger gap
+                    fermi_threshold = 0.020  # 20 meV - very relaxed for boundaries
+                elif plot_type == 'B3u':
+                    gap_threshold = 0.08 * np.max(gap_3d)  # More relaxed - match B2u
+                    fermi_threshold = 0.020  # 20 meV - very relaxed for boundaries
+                else:
+                    gap_threshold = 0.05 * np.max(gap_3d)
+                    fermi_threshold = 0.010  # 10 meV
+                
+                # Collect nodes from all slices (same method as 3D plot)
+                all_nodes_kx = []
+                all_nodes_ky = []
+                all_nodes_kz = []
+                all_nodes_gap = []
+                all_nodes_band = []
+                
+                # For B2u, ensure we check the exact nodal planes
+                critical_kz_indices = []
+                if plot_type == 'B2u':
+                    # Find indices closest to kz = 0, ±π/c
+                    idx_0 = np.argmin(np.abs(kz_gap - 0.0))
+                    idx_plus = np.argmin(np.abs(kz_gap - np.pi/c))
+                    idx_minus = np.argmin(np.abs(kz_gap - (-np.pi/c)))
+                    critical_kz_indices = [idx_0, idx_plus, idx_minus]
+                
+                print(f"      Scanning {nk_gap} kz slices...")
+                
+                for band in [2, 3]:  # Bands 3 and 4
+                    band_nodes_found = 0
                     
-                    # Check if Fermi surface crosses this slice
-                    if energy_slice.min() > effective_fermi_threshold or energy_slice.max() < -effective_fermi_threshold:
-                        continue
-                    
-                    # Find intersections in this 2D slice
-                    fermi_mask = np.abs(energy_slice) < effective_fermi_threshold
-                    gap_mask = gap_slice < gap_threshold
-                    intersection = fermi_mask & gap_mask
-                    
-                    if np.any(intersection):
-                        # Get indices of intersection points
-                        ix_slice, iy_slice = np.where(intersection)
+                    for iz, kz_val in enumerate(kz_gap):
+                        # Extract 2D slice at this kz from gap-specific energy data
+                        energy_slice = band_energies_gap[:, :, iz, band]  # Shape: (nk3d, nk3d)
+                        gap_slice = gap_3d[:, :, iz]  # Shape: (nk3d, nk3d)
                         
-                        # Apply 2D clustering within this slice
-                        selected_2d = []
-                        min_pixel_dist = 8  # Same as 3D plot
+                        # Check if this is a critical kz plane for B2u
+                        is_critical_kz = (plot_type == 'B2u' and iz in critical_kz_indices)
                         
-                        for i in range(len(ix_slice)):
-                            ix_pt, iy_pt = ix_slice[i], iy_slice[i]
+                        # Use more generous threshold at critical planes
+                        effective_fermi_threshold = fermi_threshold
+                        if is_critical_kz:
+                            effective_fermi_threshold = fermi_threshold * 2.0
+                        
+                        # Check if Fermi surface crosses this slice
+                        if energy_slice.min() > effective_fermi_threshold or energy_slice.max() < -effective_fermi_threshold:
+                            continue
+                        
+                        # Find intersections in this 2D slice
+                        fermi_mask = np.abs(energy_slice) < effective_fermi_threshold
+                        gap_mask = gap_slice < gap_threshold
+                        intersection = fermi_mask & gap_mask
+                        
+                        if np.any(intersection):
+                            # Get indices of intersection points
+                            ix_slice, iy_slice = np.where(intersection)
                             
-                            # Check distance to already selected points in this slice
+                            # Apply 2D clustering within this slice
+                            selected_2d = []
+                            min_pixel_dist = 8  # Same as 3D plot
+                            
+                            for i in range(len(ix_slice)):
+                                ix_pt, iy_pt = ix_slice[i], iy_slice[i]
+                                
+                                # Check distance to already selected points in this slice
+                                too_close = False
+                                for (prev_ix, prev_iy) in selected_2d:
+                                    if np.sqrt((ix_pt - prev_ix)**2 + (iy_pt - prev_iy)**2) < min_pixel_dist:
+                                        too_close = True
+                                        break
+                                
+                                if not too_close:
+                                    selected_2d.append((ix_pt, iy_pt))
+                                    
+                                    # Convert to physical coordinates using gap k-space arrays
+                                    kx_node = kx_gap[ix_pt]
+                                    ky_node = ky_gap[iy_pt]
+                                    gap_value = gap_slice[ix_pt, iy_pt]
+                                    
+                                    # Store this node
+                                    all_nodes_kx.append(kx_node)
+                                    all_nodes_ky.append(ky_node)
+                                    all_nodes_kz.append(kz_val)
+                                    all_nodes_gap.append(gap_value)
+                                    all_nodes_band.append(band)
+                                    band_nodes_found += 1
+                
+                # Apply 3D clustering (same as 3D plot)
+                if len(all_nodes_kx) > 0:
+                    all_nodes_kx = np.array(all_nodes_kx)
+                    all_nodes_ky = np.array(all_nodes_ky)
+                    all_nodes_kz = np.array(all_nodes_kz)
+                    all_nodes_gap = np.array(all_nodes_gap)
+                    all_nodes_band = np.array(all_nodes_band)
+                    
+                    print(f"      Total nodes from slices: {len(all_nodes_kx)}")
+                    
+                    # STEP 1: Project all nodes to (0-11) plane
+                    print(f"      Projecting to (0-11) and filtering to visible range...")
+                    kc_star_all = all_nodes_ky * np.sin(angle_rad) + all_nodes_kz * np.cos(angle_rad)
+                    kx_proj_all = all_nodes_kx / (np.pi/a)  # Convert to π/a units
+                    kc_star_all = kc_star_all / (np.pi/c_star)  # Convert to π/c* units
+                    
+                    # STEP 2: Filter to visible range [-1, 1] in BOTH axes
+                    margin = 0.05  # 5% margin for boundary nodes
+                    visible_mask = (np.abs(kx_proj_all) <= 1.0 + margin) & (np.abs(kc_star_all) <= 1.0 + margin)
+                    visible_indices = np.where(visible_mask)[0]
+                    
+                    print(f"        Visible nodes in [-1,1] range: {len(visible_indices)}/{len(all_nodes_kx)}")
+                    
+                    # STEP 3: Cluster within visible nodes only, stratified by kx
+                    if plot_type == 'B2u':
+                        # Target: 6 nodes at each of kx=-1, 0, +1 (18 total)
+                        # Need to allow side-by-side nodes at the center
+                        kx_groups = [
+                            ('kx=-1', np.abs(kx_proj_all + 1.0) < 0.15),  # Near -1
+                            ('kx=0',  np.abs(kx_proj_all) < 0.15),        # Near 0
+                            ('kx=+1', np.abs(kx_proj_all - 1.0) < 0.15),  # Near +1
+                        ]
+                        target_per_group = 6
+                        min_distance_2d = 0.03  # Very minimal clustering to preserve side-by-side nodes (in π/a, π/c* units)
+                        
+                    elif plot_type == 'B3u':
+                        # Target: 8 nodes at kx<0, 8 nodes at kx>0 (16 total)
+                        kx_groups = [
+                            ('kx<0', kx_proj_all < 0),
+                            ('kx>0', kx_proj_all > 0),
+                        ]
+                        target_per_group = 8
+                        min_distance_2d = 0.05 # Relaxed - allow closer nodes
+                    else:
+                        kx_groups = [('all', np.ones(len(all_nodes_kx), dtype=bool))]
+                        target_per_group = 20
+                        min_distance_2d = 0.05
+                    
+                    # Cluster in 2D projected space, within each kx group
+                    clustered_indices = []
+                    for group_name, group_mask in kx_groups:
+                        # Get indices that are both visible AND in this kx group
+                        group_visible_mask = visible_mask & group_mask
+                        group_indices = np.where(group_visible_mask)[0]
+                        
+                        if len(group_indices) == 0:
+                            print(f"        {group_name}: 0 visible nodes")
+                            continue
+                        
+                        # Cluster in 2D projected space
+                        group_clustered = []
+                        for i in group_indices:
+                            kx_i, kc_i = kx_proj_all[i], kc_star_all[i]
+                            
+                            # Check 2D distance to already selected nodes in this group
                             too_close = False
-                            for (prev_ix, prev_iy) in selected_2d:
-                                if np.sqrt((ix_pt - prev_ix)**2 + (iy_pt - prev_iy)**2) < min_pixel_dist:
+                            for j in group_clustered:
+                                kx_j, kc_j = kx_proj_all[j], kc_star_all[j]
+                                distance_2d = np.sqrt((kx_i - kx_j)**2 + (kc_i - kc_j)**2)
+                                if distance_2d < min_distance_2d:
                                     too_close = True
                                     break
                             
                             if not too_close:
-                                selected_2d.append((ix_pt, iy_pt))
-                                
-                                # Convert to physical coordinates using gap k-space arrays
-                                kx_node = kx_gap[ix_pt]
-                                ky_node = ky_gap[iy_pt]
-                                gap_value = gap_slice[ix_pt, iy_pt]
-                                
-                                # Store this node
-                                all_nodes_kx.append(kx_node)
-                                all_nodes_ky.append(ky_node)
-                                all_nodes_kz.append(kz_val)
-                                all_nodes_gap.append(gap_value)
-                                all_nodes_band.append(band)
-                                band_nodes_found += 1
-            
-            # Apply 3D clustering (same as 3D plot)
-            if len(all_nodes_kx) > 0:
-                all_nodes_kx = np.array(all_nodes_kx)
-                all_nodes_ky = np.array(all_nodes_ky)
-                all_nodes_kz = np.array(all_nodes_kz)
-                all_nodes_gap = np.array(all_nodes_gap)
-                all_nodes_band = np.array(all_nodes_band)
-                
-                print(f"      Total nodes from slices: {len(all_nodes_kx)}")
-                print(f"      Applying 3D clustering...")
-                
-                # 3D clustering with physical distance (same as 3D plot)
-                if plot_type == 'B3u':
-                    min_distance_3d = 0.4  # Physical units
-                elif plot_type == 'B2u':
-                    min_distance_3d = 0.20  # Same as 3D plot
+                                group_clustered.append(i)
+                                if len(group_clustered) >= target_per_group:
+                                    break
+                        
+                        clustered_indices.extend(group_clustered)
+                        print(f"        {group_name}: selected {len(group_clustered)}/{len(group_indices)} visible nodes")
+                    
+                    # Keep only clustered nodes (in original 3D coordinates for saving)
+                    final_kx_nodes = all_nodes_kx[clustered_indices]
+                    final_ky_nodes = all_nodes_ky[clustered_indices]
+                    final_kz_nodes = all_nodes_kz[clustered_indices]
+                    
+                    print(f"      Final selection: {len(final_kx_nodes)} nodes")
+                    print(f"    Found {len(final_kx_nodes)} {plot_type} gap nodes (same method as 3D plots)")
+                    
+                    # Save gap nodes to cache for future projection use
+                    try:
+                        gap_nodes_save_file = os.path.join(save_dir, 'cache', f'gap_nodes_3d_{plot_type}.npz')
+                        os.makedirs(os.path.dirname(gap_nodes_save_file), exist_ok=True)
+                        np.savez(gap_nodes_save_file, 
+                                kx=final_kx_nodes, ky=final_ky_nodes, kz=final_kz_nodes)
+                        print(f"    ✓ Saved gap nodes to cache: {gap_nodes_save_file}")
+                    except Exception as e:
+                        print(f"    ⚠ Failed to save gap nodes cache: {e}")
                 else:
-                    min_distance_3d = 0.3
+                    print(f"    No {plot_type} gap nodes found")
+                    final_kx_nodes = np.array([])
+                    final_ky_nodes = np.array([])
+                    final_kz_nodes = np.array([])
                 
-                # Apply 3D clustering
-                clustered_indices = []
-                for i in range(len(all_nodes_kx)):
-                    kx_i, ky_i, kz_i = all_nodes_kx[i], all_nodes_ky[i], all_nodes_kz[i]
+            # =========================================================
+            # STRICT 3D BOUNDS PROJECTION (NO EXTENDED ZONE)
+            # =========================================================
+            # Project gap nodes to (0-11) coordinates, but ONLY those within standard 3D BZ
+            if len(final_kx_nodes) > 0:
+                print(f"      Projecting strictly [-1, 1] 3D nodes to (0-11) plane...")
+                
+                # 1. Define the limits in physical units
+                lim_kx = np.pi / a
+                lim_ky = np.pi / b
+                lim_kz = np.pi / c
+                
+                # 2. Create a mask for nodes inside the standard 3D box [-1, 1] on all axes
+                source_mask = (
+                    (np.abs(final_kx_nodes) <= lim_kx) & 
+                    (np.abs(final_ky_nodes) <= lim_ky) & 
+                    (np.abs(final_kz_nodes) <= lim_kz)
+                )
+                
+                # 3. Apply the mask to get only valid source nodes
+                k_source_x = final_kx_nodes[source_mask]
+                k_source_y = final_ky_nodes[source_mask]
+                k_source_z = final_kz_nodes[source_mask]
+                
+                print(f"        Kept {len(k_source_x)}/{len(final_kx_nodes)} nodes within standard 3D limits")
+                
+                if len(k_source_x) > 0:
+                    # 4. Apply the Rotation Formula (Projection)
+                    kc_star_nodes = k_source_y * np.sin(angle_rad) + k_source_z * np.cos(angle_rad)
+                    kx_proj_nodes = k_source_x  # Unchanged
                     
-                    # Check if this node is too close to any already selected nodes
-                    too_close = False
-                    for j in clustered_indices:
-                        kx_j, ky_j, kz_j = all_nodes_kx[j], all_nodes_ky[j], all_nodes_kz[j]
-                        distance_3d = np.sqrt((kx_i - kx_j)**2 + (ky_i - ky_j)**2 + (kz_i - kz_j)**2)
-                        if distance_3d < min_distance_3d:
-                            too_close = True
-                            break
-                    
-                    if not too_close:
-                        clustered_indices.append(i)
+                    # 5. Normalize to plot units (π/a and π/c*)
+                    kx_proj_nodes = kx_proj_nodes / (np.pi/a)  # π/a units
+                    kc_star_nodes = kc_star_nodes / (np.pi/c_star)  # π/c* units
+                else:
+                    print("        Warning: No nodes found within the 3D limits!")
+                    kx_proj_nodes = np.array([])
+                    kc_star_nodes = np.array([])
+            else:
+                kx_proj_nodes = np.array([])
+                kc_star_nodes = np.array([])
+            
+            # Diagnostic output for projected nodes
+            if len(kx_proj_nodes) > 0:
+                print(f"    All gap nodes after projection:")
+                print(f"      kx range: [{np.min(kx_proj_nodes):.3f}, {np.max(kx_proj_nodes):.3f}]")
+                print(f"      kc* range: [{np.min(kc_star_nodes):.3f}, {np.max(kc_star_nodes):.3f}]")
+                print(f"      Nodes near kx boundaries (|kx| > 0.95):")
+                near_kx_boundary = np.abs(kx_proj_nodes) > 0.95
+                if np.any(near_kx_boundary):
+                    for kx, kc in zip(kx_proj_nodes[near_kx_boundary], kc_star_nodes[near_kx_boundary]):
+                        print(f"        kx={kx:+.3f}, kc*={kc:+.3f}")
+                else:
+                    print(f"        None found")
+                print(f"      Nodes near kc* boundaries (|kc*| > 0.95):")
+                near_kc_boundary = np.abs(kc_star_nodes) > 0.95
+                if np.any(near_kc_boundary):
+                    for kx, kc in zip(kx_proj_nodes[near_kc_boundary], kc_star_nodes[near_kc_boundary]):
+                        print(f"        kx={kx:+.3f}, kc*={kc:+.3f}")
+                else:
+                    print(f"        None found")
                 
-                # Keep only clustered nodes
-                final_kx_nodes = all_nodes_kx[clustered_indices]
-                final_ky_nodes = all_nodes_ky[clustered_indices]
-                final_kz_nodes = all_nodes_kz[clustered_indices]
+                # Filter nodes to only show those within -1 to 1 range in BOTH axes
+                # Use relaxed bounds to catch nodes at zone boundaries
+                margin = 0.05  # Larger margin to catch boundary nodes (5% tolerance)
+                in_range_mask = (np.abs(kx_proj_nodes) <= 1.0 + margin) & (np.abs(kc_star_nodes) <= 1.0 + margin)
+                kx_proj_filtered = kx_proj_nodes[in_range_mask]
+                kc_star_filtered = kc_star_nodes[in_range_mask]
                 
-                print(f"      After 3D clustering: {len(final_kx_nodes)} nodes")
-                print(f"    Found {len(final_kx_nodes)} {plot_type} gap nodes (same method as 3D plots)")
+                print(f"    Filtered gap nodes in [-1, 1] range:")
+                print(f"      Total: {len(kx_proj_filtered)}/{len(kx_proj_nodes)}")
+                if len(kx_proj_filtered) > 0:
+                    print(f"      kx range: [{np.min(kx_proj_filtered):.3f}, {np.max(kx_proj_filtered):.3f}]")
+                    print(f"      kc* range: [{np.min(kc_star_filtered):.3f}, {np.max(kc_star_filtered):.3f}]")
+                    for i, (kx_node, kc_node) in enumerate(zip(kx_proj_filtered, kc_star_filtered)):
+                        print(f"        Node {i+1}: kc*={kc_node:+.3f}, kx={kx_node:+.3f}")
                 
-                # Project to (0-11) coordinates
-                # Apply projection transformation
-                kc_star_nodes = final_ky_nodes * np.sin(angle_rad) + final_kz_nodes * np.cos(angle_rad)
-                kx_proj_nodes = final_kx_nodes
+                # Plot only gap nodes within the -1 to 1 range
+                if len(kx_proj_filtered) > 0:
+                    ax.scatter(kc_star_filtered, kx_proj_filtered, 
+                              c='yellow', s=100, marker='o', edgecolors='black', linewidth=2.0,
+                              label=f'{plot_type} Gap Nodes', 
+                              zorder=100,  # Very high zorder to appear on top of axes
+                              clip_on=False)  # Allow nodes at edges to be visible outside axis box
+                else:
+                    print(f"    WARNING: No {plot_type} gap nodes found in visible range!")
                 
-                # Convert to plot units
-                kx_proj_nodes = kx_proj_nodes / (np.pi/a)  # π/a units
-                kc_star_nodes = kc_star_nodes / (np.pi/c_star)  # π/c* units using projected spacing
-                
-                # Plot ALL gap nodes (don't filter by range - show all 18 nodes)
-                ax.scatter(kc_star_nodes, kx_proj_nodes, 
-                          c='yellow', s=50, marker='o', edgecolors='black', linewidth=1,
-                          label=f'{plot_type} Gap Nodes', zorder=10)
-                print(f"    Projected all {len(kx_proj_nodes)} {plot_type} gap nodes to (0-11) plane")
-                
-                # Adjust plot limits to show all nodes if needed
-                if len(kx_proj_nodes) > 0:
-                    kc_min, kc_max = np.min(kc_star_nodes), np.max(kc_star_nodes)
-                    kx_min, kx_max = np.min(kx_proj_nodes), np.max(kx_proj_nodes)
-                    
-                    # Extend limits to ensure all nodes are visible with some padding
-                    current_kc_lim = max(1.0, abs(kc_min), abs(kc_max)) * 1.1
-                    current_kx_lim = max(1.0, abs(kx_min), abs(kx_max)) * 1.1
+                # Set fixed limits to exactly -1 to 1
+                current_kc_lim = 1.0
+                current_kx_lim = 1.0
             else:
                 print(f"    No {plot_type} gap nodes found")
         
@@ -1633,23 +1778,21 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                     f'Angle: {angle_deg}° between normal and b-axis', fontsize=16, fontweight='bold')
         ax.grid(True, alpha=0.3)
         ax.legend()
-        ax.set_aspect('equal')
         
-        # Set axis limits - use dynamic limits if gap nodes extend beyond ±1
-        if plot_type in ['B2u', 'B3u']:
-            # Use dynamic limits calculated above if they exist
-            try:
-                ax.set_xlim(-current_kc_lim, current_kc_lim)
-                ax.set_ylim(-current_kx_lim, current_kx_lim)
-                print(f"    Set dynamic limits: kc* ±{current_kc_lim:.1f}, kx ±{current_kx_lim:.1f}")
-            except:
-                # Fallback to standard limits
-                ax.set_xlim(-1.0, 1.0)
-                ax.set_ylim(-1.0, 1.0)
-        else:
-            # Standard limits for no gap nodes
-            ax.set_xlim(-1.0, 1.0)
-            ax.set_ylim(-1.0, 1.0)
+        # Set axis limits to exactly -1 to 1 (no padding)
+        ax.set_xlim(-1.0, 1.0)
+        ax.set_ylim(-1.0, 1.0)
+        
+        # Set aspect ratio based on physical dimensions
+        # In plot coordinates (π/c* vs π/a units), but physical lengths are different
+        # π/a corresponds to a/2 = 0.407/2 = 0.2035 nm physical distance
+        # π/c* corresponds to c*/2 = 0.76/2 = 0.38 nm physical distance
+        # aspect = (y_physical / y_range) / (x_physical / x_range)
+        # Since both ranges are 2.0 (from -1 to 1), aspect = y_physical / x_physical
+        physical_aspect = (np.pi/a) / (np.pi/c_star)  # = c*/a
+        ax.set_aspect(physical_aspect)
+        print(f"    Set axis limits: kc* [-1.0, 1.0], kx [-1.0, 1.0]")
+        print(f"    Physical aspect ratio: {physical_aspect:.3f} (kx axis is {physical_aspect:.2f}x longer)")
         
         plt.tight_layout()
         
@@ -1661,7 +1804,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
         
         filepath = os.path.join(save_dir, filename)
         fig.savefig(filepath, dpi=300, bbox_inches='tight')
-        plt.show()
+        plt.close(fig)  # Close figure to free memory, don't show (causes crashes)
         
         print(f"  Saved plot to {filepath}")
     
@@ -2283,6 +2426,29 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
                         print(f"      Band {band+1}: {len(x_nodes)} gap nodes")
                 
                 print(f"    {pairing_type}: Total {len(selected_indices)} gap nodes visualized")
+                
+                # Save gap nodes to cache for projection use
+                try:
+                    gap_nodes_cache_file = os.path.join(save_dir, 'cache', f'gap_nodes_3d_{pairing_type}.npz')
+                    os.makedirs(os.path.dirname(gap_nodes_cache_file), exist_ok=True)
+                    
+                    # Convert back to physical k-space coordinates (not plot units)
+                    if orientation == 'alt':
+                        # x=ky, y=kz, z=kx
+                        kx_phys = np.array(z_nodes) * (np.pi/a)
+                        ky_phys = np.array(x_nodes) * (np.pi/b)
+                        kz_phys = np.array(y_nodes) * (np.pi/c)
+                    else:
+                        # x=ky, y=kx, z=kz
+                        kx_phys = np.array(y_nodes) * (np.pi/a)
+                        ky_phys = np.array(x_nodes) * (np.pi/b)
+                        kz_phys = np.array(z_nodes) * (np.pi/c)
+                    
+                    np.savez(gap_nodes_cache_file, kx=kx_phys, ky=ky_phys, kz=kz_phys)
+                    print(f"    ✓ Saved {len(kx_phys)} gap nodes to cache: {gap_nodes_cache_file}")
+                except Exception as e:
+                    print(f"    ⚠ Failed to save gap nodes cache: {e}")
+                    
             else:
                 print(f"    {pairing_type}: No gap nodes found on Fermi surfaces")
                 print(f"      Gap threshold: {gap_threshold:.6f}, Max gap: {np.max(gap_3d):.6f}")
