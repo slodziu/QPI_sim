@@ -1369,6 +1369,10 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
     # Create separate plots for each pairing symmetry (or combined if single type)
     plots_to_make = pairing_types if gap_node_pairing == 'both' else [gap_node_pairing if show_gap_nodes else 'no_nodes']
     
+    # Special case: For B3u, create multiple plots with different cluster selection methods
+    if gap_node_pairing == 'B3u' and show_gap_nodes:
+        plots_to_make = ['B3u_middle', 'B3u_first', 'B3u_last']
+    
     for plot_type in plots_to_make:
         print(f"Creating plot for: {plot_type}")
         
@@ -1423,8 +1427,18 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
         print(f"  Set axis limits: kc* [-1.0, 1.0], kx [-1.0, 1.0]")
         
         # Add gap nodes for this specific pairing symmetry
-        if plot_type in ['B2u', 'B3u']:
-            print(f"  Computing and projecting {plot_type} gap nodes...")
+        if plot_type in ['B2u', 'B3u', 'B3u_middle', 'B3u_first', 'B3u_last']:
+            # Extract base pairing type
+            base_pairing = 'B3u' if 'B3u' in plot_type else plot_type
+            selection_method = 'middle'  # default
+            if 'B3u_first' in plot_type:
+                selection_method = 'first'
+            elif 'B3u_last' in plot_type:
+                selection_method = 'last'
+            elif 'B3u_middle' in plot_type:
+                selection_method = 'middle'
+                
+            print(f"  Computing and projecting {base_pairing} gap nodes (selection: {selection_method})...")
             
             # NOTE: We compute gap nodes directly for the projection
             # The 3D plot cache is not used because those nodes are sampled
@@ -1470,7 +1484,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                     for j, ky in enumerate(ky_gap):
                         # Vectorize over kz direction
                         gap_stack = np.array([calculate_gap_magnitude(
-                            np.array([[kx]]), np.array([[ky]]), kz, pairing_type=plot_type)[0, 0] 
+                            np.array([[kx]]), np.array([[ky]]), kz, pairing_type=base_pairing)[0, 0] 
                             for kz in kz_gap])
                         gap_3d[i, j, :] = gap_stack
                     
@@ -1591,7 +1605,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                     print(f"        Visible nodes in [-1,1] range: {len(visible_indices)}/{len(all_nodes_kx)}")
                     
                     # STEP 3: Cluster within visible nodes only, stratified by kx
-                    if plot_type == 'B2u':
+                    if base_pairing == 'B2u':
                         # Target: 6 nodes at each of kx=-1, 0, +1 (18 total)
                         # Need to allow side-by-side nodes at the center
                         kx_groups = [
@@ -1599,25 +1613,37 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                             ('kx=0',  np.abs(kx_proj_all) < 0.15),        # Near 0
                             ('kx=+1', np.abs(kx_proj_all - 1.0) < 0.15),  # Near +1
                         ]
-                        target_per_group = 6
+                        target_per_group = [6, 6, 6]  # 6 nodes per kx region
                         min_distance_2d = 0.03  # Very minimal clustering to preserve side-by-side nodes (in π/a, π/c* units)
                         
-                    elif plot_type == 'B3u':
-                        # Target: 8 nodes at kx<0, 8 nodes at kx>0 (16 total)
+                    elif base_pairing == 'B3u':
+                        # B3u: d ∝ (0, sin(kz·c), sin(ky·b)) → zeros at kz = 0, ±π/c, ky = 0, ±π/b
+                        # In (0-11) projection: kc* = ky*sin(angle) + kz*cos(angle)
+                        # Special grouping for vertical stacking pattern
                         kx_groups = [
-                            ('kx<0', kx_proj_all < 0),
-                            ('kx>0', kx_proj_all > 0),
+                            ('kc*=0', np.abs(kc_star_all) < 0.15),           # Near kc* = 0 (center line)
+                            ('kc*≈-0.5', np.abs(kc_star_all + 0.5) < 0.2),   # Near kc* = -0.5
+                            ('kc*≈+0.5', np.abs(kc_star_all - 0.5) < 0.2),   # Near kc* = +0.5
+                            ('kc*<-0.7', kc_star_all < -0.7),                # Far negative kc*
+                            ('kc*>+0.7', kc_star_all > 0.7),                 # Far positive kc*
                         ]
-                        target_per_group = 8
-                        min_distance_2d = 0.05 # Relaxed - allow closer nodes
+                        target_per_group = [4, 3, 3, 3, 3]  # 16 total nodes
+                        min_distance_2d = 0.03  # Allow vertical stacking
                     else:
                         kx_groups = [('all', np.ones(len(all_nodes_kx), dtype=bool))]
-                        target_per_group = 20
+                        target_per_group = [20]  # Make it a list for consistency
                         min_distance_2d = 0.05
                     
-                    # Cluster in 2D projected space, within each kx group
+                    # Ensure target_per_group is a list
+                    if not isinstance(target_per_group, list):
+                        target_per_group = [target_per_group] * len(kx_groups)
+                    
+                    # Select nodes closest to key kc* values within each group
                     clustered_indices = []
-                    for group_name, group_mask in kx_groups:
+                    for group_idx, (group_name, group_mask) in enumerate(kx_groups):
+                        # Get the target for this specific group
+                        current_target = target_per_group[group_idx] if group_idx < len(target_per_group) else target_per_group[0]
+                        
                         # Get indices that are both visible AND in this kx group
                         group_visible_mask = visible_mask & group_mask
                         group_indices = np.where(group_visible_mask)[0]
@@ -1626,12 +1652,84 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                             print(f"        {group_name}: 0 visible nodes")
                             continue
                         
-                        # Cluster in 2D projected space
+                        # For each group, select nodes closest to key kc* values
+                        group_kx = kx_proj_all[group_indices]
+                        group_kc = kc_star_all[group_indices]
+                        
+                        if base_pairing == 'B2u':
+                            if 'kx=-1' in group_name:
+                                distances = np.abs(group_kx - (-1.0))
+                                sorted_indices = np.argsort(distances)
+                            elif 'kx=0' in group_name:
+                                distances = np.abs(group_kx - 0.0)
+                                sorted_indices = np.argsort(distances)
+                            elif 'kx=+1' in group_name:
+                                distances = np.abs(group_kx - (+1.0))
+                                sorted_indices = np.argsort(distances)
+                            else:
+                                sorted_indices = np.arange(len(group_indices))
+                        elif base_pairing == 'B3u':
+                            if 'kc*=0' in group_name:
+                                # For kc*=0: select based on method (middle/first/last in kx clusters)
+                                distances = np.abs(group_kc - 0.0)
+                                if selection_method == 'middle':
+                                    # Sort by kx position and select middle nodes
+                                    kx_sorted = np.argsort(group_kx)
+                                    mid_start = len(kx_sorted) // 4
+                                    mid_end = 3 * len(kx_sorted) // 4
+                                    sorted_indices = kx_sorted[mid_start:mid_end]
+                                    if len(sorted_indices) > current_target:
+                                        # If still too many, select by closest to kc*=0
+                                        kc_distances = distances[sorted_indices]
+                                        kc_sorted = np.argsort(kc_distances)
+                                        sorted_indices = sorted_indices[kc_sorted]
+                                elif selection_method == 'first':
+                                    # Select nodes with lowest kx values
+                                    kx_sorted = np.argsort(group_kx)
+                                    sorted_indices = kx_sorted
+                                elif selection_method == 'last':
+                                    # Select nodes with highest kx values  
+                                    kx_sorted = np.argsort(-group_kx)  # Descending
+                                    sorted_indices = kx_sorted
+                                else:
+                                    sorted_indices = np.argsort(distances)
+                            elif 'kc*≈-0.5' in group_name:
+                                # For kc*≈-0.5: prioritize vertical stacking (same kc*, different kx)
+                                distances = np.abs(group_kc - (-0.5))
+                                sorted_indices = np.argsort(distances)
+                            elif 'kc*≈+0.5' in group_name:
+                                # For kc*≈+0.5: prioritize vertical stacking (same kc*, different kx)
+                                distances = np.abs(group_kc - (+0.5))
+                                sorted_indices = np.argsort(distances)
+                            elif 'kc*<-0.7' in group_name:
+                                distances = np.abs(group_kc - (-1.0))
+                                sorted_indices = np.argsort(distances)
+                            elif 'kc*>+0.7' in group_name:
+                                distances = np.abs(group_kc - (+1.0))
+                                sorted_indices = np.argsort(distances)
+                            else:
+                                sorted_indices = np.arange(len(group_indices))
+                        else:
+                            # Default for other pairing types
+                            if 'kc*=0' in group_name:
+                                distances = np.abs(group_kc - 0.0)
+                                sorted_indices = np.argsort(distances)
+                            elif 'kc*<0' in group_name:
+                                distances = np.abs(group_kc - (-1.0))
+                                sorted_indices = np.argsort(distances)
+                            elif 'kc*>0' in group_name:
+                                distances = np.abs(group_kc - (+1.0))
+                                sorted_indices = np.argsort(distances)
+                            else:
+                                sorted_indices = np.arange(len(group_indices))
+                        
+                        # Apply minimal clustering to avoid duplicates
                         group_clustered = []
-                        for i in group_indices:
+                        for idx in sorted_indices:
+                            i = group_indices[idx]
                             kx_i, kc_i = kx_proj_all[i], kc_star_all[i]
                             
-                            # Check 2D distance to already selected nodes in this group
+                            # Check distance to already selected nodes
                             too_close = False
                             for j in group_clustered:
                                 kx_j, kc_j = kx_proj_all[j], kc_star_all[j]
@@ -1642,7 +1740,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                             
                             if not too_close:
                                 group_clustered.append(i)
-                                if len(group_clustered) >= target_per_group:
+                                if len(group_clustered) >= current_target:
                                     break
                         
                         clustered_indices.extend(group_clustered)
@@ -1666,7 +1764,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                     except Exception as e:
                         print(f"    ⚠ Failed to save gap nodes cache: {e}")
                 else:
-                    print(f"    No {plot_type} gap nodes found")
+                    print(f"    No {base_pairing} gap nodes found")
                     final_kx_nodes = np.array([])
                     final_ky_nodes = np.array([])
                     final_kz_nodes = np.array([])
@@ -1771,6 +1869,9 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
         # Set title based on plot type
         if plot_type == 'no_nodes':
             title_suffix = ''
+        elif 'B3u' in plot_type and '_' in plot_type:
+            method = plot_type.split('_')[1]
+            title_suffix = f' with B3u Gap Nodes ({method} selection)'
         else:
             title_suffix = f' with {plot_type} Gap Nodes'
             
@@ -2703,7 +2804,7 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
 # Main execution
 if __name__ == "__main__":
     # Verify model parameters first
-    verify_model_parameters()
+    #verify_model_parameters()
     
     # Compute for kz=0 slice only
     print("Computing 2D Fermi surface at kz=0...")
@@ -2711,49 +2812,40 @@ if __name__ == "__main__":
     energies_kz0 = band_energies_on_slice(kz0)
     
     # Generate only kz=0 2D plot
-    plot_fs_2d(energies_kz0, kz0)
+    #plot_fs_2d(energies_kz0, kz0)
     
     # Extract and print Fermi contour points
     # Create the coordinate arrays that match the energy data resolution
     resolution = 300  # Same as in band_energies_on_slice
     kx_vals_local = np.linspace(-1*np.pi/a, 1*np.pi/a, resolution)
     ky_vals_local = np.linspace(-3*np.pi/b, 3*np.pi/b, resolution)
-    extract_fermi_contour_points(kx_vals_local, ky_vals_local, energies_kz0, bands_to_extract=[2, 3])
+    #extract_fermi_contour_points(kx_vals_local, ky_vals_local, energies_kz0, bands_to_extract=[2, 3])
     
     # Plot the main 4 contours for debug
-    plot_main_fermi_contours(kx_vals_local, ky_vals_local, energies_kz0)
+    #plot_main_fermi_contours(kx_vals_local, ky_vals_local, energies_kz0)
     
     # Generate superconducting gap magnitude plots
-    print("\nGenerating superconducting gap magnitude visualizations...")
+    #print("\nGenerating superconducting gap magnitude visualizations...")
     # Skip B1u as it has no nodes at kz=0
-    plot_gap_magnitude_2d(kz=kz0, pairing_types=['B1u' , 'B2u', 'B3u'], resolution=200)
+    #plot_gap_magnitude_2d(kz=kz0, pairing_types=['B1u' , 'B2u', 'B3u'], resolution=200)
     
     # Generate 3D plot without gap nodes
-    print("\n" + "="*70)
-    print("Generating 3D Fermi Surface (no gap nodes)")
-    print("="*70)
-    plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False)
+    #print("\n" + "="*70)
+    #print("Generating 3D Fermi Surface (no gap nodes)")
+    #print("="*70)
+    #plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False)#
     
     # Generate 3D plots with gap nodes for each pairing symmetry
     # Skip B1u as it has no nodes in the relevant energy range
-    print("\n" + "="*70)
-    print("Generating 3D Fermi Surface with Gap Nodes (B2u and B3u only)")
-    print("="*70)
+    #print("Generating 3D Fermi Surface with Gap Nodes (B2u and B3u only)")
+    #print("="*70)
     
-    for pairing in ['B2u', 'B3u']:
-        print(f"\n--- {pairing} Gap Nodes ---")
-        plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
-                             gap_node_pairing=pairing)
+    #for pairing in ['B2u', 'B3u']:
+        #print(f"\n--- {pairing} Gap Nodes ---")
+        #plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
+                             #gap_node_pairing=pairing)
     
     # Generate (0-11) crystallographic projections
-    print("\n" + "="*70)
-    print("Generating (0-11) Crystallographic Projections")
-    print("="*70)
-    
-    # Generate projection at 24° (standard angle from paper)
-    print("Generating clean Fermi surface projection...")
-    plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', 
-                                    show_gap_nodes=False, angle_deg=24.0)
     
     # Generate projections with gap nodes for both B2u and B3u
     for pairing in ['B2u', 'B3u']:
@@ -2762,26 +2854,8 @@ if __name__ == "__main__":
                                         show_gap_nodes=True, gap_node_pairing=pairing, 
                                         angle_deg=24.0)
     
-    # Generate combined projection with both B2u and B3u nodes
-    print("Generating projection with both B2u and B3u gap nodes...")
-    plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', 
-                                    show_gap_nodes=True, gap_node_pairing='both', 
-                                    angle_deg=24.0)
     
-    # Generate 3D plots with alternative orientation (kx vertical, ky-kz horizontal)
-    print("\n" + "="*70)
-    print("Generating 3D Fermi Surface - Alternative Orientation")
-    print("(kx vertical, ky-kz horizontal plane)")
-    print("="*70)
-    
-    # Standard view without gap nodes
-    plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False, orientation='alt')
-    
-    # With gap nodes for each pairing symmetry
-    for pairing in ['B2u', 'B3u']:
-        print(f"\n--- {pairing} Gap Nodes (Alternative Orientation) ---")
-        plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
-                             gap_node_pairing=pairing, orientation='alt')    # Save energies to file
+
     import os
     output_dir = 'outputs/ute2_fixed'
     os.makedirs(output_dir, exist_ok=True)
