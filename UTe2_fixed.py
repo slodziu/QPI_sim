@@ -47,19 +47,30 @@ ky_vals = np.linspace(-3*np.pi/b, 3*np.pi/b, nk)  # Extended range
 KX, KY = np.meshgrid(kx_vals, ky_vals)
 
 def HU_block(kx, ky, kz):
-    """2x2 Hamiltonian for U orbitals"""
+    """2x2 Hamiltonian for U orbitals - Vectorized version"""
     diag = muU - 2*tU*np.cos(kx*a) - 2*tch_U*np.cos(ky*b)
     real_off = -DeltaU - 2*tpU*np.cos(kx*a) - 2*tpch_U*np.cos(ky*b)
     complex_amp = -4 * tz_U * np.exp(-1j * kz * c / 2) * np.cos(kx * a / 2) * np.cos(ky * b / 2)
-    H = np.zeros((2,2), dtype=complex)
-    H[0,0] = diag
-    H[1,1] = diag
-    H[0,1] = real_off + complex_amp
-    H[1,0] = real_off + np.conj(complex_amp)
+    
+    # Handle both scalar and array inputs
+    if np.isscalar(kx):
+        H = np.zeros((2,2), dtype=complex)
+        H[0,0] = diag
+        H[1,1] = diag
+        H[0,1] = real_off + complex_amp
+        H[1,0] = real_off + np.conj(complex_amp)
+    else:
+        # Vectorized: shape (..., 2, 2)
+        shape = kx.shape
+        H = np.zeros(shape + (2, 2), dtype=complex)
+        H[..., 0, 0] = diag
+        H[..., 1, 1] = diag
+        H[..., 0, 1] = real_off + complex_amp
+        H[..., 1, 0] = real_off + np.conj(complex_amp)
     return H
 
 def HTe_block(kx, ky, kz):
-    """2x2 Hamiltonian for Te orbitals"""
+    """2x2 Hamiltonian for Te orbitals - Vectorized version"""
     # Diagonal elements: μTe (no chain hopping since tch_Te = 0 in paper)
     diag = muTe
     # Off-diagonal elements from paper:
@@ -68,21 +79,49 @@ def HTe_block(kx, ky, kz):
     complex_term1 = -tTe * np.exp(-1j * ky * b)  # hopping along b direction
     complex_term2 = -tz_Te * np.cos(kz * c / 2) * np.cos(kx * a / 2) * np.cos(ky * b / 2)
     
-    H = np.zeros((2,2), dtype=complex)
-    H[0,0] = diag
-    H[1,1] = diag
-    H[0,1] = real_off + complex_term1 + complex_term2
-    H[1,0] = real_off + np.conj(complex_term1) + complex_term2  # ensures Hermiticity
+    # Handle both scalar and array inputs
+    if np.isscalar(kx):
+        H = np.zeros((2,2), dtype=complex)
+        H[0,0] = diag
+        H[1,1] = diag
+        H[0,1] = real_off + complex_term1 + complex_term2
+        H[1,0] = real_off + np.conj(complex_term1) + complex_term2  # ensures Hermiticity
+    else:
+        # Vectorized: shape (..., 2, 2)
+        shape = kx.shape
+        H = np.zeros(shape + (2, 2), dtype=complex)
+        H[..., 0, 0] = diag
+        H[..., 1, 1] = diag
+        H[..., 0, 1] = real_off + complex_term1 + complex_term2
+        H[..., 1, 0] = real_off + np.conj(complex_term1) + complex_term2
     return H
 
 def H_full(kx, ky, kz):
-    """Full 4x4 Hamiltonian with U-Te hybridization"""
+    """Full 4x4 Hamiltonian with U-Te hybridization - Vectorized version"""
     HU = HU_block(kx, ky, kz)
     HTe = HTe_block(kx, ky, kz)
-    Hhyb = np.eye(2) * delta
-    top = np.hstack((HU, Hhyb))
-    bottom = np.hstack((Hhyb.conj().T, HTe))
-    H = np.vstack((top, bottom))
+    
+    # Handle both scalar and array inputs
+    if np.isscalar(kx):
+        Hhyb = np.eye(2) * delta
+        top = np.hstack((HU, Hhyb))
+        bottom = np.hstack((Hhyb.conj().T, HTe))
+        H = np.vstack((top, bottom))
+    else:
+        # Vectorized: shape (..., 4, 4)
+        shape = kx.shape
+        H = np.zeros(shape + (4, 4), dtype=complex)
+        
+        # Fill U block (top-left 2x2)
+        H[..., 0:2, 0:2] = HU
+        
+        # Fill Te block (bottom-right 2x2)
+        H[..., 2:4, 2:4] = HTe
+        
+        # Fill hybridization (off-diagonal 2x2 blocks)
+        H[..., 0:2, 2:4] = delta * np.eye(2)
+        H[..., 2:4, 0:2] = delta * np.eye(2)
+    
     return H
 
 def verify_model_parameters():
@@ -1369,10 +1408,6 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
     # Create separate plots for each pairing symmetry (or combined if single type)
     plots_to_make = pairing_types if gap_node_pairing == 'both' else [gap_node_pairing if show_gap_nodes else 'no_nodes']
     
-    # Special case: For B3u, create multiple plots with different cluster selection methods
-    if gap_node_pairing == 'B3u' and show_gap_nodes:
-        plots_to_make = ['B3u_middle', 'B3u_first', 'B3u_last']
-    
     for plot_type in plots_to_make:
         print(f"Creating plot for: {plot_type}")
         
@@ -1438,15 +1473,33 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
             elif 'B3u_middle' in plot_type:
                 selection_method = 'middle'
                 
-            print(f"  Computing and projecting {base_pairing} gap nodes (selection: {selection_method})...")
+            print(f"  Computing and projecting {base_pairing} gap nodes...")
             
-            # NOTE: We compute gap nodes directly for the projection
-            # The 3D plot cache is not used because those nodes are sampled
-            # on a different grid and often project outside the visible [-1,1] range
-            loaded_from_cache = False
+            # TWO-TIER CACHING SYSTEM:
+            # 1. Raw nodes cache (expensive 129³ calculation) - shared between runs
+            # 2. Final nodes cache (quick selection/clustering) - can regenerate easily
             
-            # Compute gap nodes using slice-based method optimized for projection
-            if not loaded_from_cache:
+            raw_nodes_cache_file = os.path.join(save_dir, 'cache', f'gap_nodes_raw_{base_pairing}.npz')
+            loaded_raw_from_cache = False
+            
+            # Try to load RAW nodes (before selection) from cache
+            if os.path.exists(raw_nodes_cache_file):
+                print(f"  Loading raw {base_pairing} gap nodes from cache...")
+                try:
+                    raw_cache = np.load(raw_nodes_cache_file)
+                    all_nodes_kx = raw_cache['kx']
+                    all_nodes_ky = raw_cache['ky']
+                    all_nodes_kz = raw_cache['kz']
+                    all_nodes_gap = raw_cache['gap']
+                    all_nodes_band = raw_cache['band']
+                    print(f"    ✓ Loaded {len(all_nodes_kx)} raw nodes from cache (skipping 129³ calculation)")
+                    loaded_raw_from_cache = True
+                except Exception as e:
+                    print(f"    ⚠ Raw cache load failed: {e}")
+                    loaded_raw_from_cache = False
+            
+            # Compute gap nodes if not cached (initialize variables)
+            if not loaded_raw_from_cache:
                 print("  Using projection-optimized gap node detection...")
                 print("  Using slice-based method (same as 3D plots)...")
                 
@@ -1493,13 +1546,13 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                 
                 print(f"      {plot_type} gap range: {np.min(gap_3d):.6f} to {np.max(gap_3d):.6f}")
                 
-                # Set threshold based on pairing type (relaxed to catch ALL boundary nodes)
+                # Set threshold based on pairing type (STRICT for projection to get true nodes)
                 if plot_type == 'B2u':
-                    gap_threshold = 0.08 * np.max(gap_3d)  # More relaxed - boundary nodes may have larger gap
-                    fermi_threshold = 0.020  # 20 meV - very relaxed for boundaries
+                    gap_threshold = 0.06 * np.max(gap_3d)  # Strict - only nodes very close to zero
+                    fermi_threshold = 0.010  # 10 meV - strict Fermi surface crossing
                 elif plot_type == 'B3u':
-                    gap_threshold = 0.08 * np.max(gap_3d)  # More relaxed - match B2u
-                    fermi_threshold = 0.020  # 20 meV - very relaxed for boundaries
+                    gap_threshold = 0.06 * np.max(gap_3d)  # Strict - match B2u
+                    fermi_threshold = 0.010  # 10 meV - strict Fermi surface crossing
                 else:
                     gap_threshold = 0.05 * np.max(gap_3d)
                     fermi_threshold = 0.010  # 10 meV
@@ -1591,184 +1644,177 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                     
                     print(f"      Total nodes from slices: {len(all_nodes_kx)}")
                     
-                    # STEP 1: Project all nodes to (0-11) plane
-                    print(f"      Projecting to (0-11) and filtering to visible range...")
-                    kc_star_all = all_nodes_ky * np.sin(angle_rad) + all_nodes_kz * np.cos(angle_rad)
-                    kx_proj_all = all_nodes_kx / (np.pi/a)  # Convert to π/a units
-                    kc_star_all = kc_star_all / (np.pi/c_star)  # Convert to π/c* units
-                    
-                    # STEP 2: Filter to visible range [-1, 1] in BOTH axes
-                    margin = 0.05  # 5% margin for boundary nodes
-                    visible_mask = (np.abs(kx_proj_all) <= 1.0 + margin) & (np.abs(kc_star_all) <= 1.0 + margin)
-                    visible_indices = np.where(visible_mask)[0]
-                    
-                    print(f"        Visible nodes in [-1,1] range: {len(visible_indices)}/{len(all_nodes_kx)}")
-                    
-                    # STEP 3: Cluster within visible nodes only, stratified by kx
-                    if base_pairing == 'B2u':
-                        # Target: 6 nodes at each of kx=-1, 0, +1 (18 total)
-                        # Need to allow side-by-side nodes at the center
-                        kx_groups = [
-                            ('kx=-1', np.abs(kx_proj_all + 1.0) < 0.15),  # Near -1
-                            ('kx=0',  np.abs(kx_proj_all) < 0.15),        # Near 0
-                            ('kx=+1', np.abs(kx_proj_all - 1.0) < 0.15),  # Near +1
-                        ]
-                        target_per_group = [6, 6, 6]  # 6 nodes per kx region
-                        min_distance_2d = 0.03  # Very minimal clustering to preserve side-by-side nodes (in π/a, π/c* units)
-                        
-                    elif base_pairing == 'B3u':
-                        # B3u: d ∝ (0, sin(kz·c), sin(ky·b)) → zeros at kz = 0, ±π/c, ky = 0, ±π/b
-                        # In (0-11) projection: kc* = ky*sin(angle) + kz*cos(angle)
-                        # Special grouping for vertical stacking pattern
-                        kx_groups = [
-                            ('kc*=0', np.abs(kc_star_all) < 0.15),           # Near kc* = 0 (center line)
-                            ('kc*≈-0.5', np.abs(kc_star_all + 0.5) < 0.2),   # Near kc* = -0.5
-                            ('kc*≈+0.5', np.abs(kc_star_all - 0.5) < 0.2),   # Near kc* = +0.5
-                            ('kc*<-0.7', kc_star_all < -0.7),                # Far negative kc*
-                            ('kc*>+0.7', kc_star_all > 0.7),                 # Far positive kc*
-                        ]
-                        target_per_group = [4, 3, 3, 3, 3]  # 16 total nodes
-                        min_distance_2d = 0.03  # Allow vertical stacking
-                    else:
-                        kx_groups = [('all', np.ones(len(all_nodes_kx), dtype=bool))]
-                        target_per_group = [20]  # Make it a list for consistency
-                        min_distance_2d = 0.05
-                    
-                    # Ensure target_per_group is a list
-                    if not isinstance(target_per_group, list):
-                        target_per_group = [target_per_group] * len(kx_groups)
-                    
-                    # Select nodes closest to key kc* values within each group
-                    clustered_indices = []
-                    for group_idx, (group_name, group_mask) in enumerate(kx_groups):
-                        # Get the target for this specific group
-                        current_target = target_per_group[group_idx] if group_idx < len(target_per_group) else target_per_group[0]
-                        
-                        # Get indices that are both visible AND in this kx group
-                        group_visible_mask = visible_mask & group_mask
-                        group_indices = np.where(group_visible_mask)[0]
-                        
-                        if len(group_indices) == 0:
-                            print(f"        {group_name}: 0 visible nodes")
-                            continue
-                        
-                        # For each group, select nodes closest to key kc* values
-                        group_kx = kx_proj_all[group_indices]
-                        group_kc = kc_star_all[group_indices]
-                        
-                        if base_pairing == 'B2u':
-                            if 'kx=-1' in group_name:
-                                distances = np.abs(group_kx - (-1.0))
-                                sorted_indices = np.argsort(distances)
-                            elif 'kx=0' in group_name:
-                                distances = np.abs(group_kx - 0.0)
-                                sorted_indices = np.argsort(distances)
-                            elif 'kx=+1' in group_name:
-                                distances = np.abs(group_kx - (+1.0))
-                                sorted_indices = np.argsort(distances)
-                            else:
-                                sorted_indices = np.arange(len(group_indices))
-                        elif base_pairing == 'B3u':
-                            if 'kc*=0' in group_name:
-                                # For kc*=0: select based on method (middle/first/last in kx clusters)
-                                distances = np.abs(group_kc - 0.0)
-                                if selection_method == 'middle':
-                                    # Sort by kx position and select middle nodes
-                                    kx_sorted = np.argsort(group_kx)
-                                    mid_start = len(kx_sorted) // 4
-                                    mid_end = 3 * len(kx_sorted) // 4
-                                    sorted_indices = kx_sorted[mid_start:mid_end]
-                                    if len(sorted_indices) > current_target:
-                                        # If still too many, select by closest to kc*=0
-                                        kc_distances = distances[sorted_indices]
-                                        kc_sorted = np.argsort(kc_distances)
-                                        sorted_indices = sorted_indices[kc_sorted]
-                                elif selection_method == 'first':
-                                    # Select nodes with lowest kx values
-                                    kx_sorted = np.argsort(group_kx)
-                                    sorted_indices = kx_sorted
-                                elif selection_method == 'last':
-                                    # Select nodes with highest kx values  
-                                    kx_sorted = np.argsort(-group_kx)  # Descending
-                                    sorted_indices = kx_sorted
-                                else:
-                                    sorted_indices = np.argsort(distances)
-                            elif 'kc*≈-0.5' in group_name:
-                                # For kc*≈-0.5: prioritize vertical stacking (same kc*, different kx)
-                                distances = np.abs(group_kc - (-0.5))
-                                sorted_indices = np.argsort(distances)
-                            elif 'kc*≈+0.5' in group_name:
-                                # For kc*≈+0.5: prioritize vertical stacking (same kc*, different kx)
-                                distances = np.abs(group_kc - (+0.5))
-                                sorted_indices = np.argsort(distances)
-                            elif 'kc*<-0.7' in group_name:
-                                distances = np.abs(group_kc - (-1.0))
-                                sorted_indices = np.argsort(distances)
-                            elif 'kc*>+0.7' in group_name:
-                                distances = np.abs(group_kc - (+1.0))
-                                sorted_indices = np.argsort(distances)
-                            else:
-                                sorted_indices = np.arange(len(group_indices))
-                        else:
-                            # Default for other pairing types
-                            if 'kc*=0' in group_name:
-                                distances = np.abs(group_kc - 0.0)
-                                sorted_indices = np.argsort(distances)
-                            elif 'kc*<0' in group_name:
-                                distances = np.abs(group_kc - (-1.0))
-                                sorted_indices = np.argsort(distances)
-                            elif 'kc*>0' in group_name:
-                                distances = np.abs(group_kc - (+1.0))
-                                sorted_indices = np.argsort(distances)
-                            else:
-                                sorted_indices = np.arange(len(group_indices))
-                        
-                        # Apply minimal clustering to avoid duplicates
-                        group_clustered = []
-                        for idx in sorted_indices:
-                            i = group_indices[idx]
-                            kx_i, kc_i = kx_proj_all[i], kc_star_all[i]
-                            
-                            # Check distance to already selected nodes
-                            too_close = False
-                            for j in group_clustered:
-                                kx_j, kc_j = kx_proj_all[j], kc_star_all[j]
-                                distance_2d = np.sqrt((kx_i - kx_j)**2 + (kc_i - kc_j)**2)
-                                if distance_2d < min_distance_2d:
-                                    too_close = True
-                                    break
-                            
-                            if not too_close:
-                                group_clustered.append(i)
-                                if len(group_clustered) >= current_target:
-                                    break
-                        
-                        clustered_indices.extend(group_clustered)
-                        print(f"        {group_name}: selected {len(group_clustered)}/{len(group_indices)} visible nodes")
-                    
-                    # Keep only clustered nodes (in original 3D coordinates for saving)
-                    final_kx_nodes = all_nodes_kx[clustered_indices]
-                    final_ky_nodes = all_nodes_ky[clustered_indices]
-                    final_kz_nodes = all_nodes_kz[clustered_indices]
-                    
-                    print(f"      Final selection: {len(final_kx_nodes)} nodes")
-                    print(f"    Found {len(final_kx_nodes)} {plot_type} gap nodes (same method as 3D plots)")
-                    
-                    # Save gap nodes to cache for future projection use
-                    try:
-                        gap_nodes_save_file = os.path.join(save_dir, 'cache', f'gap_nodes_3d_{plot_type}.npz')
-                        os.makedirs(os.path.dirname(gap_nodes_save_file), exist_ok=True)
-                        np.savez(gap_nodes_save_file, 
-                                kx=final_kx_nodes, ky=final_ky_nodes, kz=final_kz_nodes)
-                        print(f"    ✓ Saved gap nodes to cache: {gap_nodes_save_file}")
-                    except Exception as e:
-                        print(f"    ⚠ Failed to save gap nodes cache: {e}")
-                else:
-                    print(f"    No {base_pairing} gap nodes found")
-                    final_kx_nodes = np.array([])
-                    final_ky_nodes = np.array([])
-                    final_kz_nodes = np.array([])
+                    # Save RAW nodes to cache (before selection/clustering)
+                    if not loaded_raw_from_cache:
+                        try:
+                            os.makedirs(os.path.dirname(raw_nodes_cache_file), exist_ok=True)
+                            np.savez(raw_nodes_cache_file,
+                                    kx=all_nodes_kx, ky=all_nodes_ky, kz=all_nodes_kz,
+                                    gap=all_nodes_gap, band=all_nodes_band)
+                            print(f"      ✓ Saved {len(all_nodes_kx)} raw nodes to cache")
+                        except Exception as e:
+                            print(f"      ⚠ Failed to save raw nodes cache: {e}")
+            
+            # SELECTION AND CLUSTERING (runs whether loaded from cache or freshly computed)
+            if len(all_nodes_kx) > 0:
+                # STEP 1: Project all nodes to (0-11) plane
+                print(f"      Projecting to (0-11) and filtering to visible range...")
+                kc_star_all = all_nodes_ky * np.sin(angle_rad) + all_nodes_kz * np.cos(angle_rad)
+                kx_proj_all = all_nodes_kx / (np.pi/a)  # Convert to π/a units
+                kc_star_all = kc_star_all / (np.pi/c_star)  # Convert to π/c* units
                 
+                # STEP 2: Filter to visible range [-1, 1] in BOTH axes
+                margin = 0.05  # 5% margin for boundary nodes
+                visible_mask = (np.abs(kx_proj_all) <= 1.0 + margin) & (np.abs(kc_star_all) <= 1.0 + margin)
+                visible_indices = np.where(visible_mask)[0]
+                
+                print(f"        Visible nodes in [-1,1] range: {len(visible_indices)}/{len(all_nodes_kx)}")
+                
+                # STEP 3: Cluster within visible nodes only, stratified by kx
+                if base_pairing == 'B2u':
+                    # Target: 6 nodes at each of kx=-1, 0, +1 (18 total)
+                    # Need to allow side-by-side nodes at the center
+                    kx_groups = [
+                        ('kx=-1', np.abs(kx_proj_all + 1.0) < 0.15),  # Near -1
+                        ('kx=0',  np.abs(kx_proj_all) < 0.15),        # Near 0
+                        ('kx=+1', np.abs(kx_proj_all - 1.0) < 0.15),  # Near +1
+                    ]
+                    target_per_group = [6, 6, 6]  # 6 nodes per kx region
+                    min_distance_2d = 0.03  # Very minimal clustering to preserve side-by-side nodes (in π/a, π/c* units)
+                    
+                elif base_pairing == 'B3u':
+                    # B3u: d ∝ (0, sin(kz·c), sin(ky·b)) → zeros at kz = 0, ±π/c, ky = 0, ±π/b
+                    # In (0-11) projection: kc* = ky*sin(angle) + kz*cos(angle)
+                    # Target: 16 total nodes
+                    #   - 4 along kc*=0
+                    #   - 2 at kc*=-1 (boundary)
+                    #   - 2 at kc*=+1 (boundary)
+                    #   - 4 between kc*=0 and kc*=-1
+                    #   - 4 between kc*=0 and kc*=+1
+                    kx_groups = [
+                        ('kc*=0', np.abs(kc_star_all) < 0.1),                    # Near kc* = 0 (center line): 4 nodes
+                        ('kc*=-1', np.abs(kc_star_all + 1.0) < 0.1),             # Near kc* = -1 (boundary): 2 nodes
+                        ('kc*=+1', np.abs(kc_star_all - 1.0) < 0.1),             # Near kc* = +1 (boundary): 2 nodes
+                        ('0<kc*<-1', (kc_star_all < -0.1) & (kc_star_all > -0.9)),  # Between 0 and -1: 4 nodes
+                        ('0<kc*<+1', (kc_star_all > 0.1) & (kc_star_all < 0.9)),    # Between 0 and +1: 4 nodes
+                    ]
+                    target_per_group = [4, 2, 2, 4, 4]  # 16 total nodes
+                    min_distance_2d = 0.03  # Allow vertical stacking
+                else:
+                    kx_groups = [('all', np.ones(len(all_nodes_kx), dtype=bool))]
+                    target_per_group = [20]  # Make it a list for consistency
+                    min_distance_2d = 0.05
+                
+                # Ensure target_per_group is a list
+                if not isinstance(target_per_group, list):
+                    target_per_group = [target_per_group] * len(kx_groups)
+                
+                # Select nodes closest to key kc* values within each group
+                clustered_indices = []
+                for group_idx, (group_name, group_mask) in enumerate(kx_groups):
+                    # Get the target for this specific group
+                    current_target = target_per_group[group_idx] if group_idx < len(target_per_group) else target_per_group[0]
+                    
+                    # Get indices that are both visible AND in this kx group
+                    group_visible_mask = visible_mask & group_mask
+                    group_indices = np.where(group_visible_mask)[0]
+                    
+                    if len(group_indices) == 0:
+                        print(f"        {group_name}: 0 visible nodes")
+                        continue
+                    
+                    # For each group, select nodes closest to key kc* values
+                    group_kx = kx_proj_all[group_indices]
+                    group_kc = kc_star_all[group_indices]
+                    
+                    if base_pairing == 'B2u':
+                        if 'kx=-1' in group_name:
+                            distances = np.abs(group_kx - (-1.0))
+                            sorted_indices = np.argsort(distances)
+                        elif 'kx=0' in group_name:
+                            distances = np.abs(group_kx - 0.0)
+                            sorted_indices = np.argsort(distances)
+                        elif 'kx=+1' in group_name:
+                            distances = np.abs(group_kx - (+1.0))
+                            sorted_indices = np.argsort(distances)
+                        else:
+                            sorted_indices = np.arange(len(group_indices))
+                    elif base_pairing == 'B3u':
+                        if 'kc*=0' in group_name:
+                            # For kc*=0: select nodes closest to kc*=0, spread across kx
+                            distances = np.abs(group_kc - 0.0)
+                            sorted_indices = np.argsort(distances)
+                        elif 'kc*=-1' in group_name:
+                            # For kc*=-1: select nodes closest to kc*=-1 boundary
+                            distances = np.abs(group_kc - (-1.0))
+                            sorted_indices = np.argsort(distances)
+                        elif 'kc*=+1' in group_name:
+                            # For kc*=+1: select nodes closest to kc*=+1 boundary
+                            distances = np.abs(group_kc - (+1.0))
+                            sorted_indices = np.argsort(distances)
+                        elif '0<kc*<-1' in group_name:
+                            # Between 0 and -1: spread evenly, prioritize kc* ~ -0.5
+                            distances = np.abs(group_kc - (-0.5))
+                            sorted_indices = np.argsort(distances)
+                        elif '0<kc*<+1' in group_name:
+                            # Between 0 and +1: spread evenly, prioritize kc* ~ +0.5
+                            distances = np.abs(group_kc - (+0.5))
+                            sorted_indices = np.argsort(distances)
+                        else:
+                            sorted_indices = np.arange(len(group_indices))
+                    else:
+                        # Default for other pairing types
+                        if 'kc*=0' in group_name:
+                            distances = np.abs(group_kc - 0.0)
+                            sorted_indices = np.argsort(distances)
+                        elif 'kc*<0' in group_name:
+                            distances = np.abs(group_kc - (-1.0))
+                            sorted_indices = np.argsort(distances)
+                        elif 'kc*>0' in group_name:
+                            distances = np.abs(group_kc - (+1.0))
+                            sorted_indices = np.argsort(distances)
+                        else:
+                            sorted_indices = np.arange(len(group_indices))
+                    
+                    # Apply minimal clustering to avoid duplicates
+                    group_clustered = []
+                    for idx in sorted_indices:
+                        i = group_indices[idx]
+                        kx_i, kc_i = kx_proj_all[i], kc_star_all[i]
+                        
+                        # Check distance to already selected nodes
+                        too_close = False
+                        for j in group_clustered:
+                            kx_j, kc_j = kx_proj_all[j], kc_star_all[j]
+                            distance_2d = np.sqrt((kx_i - kx_j)**2 + (kc_i - kc_j)**2)
+                            if distance_2d < min_distance_2d:
+                                too_close = True
+                                break
+                        
+                        if not too_close:
+                            group_clustered.append(i)
+                            if len(group_clustered) >= current_target:
+                                break
+                    
+                    clustered_indices.extend(group_clustered)
+                    print(f"        {group_name}: selected {len(group_clustered)}/{len(group_indices)} visible nodes")
+                
+                # Keep only clustered nodes (in original 3D coordinates for saving)
+                final_kx_nodes = all_nodes_kx[clustered_indices]
+                final_ky_nodes = all_nodes_ky[clustered_indices]
+                final_kz_nodes = all_nodes_kz[clustered_indices]
+                
+                print(f"      Final selection: {len(final_kx_nodes)} nodes")
+                print(f"    Found {len(final_kx_nodes)} {plot_type} gap nodes")
+                
+                # Note: We use raw node cache for fast iteration
+                # Final selected nodes are recomputed each time (fast operation)
+            else:
+                print(f"    No {base_pairing} gap nodes found")
+                final_kx_nodes = np.array([])
+                final_ky_nodes = np.array([])
+                final_kz_nodes = np.array([])
+            
             # =========================================================
             # STRICT 3D BOUNDS PROJECTION (NO EXTENDED ZONE)
             # =========================================================
