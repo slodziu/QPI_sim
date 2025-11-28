@@ -1,3 +1,4 @@
+
 # UTe2 model with 3D Fermi surface visualization
 import numpy as np
 import matplotlib.pyplot as plt
@@ -123,7 +124,46 @@ def H_full(kx, ky, kz):
         H[..., 2:4, 0:2] = delta * np.eye(2)
     
     return H
+import matplotlib.pyplot as plt
+from scipy.spatial import cKDTree
+import numpy as np
 
+def plot_011_density_map(fermi_surfaces, save_path=None, grid_res=500, sigma=0.01):
+    """
+    Plot the (0-11) Fermi surface projection as a smooth density map using Gaussian painting.
+    Args:
+        fermi_surfaces: dict with 'verts_2d' for each band
+        save_path: optional path to save the figure
+        grid_res: resolution of the output grid
+        sigma: Gaussian thickness in normalized units
+    """
+    # Combine all projected vertices
+    all_verts = np.vstack([fs['verts_2d'] for fs in fermi_surfaces.values()])
+    # Set up grid in normalized units (-1 to 1)
+    x_min, x_max = -1, 1
+    y_min, y_max = -1, 1
+    x_grid = np.linspace(x_min, x_max, grid_res)
+    y_grid = np.linspace(y_min, y_max, grid_res)
+    X, Y = np.meshgrid(x_grid, y_grid)
+    grid_points = np.column_stack([X.ravel(), Y.ravel()])
+    # Build KDTree for fast nearest neighbor search
+    tree = cKDTree(all_verts)
+    # For each grid point, find distance to nearest FS point
+    dists, _ = tree.query(grid_points, k=1)
+    # Paint with Gaussian weight
+    density = np.exp(-0.5 * (dists / sigma)**2)
+    density = density.reshape(X.shape)
+    # Plot
+    plt.figure(figsize=(8, 8))
+    plt.imshow(density, extent=[x_min, x_max, y_min, y_max], origin='lower', cmap='inferno', aspect='equal')
+    plt.xlabel(r'$k_{c^*}$ (normalized)')
+    plt.ylabel(r'$k_x$ (normalized)')
+    plt.title('Fermi Surface Projection (0-11) Density Map')
+    plt.colorbar(label='FS Density')
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=300)
+    plt.show()
 def verify_model_parameters():
     print("\\n=== Model Verification ===")
     print("Checking parameters against paper values...")
@@ -1262,8 +1302,8 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
     
     # Use LOWER resolution for projection to avoid memory issues
     # Extended ky range creates huge meshes, so reduce grid size significantly
-    nk3d = 60  # Reduced from 129 to avoid memory crash with extended ky
-    
+    nk3d = 121  # Reduced from 129 to avoid memory crash with extended ky
+
     # Create cache filename based on grid parameters (use extended ky for projection)
     cache_key = f"{nk3d}_{a:.6f}_{b:.6f}_{c:.6f}_extended_ky"  # Different cache for extended ky
     cache_hash = hashlib.md5(cache_key.encode()).hexdigest()[:8]
@@ -1285,7 +1325,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
         print("Computing 3D band energies with extended ky range for projection...")
         # Extended ky range for projection to capture full Fermi surface
         kx_3d = np.linspace(-np.pi/a, np.pi/a, nk3d)
-        ky_3d = np.linspace(-3*np.pi/b, 3*np.pi/b, nk3d)  # Extended ky range for projection
+        ky_3d = np.linspace(-np.pi/b, np.pi/b, nk3d)  # Extended ky range for projection
         kz_3d = np.linspace(-np.pi/c, np.pi/c, nk3d)
         
         band_energies_3d = np.zeros((nk3d, nk3d, nk3d, 4))
@@ -1347,7 +1387,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                         mesh = trimesh.Trimesh(vertices=verts, faces=faces)
                         # Decimate to target face count
                         target_faces = 15000
-                        mesh = mesh.simplify_quadric_decimation(target_faces)
+                        mesh = mesh.simplify_quadric_decimation(0.3)
                         verts = mesh.vertices
                         faces = mesh.faces
                         print(f"    After decimation: {len(verts)} vertices, {len(faces)} faces")
@@ -1377,11 +1417,13 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
             
             # Projection transformation
             kc_star = ky_fs * np.sin(angle_rad) + kz_fs * np.cos(angle_rad)
+            kc_star_norm = kc_star / (np.pi/c_star)
+            kc_star_norm /= np.max(np.abs(kc_star_norm))
             kx_unchanged = kx_fs
             
             # Store 2D projected vertices and original 3D faces
             verts_2d = np.column_stack((
-                kc_star / (np.pi/c_star),  # x-axis: kc* in π/c* units
+                kc_star_norm,  # x-axis: kc* in π/c* units
                 kx_unchanged / (np.pi/a)    # y-axis: kx in π/a units
             ))
             
@@ -1391,7 +1433,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                 'color': colors[band],
                 'label': band_labels[band]
             }
-            
+            plot_011_density_map(fermi_surfaces, save_path='outputs/FS_density_map.png', grid_res=3000, sigma=0.009)
             print(f"    Ready to render: {len(verts)} vertices, {len(faces)} faces")
             
         except Exception as e:
@@ -1445,7 +1487,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
             poly_col = PolyCollection(triangles,
                                      facecolors=fs_data['color'],
                                      edgecolors='none',
-                                     alpha=0.2,  # Slightly higher alpha for better visibility
+                                     alpha=0.3,  # Slightly higher alpha for better visibility
                                      linewidths=0,
                                      antialiaseds=False)  # Disable AA for speed
             ax.add_collection(poly_col)
@@ -1457,7 +1499,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
             print(f"    ✓ {fs_data['label']}: Rendered {len(faces)} triangles (preserved 3D topology)")
         
         # Set initial axis limits to exactly -1 to 1 (will be maintained throughout)
-        ax.set_xlim(-1.0, 1.0)
+        ax.set_xlim(-0.75, 0.75)
         ax.set_ylim(-1.0, 1.0)
         print(f"  Set axis limits: kc* [-1.0, 1.0], kx [-1.0, 1.0]")
         
@@ -1927,7 +1969,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
         ax.legend()
         
         # Set axis limits to exactly -1 to 1 (no padding)
-        ax.set_xlim(-1.0, 1.0)
+        ax.set_xlim(-0.75, 0.75)
         ax.set_ylim(-1.0, 1.0)
         
         # Set aspect ratio based on physical dimensions
