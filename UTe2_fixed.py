@@ -12,9 +12,9 @@ except ImportError:
 
 # Lattice constants (nm) - UTe2 orthorhombic structure
 # Full lattice parameters for gap function calculations
-a = 0.407   # Lattice constant along a direction: 4.07 Å
-b = 0.583   # Lattice constant along b direction: 5.83 Å
-c = 1.378   # Lattice constant along c direction: 13.78 Å
+a = 0.41   
+b = 0.61   
+c = 1.39   
 
 # (0-11) plane crystallographic parameters
 # c* ≈ 0.76 nm is the projected lattice spacing in the (0-11) plane
@@ -85,7 +85,7 @@ def HTe_block(kx, ky, kz):
         H[0,0] = diag
         H[1,1] = diag
         H[0,1] = real_off + complex_term1 + complex_term2
-        H[1,0] = real_off + np.conj(complex_term1) + complex_term2  # ensures Hermiticity
+        H[1,0] = real_off + np.conj(complex_term1) + complex_term2  #
     else:
         # Vectorized: shape (..., 2, 2)
         shape = kx.shape
