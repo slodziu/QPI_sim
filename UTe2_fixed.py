@@ -188,13 +188,13 @@ def verify_model_parameters():
     for param, paper_val in paper_params.items():
         our_val = our_params[param]
         match = abs(our_val - paper_val) < 1e-6
-        status = "✓" if match else "✗"
+        status = "" if match else "✗"
         print(f"  {status} {param}: paper={paper_val:.3f}, ours={our_val:.3f}")
         if not match:
             all_match = False
     
     if all_match:
-        print("✓ All parameters match the paper exactly!")
+        print(" All parameters match the paper exactly!")
     else:
         print("✗ Some parameters don't match - check implementation")
     print("=" * 40)
@@ -1327,17 +1327,13 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
         kx_3d = np.linspace(-np.pi/a, np.pi/a, nk3d)
         ky_3d = np.linspace(-np.pi/b, np.pi/b, nk3d)  # Extended ky range for projection
         kz_3d = np.linspace(-np.pi/c, np.pi/c, nk3d)
-        
+
+        KX,KY,KZ = np.meshgrid(kx_3d, ky_3d, kz_3d, indexing='ij')
         band_energies_3d = np.zeros((nk3d, nk3d, nk3d, 4))
         
-        for i, kx in enumerate(kx_3d):
-            if i % (nk3d//10) == 0:
-                print(f"  Progress: {i}/{nk3d} ({100*i/nk3d:.1f}%)")
-            for j, ky in enumerate(ky_3d):
-                for k, kz in enumerate(kz_3d):
-                    H = H_full(kx, ky, kz)
-                    eigvals = np.linalg.eigvals(H)
-                    band_energies_3d[i, j, k, :] = np.sort(np.real(eigvals))
+        H = H_full(KX, KY, KZ)
+        eigvals = np.linalg.eigvals(H)
+        band_energies_3d = np.sort(np.real(eigvals))
         
         # Cache the results
         cache_data = {
@@ -1496,7 +1492,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
             ax.plot([], [], color=fs_data['color'], linewidth=4, alpha=0.8,
                    label=fs_data['label'])
             
-            print(f"    ✓ {fs_data['label']}: Rendered {len(faces)} triangles (preserved 3D topology)")
+            print(f"     {fs_data['label']}: Rendered {len(faces)} triangles (preserved 3D topology)")
         
         # Set initial axis limits to exactly -1 to 1 (will be maintained throughout)
         ax.set_xlim(-0.75, 0.75)
@@ -1534,10 +1530,10 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                     all_nodes_kz = raw_cache['kz']
                     all_nodes_gap = raw_cache['gap']
                     all_nodes_band = raw_cache['band']
-                    print(f"    ✓ Loaded {len(all_nodes_kx)} raw nodes from cache (skipping 129³ calculation)")
+                    print(f"     Loaded {len(all_nodes_kx)} raw nodes from cache (skipping 129³ calculation)")
                     loaded_raw_from_cache = True
                 except Exception as e:
-                    print(f"    ⚠ Raw cache load failed: {e}")
+                    print(f"     Raw cache load failed: {e}")
                     loaded_raw_from_cache = False
             
             # Compute gap nodes if not cached (initialize variables)
@@ -1693,9 +1689,9 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
                             np.savez(raw_nodes_cache_file,
                                     kx=all_nodes_kx, ky=all_nodes_ky, kz=all_nodes_kz,
                                     gap=all_nodes_gap, band=all_nodes_band)
-                            print(f"      ✓ Saved {len(all_nodes_kx)} raw nodes to cache")
+                            print(f"       Saved {len(all_nodes_kx)} raw nodes to cache")
                         except Exception as e:
-                            print(f"      ⚠ Failed to save raw nodes cache: {e}")
+                            print(f"       Failed to save raw nodes cache: {e}")
             
             # SELECTION AND CLUSTERING (runs whether loaded from cache or freshly computed)
             if len(all_nodes_kx) > 0:
@@ -2045,9 +2041,9 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
             kx_3d = cache_data['kx_3d']
             ky_3d = cache_data['ky_3d']
             kz_3d = cache_data['kz_3d']
-            print(f"  ✓ Successfully loaded cached 3D band energies ({band_energies_3d.shape})")
+            print(f"   Successfully loaded cached 3D band energies ({band_energies_3d.shape})")
         except Exception as e:
-            print(f"  ⚠ Failed to load cache file: {e}")
+            print(f"   Failed to load cache file: {e}")
             print("  Computing fresh band energies...")
             cache_file = None  # Force recomputation
     else:
@@ -2102,10 +2098,10 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
         try:
             with open(cache_file, 'wb') as f:
                 pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
-            print(f"  ✓ Band energies cached to disk: {cache_file}")
+            print(f"   Band energies cached to disk: {cache_file}")
             print(f"    Cache size: {os.path.getsize(cache_file) / (1024*1024):.1f} MB")
         except Exception as e:
-            print(f"  ⚠ Failed to save cache: {e}")
+            print(f"   Failed to save cache: {e}")
         
         # Also update global cache for this session
         global _cached_band_energies_3d, _cached_kx_3d, _cached_ky_3d, _cached_kz_3d, _cached_nk3d
@@ -2165,10 +2161,10 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
                     for pairing_type in pairing_types:
                         if f'gap_{pairing_type}' in gap_cache_data:
                             cached_gaps[pairing_type] = gap_cache_data[f'gap_{pairing_type}']
-                            print(f"    ✓ Loaded cached {pairing_type} gap magnitude")
+                            print(f"     Loaded cached {pairing_type} gap magnitude")
                 
             except Exception as e:
-                print(f"    ⚠ Failed to load gap cache: {e}")
+                print(f"     Failed to load gap cache: {e}")
         
         # Determine which gaps need to be computed
         missing_gaps = [p for p in pairing_types if p not in cached_gaps]
@@ -2228,18 +2224,18 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
                     with open(gap_metadata_file, 'w') as f:
                         json.dump(gap_metadata, f, indent=2)
                     
-                    print(f"      ✓ Gap magnitudes cached to disk: {gap_cache_file}")
+                    print(f"       Gap magnitudes cached to disk: {gap_cache_file}")
                     print(f"        Cache size: {os.path.getsize(gap_cache_file) / (1024*1024):.1f} MB")
                     print(f"        Cached pairing types: {sorted(all_pairing_types)}")
                     
                 except Exception as e:
-                    print(f"      ⚠ Failed to save gap cache: {e}")
+                    print(f"       Failed to save gap cache: {e}")
         
         # Use cached gaps (both loaded and newly computed)
         gap_magnitudes_3d = cached_gaps
         
         if not missing_gaps:
-            print("    ✓ All gap magnitudes loaded from cache!")
+            print("     All gap magnitudes loaded from cache!")
         
         print("  3D gap computation complete!")
     else:
@@ -2634,9 +2630,9 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
                         kz_phys = np.array(z_nodes) * (np.pi/c)
                     
                     np.savez(gap_nodes_cache_file, kx=kx_phys, ky=ky_phys, kz=kz_phys)
-                    print(f"    ✓ Saved {len(kx_phys)} gap nodes to cache: {gap_nodes_cache_file}")
+                    print(f"     Saved {len(kx_phys)} gap nodes to cache: {gap_nodes_cache_file}")
                 except Exception as e:
-                    print(f"    ⚠ Failed to save gap nodes cache: {e}")
+                    print(f"     Failed to save gap nodes cache: {e}")
                     
             else:
                 print(f"    {pairing_type}: No gap nodes found on Fermi surfaces")
@@ -2738,7 +2734,7 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
                         vertex_offset += len(mesh.vertices)
                         obj_file.write(f"\n")
                 
-                print(f"  ✓ Exported colored Fermi surface as {obj_filename} (with {mtl_filename})")
+                print(f"   Exported colored Fermi surface as {obj_filename} (with {mtl_filename})")
                 print(f"    Materials created for {len(mesh_colors)} bands with distinct colors")
                 for i, color_info in enumerate(mesh_colors):
                     print(f"      {color_info['band_name']}: {colors[color_info['band_index']]} -> RGB{color_info['rgb']}")
