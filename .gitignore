@@ -54,5 +54,7 @@ Thumbs.db
 # Cache files (large binary files)
 **/cache/
 *.pkl
+*.npy
+*.npz
 outputs/**/cache/
 outputs/global_cache/
