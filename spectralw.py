@@ -13,6 +13,20 @@ b = scaleb*0.61
 c = 1.39
 c_star = scaleb*0.76
 theta = np.radians(24)  # Angle for (0-11) projection
+def spectral_weight(H_grid, omega, eta):
+    """
+    H_grid : array (...,4,4) Hamiltonians
+    omega  : energy at which A(k,omega) is evaluated
+    eta    : broadening
+    """
+    # Eigenvalues of H(k)
+    evals = np.linalg.eigvalsh(H_grid)   # shape (...,4)
+
+    # Lorentzian sum
+    A = np.sum( eta / ((omega - evals)**2 + eta**2) / np.pi, axis=-1 )
+
+    return A
+
 def calculate_fig1b(res=1000, eta=0.0001):
     # Grid Setup (High Res for small eta)
     nk_x = res
@@ -42,7 +56,7 @@ def calculate_fig1b(res=1000, eta=0.0001):
     
     # --- PROJECTION ---
     # CRITICAL: Using indices [0, 1] for Uranium based on your H_full structure
-    u_indices = [0, 1, 2, 3]  # All orbitals contribute to spectral weight 
+    u_indices = [0,1]  # All orbitals contribute to spectral weight 
     
     spectral_weight = np.zeros_like(KX)
     for idx in u_indices:

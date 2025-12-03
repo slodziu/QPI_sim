@@ -102,8 +102,11 @@ def H_full(kx, ky, kz):
     HU = HU_block(kx, ky, kz)
     HTe = HTe_block(kx, ky, kz)
     m_eff = 1.53
-    Z = 1.0 / m_eff
-    HU_scaled = HU / Z   # equivalent to HU * m_eff
+    E0 = np.trace(HU, axis1=-2, axis2=-1) / 2.0            
+    E0I = E0[..., None, None] * np.eye(2)                  
+    HU_scaled = E0I + (HU - E0I) / m_eff
+
+
     # Handle both scalar and array inputs
     if np.isscalar(kx):
         Hhyb = np.eye(2) * delta
