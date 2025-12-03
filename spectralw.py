@@ -7,7 +7,7 @@ from UTe2_fixed import *
 import os
 import pickle
 import hashlib
-scaleb=2
+scaleb=1
 a = 0.41   
 b = scaleb*0.61   
 c = 1.39
@@ -17,11 +17,11 @@ def calculate_fig1b(res=1000, eta=0.0001):
     # Grid Setup (High Res for small eta)
     nk_x = res
     nk_y = res # Same resolution for both directions
-    scale_val = 1.5
+    scale_val = 1
     # EXTENDED RANGE: Need much larger k-space to capture full JDOS features
     # The paper shows features extending to ±1.5 π/a, so we need k-space that extends at least ±3 π/a
     # to get full autocorrelation range of ±1.5 π/a in q-space
-    kx_vals = np.linspace(-scale_val*1.4*np.pi/a, scale_val*1.4*np.pi/a, nk_x)  # Much larger extent
+    kx_vals = np.linspace(-scale_val*1.5*np.pi/a, scale_val*1.5*np.pi/a, nk_x)  # Much larger extent
     ky_vals = np.linspace(-scale_val*3*np.pi/b, scale_val*3*np.pi/b, nk_y)  # Much larger extent
     KX, KY = np.meshgrid(kx_vals, ky_vals)
     
@@ -42,12 +42,12 @@ def calculate_fig1b(res=1000, eta=0.0001):
     
     # --- PROJECTION ---
     # CRITICAL: Using indices [0, 1] for Uranium based on your H_full structure
-    u_indices = [0, 1] 
+    u_indices = [0, 1, 2, 3]  # All orbitals contribute to spectral weight 
     
     spectral_weight = np.zeros_like(KX)
     for idx in u_indices:
         spectral_weight += -1.0 / np.pi * np.imag(G_grid[:, :, idx, idx])
-
+    
     return KX, KY, spectral_weight, kx_vals, ky_vals  # Return the 1D arrays too
 
 def plot_jdos(JDOS_q, kx_vals, ky_vals, with_vectors=False, use_log=True, title_suffix="", project_0m11=False):
@@ -344,7 +344,7 @@ def get_spectral(res=1000, eta=0.0001):
 
     # Save with output directory creation
     os.makedirs('outputs/Spectral', exist_ok=True)
-    filename = f'outputs/Spectral/SpectralNew.png'
+    filename = f'outputs/Spectral/SpectralNew_{res}_{eta}.png'
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     print(f"Saved {filename}")
     plt.close()
@@ -390,16 +390,16 @@ def measure_fwhm(xvals, profile):
 
 
 
-res_list = [1000, 3000, 4000]
-eta_list = [0.0001, 0.0001,0.0001]
+res_list = [3001, 4001, 5001]
+eta_list = [0.0003, 0.0003,0.0003]
 for res, eta in zip(res_list, eta_list):
     intensity, kx_vals, ky_vals = get_spectral(res, eta)
-    JDOS_q = calculate_jdos_with_windowing(intensity,window_type=None, alpha=0.25)
+    #JDOS_q = calculate_jdos_with_windowing(intensity,window_type=None, alpha=0.25)
 
-    print(f"\nGenerating JDOS plots for resolution {res} and eta {eta}...")
+    #print(f"\nGenerating JDOS plots for resolution {res} and eta {eta}...")
 
-    plot_jdos(JDOS_q, kx_vals, ky_vals, with_vectors=True, use_log=False, 
-              title_suffix=f"(FFT Method, res={res}, eta={eta})", project_0m11=True)
+    #plot_jdos(JDOS_q, kx_vals, ky_vals, with_vectors=True, use_log=False, 
+              #title_suffix=f"(FFT Method, res={res}, eta={eta})", project_0m11=False)
 
 
 

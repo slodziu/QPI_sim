@@ -101,11 +101,13 @@ def H_full(kx, ky, kz):
     """Full 4x4 Hamiltonian with U-Te hybridization - Vectorized version"""
     HU = HU_block(kx, ky, kz)
     HTe = HTe_block(kx, ky, kz)
-    
+    m_eff = 1.53
+    Z = 1.0 / m_eff
+    HU_scaled = HU / Z   # equivalent to HU * m_eff
     # Handle both scalar and array inputs
     if np.isscalar(kx):
         Hhyb = np.eye(2) * delta
-        top = np.hstack((HU, Hhyb))
+        top = np.hstack((HU_scaled, Hhyb))
         bottom = np.hstack((Hhyb.conj().T, HTe))
         H = np.vstack((top, bottom))
     else:
