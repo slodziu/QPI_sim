@@ -6,9 +6,14 @@ from scipy.ndimage import gaussian_filter
 def orbital_projected_spectral_weight_paper_method(H_grid, omega=0.0, eta=5e-3):
     """
     Compute HYBRIDIZED U 5f orbital-projected spectral weight as in Nature Physics paper.
-    Now with per-band normalization for Fermi-crossing bands.
+    Now with per-band normalization for Fermi-crossing bands and correct cosine modulation.
     """
     Ny, Nx = H_grid.shape[:2]
+
+    # Get the actual ky coordinates for cosine modulation
+    ky_vals = np.linspace(-3*np.pi/b, 3*np.pi/b, Ny)
+    kx_vals = np.linspace(-1*np.pi/a, 1*np.pi/a, Nx)
+    KY, KX = np.meshgrid(ky_vals, kx_vals, indexing='ij')  # Match H_grid indexing
 
     # Vectorized computation
     H_flat = H_grid.reshape(-1, 4, 4)  # Shape: (M, 4, 4)
@@ -26,9 +31,23 @@ def orbital_projected_spectral_weight_paper_method(H_grid, omega=0.0, eta=5e-3):
     
     delta = 0.13  # eV - hybridization parameter
     
+    # Get actual ky coordinates for cosine modulation
+    ky_flat = KY.flatten()  # Shape: (M,)
+    
+    # Apply cosine modulation that peaks at multiples of π/b
+    # cosine(ky * b) peaks at ky = 0, ±π/b, ±2π/b and is zero at ky = ±0.5π/b, ±1.5π/b
+    # Use stronger modulation to create clear peaks/minima given intensity scale ~1000
+    cosine_modulation = 0.2 + 0.8 * (1 + np.cos(ky_flat * b))/2  # Range: [0.2, 1.0]
+    
+    # Reshape cosine to match eigenvals shape for broadcasting
+    cosine_modulation = cosine_modulation[:, np.newaxis]  # Shape: (M, 1)
+    
     # Hybridization enhancement factor based on the actual δ parameter
     Te_pure_weights = np.abs(eigenvecs[:, 2, :])**2 + np.abs(eigenvecs[:, 3, :])**2  # Pure Te p
-    hybridization_factor = 1 + (delta**2) * Te_pure_weights / ((eigenvals - 0.0)**2 + delta**2 + 1e-6)
+    energy_hybridization = 1 + (delta**2) * Te_pure_weights / ((eigenvals - 0.0)**2 + delta**2 + 1e-6)
+    
+    # Combined hybridization: energy-dependent + cosine modulation
+    hybridization_factor = energy_hybridization * cosine_modulation
     
     # The "hybridized U 5f spectral weight" is the U weight enhanced by δ-mixing
     U_hybridized_weights = U_pure_weights * hybridization_factor
@@ -100,7 +119,7 @@ def contour_plot_only():
     print("=== Creating contour plot with correct orientation ===")
     
     # Higher resolution grid
-    res = 3001
+    res = 1001
     nk_x = res
     nk_y = res * 3
     
@@ -125,7 +144,101 @@ def contour_plot_only():
     print(f"Band 2 spectral weight range: {np.min(A_bands_2d[:,:,2]):.1f} to {np.max(A_bands_2d[:,:,2]):.1f}")
     print(f"Band 3 spectral weight range: {np.min(A_bands_2d[:,:,3]):.1f} to {np.max(A_bands_2d[:,:,3]):.1f}")
     
-    # Smooth the data to reduce periodic modulation
+    # First, save the raw cosine-modulated result BEFORE smoothing
+    print("Saving raw cosine-modulated spectral weight...")
+    ky_2d_raw, kx_2d_raw = np.meshgrid(ky_vals/(np.pi/b), kx_vals/(np.pi/a))
+    
+    # Plot raw cosine-modulated spectral weight (before smoothing)
+    plt.figure(figsize=(12, 8))
+    levels_raw = np.linspace(np.min(A_map), np.max(A_map), 50)
+    contour_raw = plt.contourf(ky_2d_raw, kx_2d_raw, A_map.T, levels=levels_raw, 
+                               cmap='plasma', extend='both')
+    plt.xlabel('ky (π/b)')
+    plt.ylabel('kx (π/a)')
+    plt.title('Raw U 5f Spectral Weight with Cosine Modulation (Unsmoothed)')
+    plt.xlim(-3, 3)
+    plt.ylim(-1, 1)
+    plt.colorbar(contour_raw, label='Raw Spectral Weight')
+    plt.tight_layout()
+    plt.savefig('outputs/Spectral/5f/raw_cosine_modulated.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # Also save individual raw bands with cosine modulation
+    plt.figure(figsize=(18, 6))
+    
+    # Raw Band 2 with cosine modulation
+    plt.subplot(1, 3, 1)
+    levels_b2_raw = np.linspace(np.min(A_bands_2d[:,:,2]), np.max(A_bands_2d[:,:,2]), 50)
+    contour_b2_raw = plt.contourf(ky_2d_raw, kx_2d_raw, A_bands_2d[:,:,2].T, levels=levels_b2_raw, 
+                                  cmap='plasma', extend='both')
+    plt.xlabel('ky (π/b)')
+    plt.ylabel('kx (π/a)')
+    plt.title('Band 2 Raw (with Cosine Modulation)')
+    plt.xlim(-3, 3)
+    plt.ylim(-1, 1)
+    plt.colorbar(contour_b2_raw, label='Band 2 Raw Weight')
+    
+    # Raw Band 3 with cosine modulation
+    plt.subplot(1, 3, 2)
+    levels_b3_raw = np.linspace(np.min(A_bands_2d[:,:,3]), np.max(A_bands_2d[:,:,3]), 50)
+    contour_b3_raw = plt.contourf(ky_2d_raw, kx_2d_raw, A_bands_2d[:,:,3].T, levels=levels_b3_raw, 
+                                  cmap='inferno', extend='both')
+    plt.xlabel('ky (π/b)')
+    plt.ylabel('kx (π/a)')
+    plt.title('Band 3 Raw (with Cosine Modulation)')
+    plt.xlim(-3, 3)
+    plt.ylim(-1, 1)
+    plt.colorbar(contour_b3_raw, label='Band 3 Raw Weight')
+    
+    # Total raw with cosine modulation
+    plt.subplot(1, 3, 3)
+    contour_total_raw = plt.contourf(ky_2d_raw, kx_2d_raw, A_map.T, levels=levels_raw, 
+                                     cmap='viridis', extend='both')
+    plt.xlabel('ky (π/b)')
+    plt.ylabel('kx (π/a)')
+    plt.title('Total Raw (with Cosine Modulation)')
+    plt.xlim(-3, 3)
+    plt.ylim(-1, 1)
+    plt.colorbar(contour_total_raw, label='Total Raw Weight')
+    
+    plt.tight_layout()
+    plt.savefig('outputs/Spectral/5f/raw_bands_cosine_modulated.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # Save individual raw band plots separately
+    plt.figure(figsize=(12, 8))
+    contour_b2_individual = plt.contourf(ky_2d_raw, kx_2d_raw, A_bands_2d[:,:,2].T, levels=levels_b2_raw, 
+                                        cmap='plasma', extend='both')
+    plt.xlabel('ky (π/b)')
+    plt.ylabel('kx (π/a)')
+    plt.title('Band 2 Raw U 5f Weight with Cosine Modulation')
+    plt.xlim(-3, 3)
+    plt.ylim(-1, 1)
+    plt.colorbar(contour_b2_individual, label='Band 2 Raw Weight')
+    plt.tight_layout()
+    plt.savefig('outputs/Spectral/5f/band2_raw_cosine_modulated.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    plt.figure(figsize=(12, 8))
+    contour_b3_individual = plt.contourf(ky_2d_raw, kx_2d_raw, A_bands_2d[:,:,3].T, levels=levels_b3_raw, 
+                                        cmap='inferno', extend='both')
+    plt.xlabel('ky (π/b)')
+    plt.ylabel('kx (π/a)')
+    plt.title('Band 3 Raw U 5f Weight with Cosine Modulation')
+    plt.xlim(-3, 3)
+    plt.ylim(-1, 1)
+    plt.colorbar(contour_b3_individual, label='Band 3 Raw Weight')
+    plt.tight_layout()
+    plt.savefig('outputs/Spectral/5f/band3_raw_cosine_modulated.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # Save raw data
+    np.save('outputs/Spectral/5f/raw_cosine_modulated_total.npy', A_map)
+    np.save('outputs/Spectral/5f/raw_cosine_modulated_band2.npy', A_bands_2d[:,:,2])
+    np.save('outputs/Spectral/5f/raw_cosine_modulated_band3.npy', A_bands_2d[:,:,3])
+    
+    # NOW proceed with smoothing to reduce periodic modulation
+    print("Applying smoothing to reduce noise...")
     sig_val = 2.0  # Smoothing sigma
     A_smoothed = gaussian_filter(A_map, sigma=sig_val)
     A_band2_smoothed = gaussian_filter(A_bands_2d[:,:,2], sigma=sig_val)

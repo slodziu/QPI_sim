@@ -51,20 +51,24 @@ def orbital_projected_spectral_weight_paper_method(H_grid, omega=0.0, eta=5e-3):
 
 def split_ky_analysis():
     """
-    Split ky into 3 regions: [-3π/b, -π/b], [-π/b, π/b], [π/b, 3π/b]
-    Calculate bands separately, normalize each region, then stitch together
+    Split ky into 7 smaller regions: [-3π/b, -2.5π/b], [-2.5π/b, -1.5π/b], etc.
+    Calculate bands separately, normalize each region, then stitch together for better continuity
     """
     print("=== Split ky Analysis ===")
     
     # Higher resolution grid
-    res = 1501  # Lower res for faster computation
+    res = 3001  # Lower res for faster computation
     nk_x = res
     
-    # Define the three ky regions
+    # Define smaller overlapping ky regions for better continuity
     ky_regions = [
-        (-3*np.pi/b, -1*np.pi/b, "region1"),  # Region 1: -3π/b to -π/b  
-        (-1*np.pi/b, 1*np.pi/b, "region2"),   # Region 2: -π/b to π/b
-        (1*np.pi/b, 3*np.pi/b, "region3")     # Region 3: π/b to 3π/b
+        (-3*np.pi/b, -2.5*np.pi/b, "region1"),    # Region 1: -3π/b to -2.5π/b
+        (-2.5*np.pi/b, -1.5*np.pi/b, "region2"),  # Region 2: -2.5π/b to -1.5π/b
+        (-1.5*np.pi/b, -0.5*np.pi/b, "region3"),  # Region 3: -1.5π/b to -0.5π/b
+        (-0.5*np.pi/b, 0.5*np.pi/b, "region4"),   # Region 4: -0.5π/b to 0.5π/b (center)
+        (0.5*np.pi/b, 1.5*np.pi/b, "region5"),    # Region 5: 0.5π/b to 1.5π/b
+        (1.5*np.pi/b, 2.5*np.pi/b, "region6"),    # Region 6: 1.5π/b to 2.5π/b
+        (2.5*np.pi/b, 3*np.pi/b, "region7")       # Region 7: 2.5π/b to 3π/b
     ]
     
     # Paper-appropriate broadening
@@ -99,20 +103,9 @@ def split_ky_analysis():
         A_band2_smooth = gaussian_filter(A_band2_region, sigma=2.0)
         A_band3_smooth = gaussian_filter(A_band3_region, sigma=2.0)
         
-        # Apply cosine modulation BEFORE normalization
-        cosine_modulation_region = np.abs(np.cos(ky_vals_region * b / np.pi))
-        cosine_mod_2d_region = cosine_modulation_region[:, np.newaxis]
-        
-        A_band2_cos_region = A_band2_smooth * cosine_mod_2d_region
-        A_band3_cos_region = A_band3_smooth * cosine_mod_2d_region
-        
-        # Normalize within this region (regular normalization)
+        # Normalize within this region (regular normalization only)
         max_band2 = np.max(A_band2_smooth)
         max_band3 = np.max(A_band3_smooth)
-        
-        # Normalize within this region (cosine-modulated normalization)  
-        max_band2_cos = np.max(A_band2_cos_region)
-        max_band3_cos = np.max(A_band3_cos_region)
         
         if max_band2 > 0 and max_band3 > 0:
             # Normalize to the maximum of the two bands in this region
@@ -127,30 +120,10 @@ def split_ky_analysis():
             A_band3_norm = A_band3_smooth
             print(f"  No significant spectral weight in this region")
         
-        if max_band2_cos > 0 and max_band3_cos > 0:
-            # Normalize cosine-modulated versions
-            target_max_cos = max(max_band2_cos, max_band3_cos)
-            A_band2_cos_norm = A_band2_cos_region * (target_max_cos / max_band2_cos)
-            A_band3_cos_norm = A_band3_cos_region * (target_max_cos / max_band3_cos)
-            
-            print(f"  Cosine Band 2 max: {max_band2_cos:.1f} -> {np.max(A_band2_cos_norm):.1f}")
-            print(f"  Cosine Band 3 max: {max_band3_cos:.1f} -> {np.max(A_band3_cos_norm):.1f}")
-        else:
-            A_band2_cos_norm = A_band2_cos_region
-            A_band3_cos_norm = A_band3_cos_region
-            print(f"  No significant cosine-modulated spectral weight in this region")
-        
-        # Store for stitching (both regular and cosine-modulated)
+        # Store for stitching (normalized data only)
         all_ky_vals.append(ky_vals_region)
         all_A_band2.append(A_band2_norm)
         all_A_band3.append(A_band3_norm)
-        
-        # Store cosine-modulated versions
-        if 'all_A_band2_cos' not in locals():
-            all_A_band2_cos = []
-            all_A_band3_cos = []
-        all_A_band2_cos.append(A_band2_cos_norm)
-        all_A_band3_cos.append(A_band3_cos_norm)
     
     # Stitch the regions together
     print("\nStitching regions together...")
@@ -158,13 +131,18 @@ def split_ky_analysis():
     A_band2_full = np.concatenate(all_A_band2, axis=0)
     A_band3_full = np.concatenate(all_A_band3, axis=0)
     
-    # Stitch cosine-modulated versions
-    A_band2_cos_full = np.concatenate(all_A_band2_cos, axis=0)
-    A_band3_cos_full = np.concatenate(all_A_band3_cos, axis=0)
-    
     # Create average of normalized bands
     A_total_full = (A_band2_full + A_band3_full) / 2.0
-    A_total_cos_full = (A_band2_cos_full + A_band3_cos_full) / 2.0
+    
+    # Apply cosine modulation AFTER stitching to avoid discontinuities
+    print("Applying cosine modulation to stitched data...")
+    cosine_modulation_full = 0.2 + 0.8 * np.abs(np.cos(ky_full * b))  # Range: [0.2, 1.0]
+    cosine_mod_2d_full = cosine_modulation_full[:, np.newaxis]
+    
+    # Apply cosine to the complete stitched data
+    A_band2_cos_full = A_band2_full * cosine_mod_2d_full
+    A_band3_cos_full = A_band3_full * cosine_mod_2d_full  
+    A_total_cos_full = A_total_full * cosine_mod_2d_full
     
     # Create meshgrid for plotting
     ky_2d, kx_2d = np.meshgrid(ky_full/(np.pi/b), kx_vals/(np.pi/a))
@@ -182,9 +160,10 @@ def split_ky_analysis():
     axes[0].set_xlim(-3, 3)
     axes[0].set_ylim(-1, 1)
     
-    # Add region boundaries
-    axes[0].axvline(-1, color='white', linestyle='--', alpha=0.7, linewidth=2)
-    axes[0].axvline(1, color='white', linestyle='--', alpha=0.7, linewidth=2)
+    # Add region boundaries for all 7 regions
+    region_boundaries = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5]
+    for boundary in region_boundaries:
+        axes[0].axvline(boundary, color='white', linestyle='--', alpha=0.5, linewidth=1)
     fig.colorbar(contour1, ax=axes[0], label='Stitched Weight')
     
     # Plot 2: Band 2 stitched
@@ -196,8 +175,8 @@ def split_ky_analysis():
     axes[1].set_title('Band 2 Stitched (Region-Normalized)')
     axes[1].set_xlim(-3, 3)
     axes[1].set_ylim(-1, 1)
-    axes[1].axvline(-1, color='white', linestyle='--', alpha=0.7, linewidth=2)
-    axes[1].axvline(1, color='white', linestyle='--', alpha=0.7, linewidth=2)
+    for boundary in region_boundaries:
+        axes[1].axvline(boundary, color='white', linestyle='--', alpha=0.5, linewidth=1)
     fig.colorbar(contour2, ax=axes[1], label='Band 2 Weight')
     
     # Plot 3: Band 3 stitched  
@@ -209,8 +188,8 @@ def split_ky_analysis():
     axes[2].set_title('Band 3 Stitched (Region-Normalized)')
     axes[2].set_xlim(-3, 3)
     axes[2].set_ylim(-1, 1)
-    axes[2].axvline(-1, color='white', linestyle='--', alpha=0.7, linewidth=2)
-    axes[2].axvline(1, color='white', linestyle='--', alpha=0.7, linewidth=2)
+    for boundary in region_boundaries:
+        axes[2].axvline(boundary, color='white', linestyle='--', alpha=0.5, linewidth=1)
     fig.colorbar(contour3, ax=axes[2], label='Band 3 Weight')
     
     plt.tight_layout()
@@ -229,8 +208,8 @@ def split_ky_analysis():
     plt.title('Total Stitched U 5f Weight (Region-Normalized)')
     plt.xlim(-3, 3)
     plt.ylim(-1, 1)
-    plt.axvline(-1, color='white', linestyle='--', alpha=0.7, linewidth=2)
-    plt.axvline(1, color='white', linestyle='--', alpha=0.7, linewidth=2)
+    for boundary in region_boundaries:
+        plt.axvline(boundary, color='white', linestyle='--', alpha=0.5, linewidth=1)
     plt.colorbar(contour_total, label='Total Weight')
     plt.tight_layout()
     plt.savefig('outputs/Spectral/5f/total_stitched_individual.png', dpi=300, bbox_inches='tight')
@@ -245,8 +224,8 @@ def split_ky_analysis():
     plt.title('Band 2 Stitched U 5f Weight (Region-Normalized)')
     plt.xlim(-3, 3)
     plt.ylim(-1, 1)
-    plt.axvline(-1, color='white', linestyle='--', alpha=0.7, linewidth=2)
-    plt.axvline(1, color='white', linestyle='--', alpha=0.7, linewidth=2)
+    for boundary in region_boundaries:
+        plt.axvline(boundary, color='white', linestyle='--', alpha=0.5, linewidth=1)
     plt.colorbar(contour_b2, label='Band 2 Weight')
     plt.tight_layout()
     plt.savefig('outputs/Spectral/5f/band2_stitched_individual.png', dpi=300, bbox_inches='tight')
@@ -261,16 +240,16 @@ def split_ky_analysis():
     plt.title('Band 3 Stitched U 5f Weight (Region-Normalized)')
     plt.xlim(-3, 3)
     plt.ylim(-1, 1)
-    plt.axvline(-1, color='white', linestyle='--', alpha=0.7, linewidth=2)
-    plt.axvline(1, color='white', linestyle='--', alpha=0.7, linewidth=2)
+    for boundary in region_boundaries:
+        plt.axvline(boundary, color='white', linestyle='--', alpha=0.5, linewidth=1)
     plt.colorbar(contour_b3, label='Band 3 Weight')
     plt.tight_layout()
     plt.savefig('outputs/Spectral/5f/band3_stitched_individual.png', dpi=300, bbox_inches='tight')
     plt.show()
     
-    # Create cosine-modulated plots (peaks every π/b) - now using pre-normalized cosine data
+    # Create cosine-modulated plots (peaks every π/b) - now using post-stitching cosine data
     print("\nCreating cosine-modulated plots (peaks every π/b)...")
-    print("Using cosine modulation applied BEFORE regional normalization...")
+    print("Using cosine modulation applied AFTER stitching to avoid discontinuities...")
     
     # Cosine-modulated total plot
     plt.figure(figsize=(12, 8))
@@ -279,13 +258,13 @@ def split_ky_analysis():
                                     cmap='viridis', extend='both')
     plt.xlabel('ky (π/b)')
     plt.ylabel('kx (π/a)')
-    plt.title('Total Stitched × |cos(ky)| - Cosine Applied Before Normalization')
+    plt.title('Total Stitched × |cos(ky)| - Cosine Applied After Stitching')
     plt.xlim(-3, 3)
     plt.ylim(-1, 1)
     # Mark π/b multiples where cosine peaks
     for multiple in [-3, -2, -1, 0, 1, 2, 3]:
         plt.axvline(multiple, color='yellow', linestyle=':', alpha=0.8, linewidth=1)
-    plt.colorbar(contour_total_cos, label='Cosine-First Weight')
+    plt.colorbar(contour_total_cos, label='Post-Stitch Cosine Weight')
     plt.tight_layout()
     plt.savefig('outputs/Spectral/5f/total_stitched_cosine_first.png', dpi=300, bbox_inches='tight')
     plt.show()
@@ -297,12 +276,12 @@ def split_ky_analysis():
                                  cmap='plasma', extend='both')
     plt.xlabel('ky (π/b)')
     plt.ylabel('kx (π/a)')
-    plt.title('Band 2 Stitched × |cos(ky)| - Cosine Applied Before Normalization')
+    plt.title('Band 2 Stitched × |cos(ky)| - Cosine Applied After Stitching')
     plt.xlim(-3, 3)
     plt.ylim(-1, 1)
     for multiple in [-3, -2, -1, 0, 1, 2, 3]:
         plt.axvline(multiple, color='yellow', linestyle=':', alpha=0.8, linewidth=1)
-    plt.colorbar(contour_b2_cos, label='Cosine-First Band 2')
+    plt.colorbar(contour_b2_cos, label='Post-Stitch Band 2')
     plt.tight_layout()
     plt.savefig('outputs/Spectral/5f/band2_stitched_cosine_first.png', dpi=300, bbox_inches='tight')
     plt.show()
@@ -314,30 +293,30 @@ def split_ky_analysis():
                                  cmap='inferno', extend='both')
     plt.xlabel('ky (π/b)')
     plt.ylabel('kx (π/a)')
-    plt.title('Band 3 Stitched × |cos(ky)| - Cosine Applied Before Normalization')
+    plt.title('Band 3 Stitched × |cos(ky)| - Cosine Applied After Stitching')
     plt.xlim(-3, 3)
     plt.ylim(-1, 1)
     for multiple in [-3, -2, -1, 0, 1, 2, 3]:
         plt.axvline(multiple, color='yellow', linestyle=':', alpha=0.8, linewidth=1)
-    plt.colorbar(contour_b3_cos, label='Cosine-First Band 3')
+    plt.colorbar(contour_b3_cos, label='Post-Stitch Band 3')
     plt.tight_layout()
     plt.savefig('outputs/Spectral/5f/band3_stitched_cosine_first.png', dpi=300, bbox_inches='tight')
     plt.show()
     
-    print(f"Cosine-first modulation summary:")
+    print(f"Post-stitching cosine modulation summary:")
     print(f"  Regular total max: {np.max(A_total_full):.1f}")
-    print(f"  Cosine-first total max: {np.max(A_total_cos_full):.1f}")
-    print(f"  Cosine applied BEFORE normalization for better regional balance")
+    print(f"  Post-stitch cosine total max: {np.max(A_total_cos_full):.1f}")
+    print(f"  Cosine applied AFTER stitching to prevent discontinuities")
     
     print(f"\n=== Stitching Complete ===")
-    print(f"- Created 3 regions with independent normalization")
+    print(f"- Created 7 smaller regions with independent normalization")
     print(f"- Region boundaries shown as white dashed lines")
     print(f"- Each region normalized to its own maximum")
     print(f"- Total grid: {A_total_full.shape}")
     print(f"- Saved individual plots for total, band 2, and band 3")
-    print(f"- Created cosine-modulated versions with cosine applied BEFORE normalization")
+    print(f"- Created cosine-modulated versions with cosine applied AFTER stitching")
     print(f"- Yellow dotted lines mark π/b multiples where cosine modulation peaks")
-    print(f"- Cosine-first approach preserves regional intensity balance")
+    print(f"- Post-stitch cosine approach maintains continuity across regions")
 
 if __name__ == "__main__":
     import os
