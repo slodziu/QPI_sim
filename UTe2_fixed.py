@@ -36,9 +36,9 @@ tz_U = -0.0375
 muTe = -2.25
 DeltaTe = -1.4
 tTe = -1.5  # hopping along Te(2) chain in b direction
-tch_Te = 0  # hopping between chains in a direction (paper shows 0)
+tch_Te = 0  # hopping between chains in a direction 
 tz_Te = -0.05  # hopping between chains along c axis
-delta = 0.13
+delta = 0.13 #try 0.1 later
 
 # momentum grid for kx-ky plane (in nm^-1, will be converted to π/a, π/b units for plotting)
 nk = 201  # Reduced for faster computation
@@ -53,7 +53,7 @@ def HU_block(kx, ky, kz):
     real_off = -DeltaU - 2*tpU*np.cos(kx*a) - 2*tpch_U*np.cos(ky*b)
     complex_amp = -4 * tz_U * np.exp(-1j * kz * c / 2) * np.cos(kx * a / 2) * np.cos(ky * b / 2)
     
-    # Handle both scalar and array inputs
+    # Handle scalar
     if np.isscalar(kx):
         H = np.zeros((2,2), dtype=complex)
         H[0,0] = diag
@@ -61,7 +61,7 @@ def HU_block(kx, ky, kz):
         H[0,1] = real_off + complex_amp
         H[1,0] = real_off + np.conj(complex_amp)
     else:
-        # Vectorized: shape (..., 2, 2)
+        # Vectorissed
         shape = kx.shape
         H = np.zeros(shape + (2, 2), dtype=complex)
         H[..., 0, 0] = diag
@@ -74,8 +74,7 @@ def HTe_block(kx, ky, kz):
     """2x2 Hamiltonian for Te orbitals - Vectorized version"""
     # Diagonal elements: μTe (no chain hopping since tch_Te = 0 in paper)
     diag = muTe
-    # Off-diagonal elements from paper:
-    # -ΔTe - tTe*exp(-iky*b) - tz_Te*cos(kz*c/2)*cos(kx*a/2)*cos(ky*b/2)
+    # Off-diagonal elements from paper
     real_off = -DeltaTe
     complex_term1 = -tTe * np.exp(-1j * ky * b)  # hopping along b direction
     complex_term2 = -tz_Te * np.cos(kz * c / 2) * np.cos(kx * a / 2) * np.cos(ky * b / 2)
@@ -101,16 +100,13 @@ def H_full(kx, ky, kz):
     """Full 4x4 Hamiltonian with U-Te hybridization - Vectorized version"""
     HU = HU_block(kx, ky, kz)
     HTe = HTe_block(kx, ky, kz)
-    m_eff = 1.53
-    E0 = np.trace(HU, axis1=-2, axis2=-1) / 2.0            
-    E0I = E0[..., None, None] * np.eye(2)                  
-    HU_scaled = E0I + (HU - E0I) / m_eff
+
 
 
     # Handle both scalar and array inputs
     if np.isscalar(kx):
         Hhyb = np.eye(2) * delta
-        top = np.hstack((HU_scaled, Hhyb))
+        top = np.hstack((HU, Hhyb))
         bottom = np.hstack((Hhyb.conj().T, HTe))
         H = np.vstack((top, bottom))
     else:
@@ -534,9 +530,9 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
             eigvals = np.linalg.eigvals(H)
             energies_fs[i, j, :] = np.sort(np.real(eigvals))
     
-    # Create subplot layout
+    # Create subplot layout - 3 plots side by side
     n_types = len(pairing_types)
-    if n_types <= 2:
+    if n_types <= 3:
         fig, axes = plt.subplots(1, n_types, figsize=(8*n_types, 7))
         if n_types == 1:
             axes = [axes]
@@ -2914,9 +2910,9 @@ if __name__ == "__main__":
     #plot_main_fermi_contours(kx_vals_local, ky_vals_local, energies_kz0)
     
     # Generate superconducting gap magnitude plots
-    #print("\nGenerating superconducting gap magnitude visualizations...")
+    print("\nGenerating superconducting gap magnitude visualizations...")
     # Skip B1u as it has no nodes at kz=0
-    #plot_gap_magnitude_2d(kz=kz0, pairing_types=['B1u' , 'B2u', 'B3u'], resolution=200)
+    plot_gap_magnitude_2d(kz=kz0, pairing_types=['B1u' , 'B2u', 'B3u'], resolution=200)
     
     # Generate 3D plot without gap nodes
     #print("\n" + "="*70)
@@ -2937,11 +2933,11 @@ if __name__ == "__main__":
     # Generate (0-11) crystallographic projections
     
     # Generate projections with gap nodes for both B2u and B3u
-    for pairing in ['B2u', 'B3u']:
-        print(f"Generating projection with {pairing} gap nodes...")
-        plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', 
-                                        show_gap_nodes=True, gap_node_pairing=pairing, 
-                                        angle_deg=24.0)
+    #for pairing in ['B2u', 'B3u']:
+        #print(f"Generating projection with {pairing} gap nodes...")
+        #plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', 
+                                        #show_gap_nodes=True, gap_node_pairing=pairing, 
+                                        #angle_deg=24.0)
     
     
 
