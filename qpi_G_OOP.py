@@ -8,6 +8,37 @@ impurity scattering.
 
 import numpy as np
 import matplotlib.pyplot as plt
+
+# LDOS colormap configuration
+LDOS_COLORMAPS = {
+    'RdBu_r': 'Red-Blue (reversed) - excellent contrast for pos/neg values',
+    'coolwarm': 'Cool-warm - perceptually uniform',
+    'bwr': 'Blue-White-Red - sharp contrast with white at zero',
+    'RdYlBu_r': 'Red-Yellow-Blue (reversed) - three-color diverging',
+    'PiYG': 'Pink-Yellow-Green - high contrast alternative',
+    'seismic': 'Blue-White-Red classic - traditional seismic colormap',
+    'RdGy': 'Red-Gray - original (lower contrast)'
+}
+
+DEFAULT_LDOS_COLORMAP = 'RdBu_r'
+
+def set_ldos_colormap(colormap_name):
+    """
+    Change the default LDOS colormap for all new visualizations.
+    
+    Args:
+        colormap_name (str): Name of matplotlib colormap to use.
+                           See LDOS_COLORMAPS for recommended options.
+    """
+    global DEFAULT_LDOS_COLORMAP
+    if colormap_name in LDOS_COLORMAPS:
+        DEFAULT_LDOS_COLORMAP = colormap_name
+        print(f"LDOS colormap changed to: {colormap_name}")
+        print(f"Description: {LDOS_COLORMAPS[colormap_name]}")
+    else:
+        print(f"Warning: {colormap_name} not in recommended list.")
+        print(f"Available options: {list(LDOS_COLORMAPS.keys())}")
+        DEFAULT_LDOS_COLORMAP = colormap_name
 import matplotlib.animation as animation
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
@@ -28,19 +59,7 @@ class SystemParameters:
         E_min: Minimum energy for sweep
         E_max: Maximum energy for sweep
         n_frames: Number of energy points to simulate
-        rotation_angle: Lattice rotation (currently unused)
-        disorder_strength: Disorder strength (currently unused)
-        zoom_factor: Zoom factor for visualization (currently unused)
-        high_pass_strength: High-pass filter strength (currently unused)
-        low_freq_suppress_radius: Radius for DC suppression in FFT
-        low_freq_transition_radius: Transition width for DC suppression
-        subtract_radial_average: Whether to subtract radial average (currently unused)
-        
-        # Tight-binding specific parameters
-        model_type: Model type ("parabolic", "square_lattice", "graphene", etc.)
-        t_prime: Next-nearest neighbor hopping (for applicable models)
-        use_all_bands: Whether to sum over all bands (for multi-band models)
-        band_index: Which band to use if not using all bands
+        model_type: Model type (currently only "parabolic" supported)
     """
     gridsize: int = 512
     L: float = 50.0
@@ -62,16 +81,7 @@ class SystemParameters:
     low_freq_transition_radius: int = 3
     subtract_radial_average: bool = False
     
-    # Tight-binding specific parameters
-    model_type: str = "parabolic"  # Default to parabolic for backward compatibility
-    t_prime: float = 0.0  # Next-nearest neighbor hopping
-    use_all_bands: bool = False  # Whether to sum over all bands
-    band_index: int = 0  # Which band to use if not using all bands
-    
-    # Advanced tight-binding parameters
-    ty: float = 0.6  # Hopping in y-direction (for anisotropic models)
-    t_z: float = 0.5  # Out-of-plane hopping (for 3D models)
-    kz_slice: float = 0.0  # kz value for 2D slice visualization
+    model_type: str = "parabolic"
     
     @property
     def a(self) -> float:
@@ -80,12 +90,8 @@ class SystemParameters:
     
     @property
     def k_F_max(self) -> float:
-        """Maximum Fermi wavevector - model dependent."""
-        if self.model_type == "parabolic":
-            return np.sqrt(max(abs(self.E_min), abs(self.E_max)))
-        else:
-            # For tight-binding, use Brillouin zone scale
-            return np.pi / self.a  # Brillouin zone boundary
+        """Maximum Fermi wavevector for parabolic dispersion."""
+        return np.sqrt(max(abs(self.E_min), abs(self.E_max)))
 
 
 class SignalProcessing:
@@ -711,12 +717,12 @@ class QPIvisualiser:
     def _setup_figure(self):
         """Initialize the figure and subplots with appropriate scaling."""
         self.fig, (self.ax1, self.ax2, self.ax4) = plt.subplots(
-            1, 3, figsize=(24, 8), dpi=100
+            1, 3, figsize=(24, 8), dpi=300
         )
         
         self.im1 = self.ax1.imshow(
             np.zeros((self.params.gridsize, self.params.gridsize)), 
-            origin='lower', cmap='RdGy', extent=[0, self.params.L, 0, self.params.L]
+            origin='lower', cmap=DEFAULT_LDOS_COLORMAP, extent=[0, self.params.L, 0, self.params.L]
         )
         self.ax1.set_title("LDOS around impurities")
         self.ax1.set_xlabel('x (physical units)')
@@ -728,23 +734,33 @@ class QPIvisualiser:
         dk = 2 * np.pi / self.params.L
         k_actual_max = dk * self.params.gridsize / 2
         
+        # Set momentum space bounds based on energy range for better focus
+        max_kF = np.sqrt(self.params.E_max)
+        k_zoom = min(k_actual_max, max_kF * 5)  # Show up to 5*kF_max for QPI features
+        
         self.im2 = self.ax2.imshow(
             np.zeros((self.params.gridsize, self.params.gridsize)), origin='lower', cmap='plasma',
-            extent=[-k_actual_max, k_actual_max, -k_actual_max, k_actual_max]
+            extent=[-k_zoom, k_zoom, -k_zoom, k_zoom]  # Use zoomed range, not full k_actual_max
         )
+        self.ax2.set_xlim(-k_zoom, k_zoom)
+        self.ax2.set_ylim(-k_zoom, k_zoom)
         self.ax2.set_title('Momentum Space: QPI Pattern')
-        self.ax2.set_xlabel('kx (1/a)')
-        self.ax2.set_ylabel('ky (1/a)')
+        self.ax2.set_xlabel('$k_x$ (1/a)')
+        self.ax2.set_ylabel('$k_y$ (1/a)')
         self.ax2.grid(False)
         plt.colorbar(self.im2, ax=self.ax2, label='log|FFT(LDOS)|')
         
+        # Set dispersion plot bounds based on energy range
+        k_disp_max = np.sqrt(self.params.E_max) + 1
         self.ax4.set_xlabel('k_F (1/length units)')
         self.ax4.set_ylabel('Energy E')
         self.ax4.set_title('Dispersion: Theory vs Extracted')
+        self.ax4.set_xlim(-k_disp_max, k_disp_max)
+        self.ax4.set_ylim(self.params.E_min - 2, self.params.E_max + 2)
         self.ax4.grid(True, alpha=0.3)
         
-        # Plot theoretical dispersion based on model type - store the line objects
-        k_theory = np.linspace(-self.params.k_F_max * 1.2, self.params.k_F_max * 1.2, 400)
+        # Plot theoretical dispersion based on model type - use energy-based k range
+        k_theory = np.linspace(-k_disp_max, k_disp_max, 400)
         self.theory_lines = self._plot_theoretical_dispersion(k_theory)
         
         self.extracted_scatter = self.ax4.scatter(
@@ -879,14 +895,25 @@ class QPIvisualiser:
         """
         fft_log = np.log10(fft_display + 1)
         
-        self.im2.set_data(fft_log)
-        
+        # Calculate proper k-space bounds (same as initialization)
         dk = 2 * np.pi / self.params.L
         k_actual_max = dk * self.params.gridsize / 2
-        self.im2.set_extent([-k_actual_max, k_actual_max, -k_actual_max, k_actual_max])
+        max_kF = np.sqrt(self.params.E_max)
+        k_zoom = min(k_actual_max, max_kF * 5)  # Same logic as initialization
         
-        vmin_fft = np.min(fft_log)
-        vmax_fft = np.max(fft_log)
+        # Crop the FFT data to match the zoom range
+        center = fft_log.shape[0] // 2
+        pixels_to_show = int(k_zoom / dk)
+        pixels_to_show = min(pixels_to_show, center)
+        
+        fft_cropped = fft_log[center-pixels_to_show:center+pixels_to_show, 
+                             center-pixels_to_show:center+pixels_to_show]
+        
+        self.im2.set_data(fft_cropped)
+        self.im2.set_extent([-k_zoom, k_zoom, -k_zoom, k_zoom])
+        
+        vmin_fft = np.min(fft_cropped)
+        vmax_fft = np.max(fft_cropped)
         self.im2.set_clim(vmin=vmin_fft, vmax=vmax_fft)
     def _update_dispersion_plot(self, peak_q: Optional[float]):
         """
@@ -937,8 +964,10 @@ class QPIvisualiser:
         )
         
         # Create 2x3 subplot figure with tighter layout
-        fig = plt.figure(figsize=(22, 12), dpi=100)
-        gs = fig.add_gridspec(2, 3, hspace=0.2, wspace=0.25, top=0.95, bottom=0.08, left=0.06, right=0.98)
+        fig = plt.figure(figsize=(8.3, 5.5), dpi=300)
+        gs = fig.add_gridspec(2, 3, hspace=0.4, wspace=0.65, 
+                             width_ratios=[1.3, 1.3, 0.8],  # Make 2D plots (a,b,d,e) bigger
+                             top=0.95, bottom=0.08, left=0.06, right=0.98)
         
         # Get k-space extent - this must match the coordinates used in azimuthal integration
         dk = 2 * np.pi / self.params.L
@@ -1043,10 +1072,16 @@ class QPIvisualiser:
         vmax_real_fft = np.max(np.abs(real_fft_crop))
         im1 = ax1.imshow(real_fft_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-scale*np.max(real_fft_crop), vmax=scale*np.max(real_fft_crop))
-        ax1.set_title(f'Re[FFT(δN(r))] at E={energy:.2f}', fontsize=14)
-        ax1.set_xlabel('kx (1/a)', fontsize=12)
-        ax1.set_ylabel('ky (1/a)', fontsize=12)
+        ax1.set_title('Re[FFT(δN(r))]', fontsize=12)
+        ax1.set_xlabel('$k_x$ (1/a)', fontsize=10)
+        ax1.set_ylabel('$k_y$ (1/a)', fontsize=10)
+        ax1.tick_params(axis='both', which='major', labelsize=11)
+
         plt.colorbar(im1, ax=ax1, label='Re[FFT]')
+        # Add panel label (a)
+        ax1.text(0.05, 0.95, '(a)', transform=ax1.transAxes, fontsize=12, fontweight='bold',
+                verticalalignment='top', horizontalalignment='left',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
         # Panel 2: Imaginary part of FFT
         ax2 = fig.add_subplot(gs[0, 1])
@@ -1056,15 +1091,20 @@ class QPIvisualiser:
         vmax_imag_fft = np.max(np.abs(imag_fft_crop))
         im2 = ax2.imshow(imag_fft_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-scale*np.max(imag_fft_crop), vmax=scale*np.max(imag_fft_crop))
-        ax2.set_title(f'Im[FFT(δN(r))] at E={energy:.2f}', fontsize=14)
-        ax2.set_xlabel('kx (1/a)', fontsize=12)
-        ax2.set_ylabel('ky (1/a)', fontsize=12)
+        ax2.set_title('Im[FFT(δN(r))]', fontsize=12)
+        ax2.set_xlabel('$k_x$ (1/a)', fontsize=10)
+        ax2.set_ylabel('$k_y$ (1/a)', fontsize=10)
+        ax2.tick_params(axis='both', which='major', labelsize=11)
+
         plt.colorbar(im2, ax=ax2, label='Im[FFT]')
+        # Add panel label (b)
+        ax2.text(0.05, 0.95, '(b)', transform=ax2.transAxes, fontsize=12, fontweight='bold',
+                verticalalignment='top', horizontalalignment='left',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
         # Panel 3: Azimuthally integrated profiles for Re[FFT]
         ax3 = fig.add_subplot(gs[0, 2])
-        ax3.plot(q_plot, cut_right_fft, 'g-', linewidth=2, label='θ=0 (right)', alpha=0.8)
-        ax3.plot(q_plot, cut_left_fft, 'r-', linewidth=2, label='θ=π (left)', alpha=0.8)
+        ax3.plot(q_plot, cut_left_fft, 'r-', linewidth=2, label='extracted values', alpha=0.8)
         ax3.axhline(y=0, color='gray', linestyle=':', linewidth=1, alpha=0.5)
         
         # Add expected 2k_F peak position (if meaningful)
@@ -1080,10 +1120,15 @@ class QPIvisualiser:
             if expected_2kF <= np.max(q_plot):
                 ax3.axvline(x=expected_2kF, color='black', linestyle='--', linewidth=2, alpha=0.8, label=f'2k_F = {expected_2kF:.2f}')
         
-        ax3.set_xlabel('|q| (1/a)', fontsize=12)
-        ax3.set_ylabel('Re[FFT(δN)] (azimuthally integrated)', fontsize=12)
-        ax3.set_title(f'Azimuthal Integration: Re[FFT] at E={energy:.2f}', fontsize=14)
-        ax3.legend(loc='best', fontsize=11)
+        ax3.set_xlabel('|q| (1/a)', fontsize=10)
+        ax3.set_ylabel('Re[FFT(δN)]', fontsize=10)
+        ax3.set_title('Azimuthal Integration: Re[FFT]', fontsize=12)
+        ax3.tick_params(axis='both', which='major', labelsize=11)
+        # Add panel label (c)
+        ax3.text(0.05, 0.95, '(c)', transform=ax3.transAxes, fontsize=12, fontweight='bold',
+                verticalalignment='top', horizontalalignment='left',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        ax3.legend(loc='best', fontsize=8)
         ax3.grid(True, alpha=0.3)
         
         # Panel 4: Real part of R_MA
@@ -1094,9 +1139,14 @@ class QPIvisualiser:
         vmax_R_MA = np.max(np.abs(real_R_MA_crop))
         im4 = ax4.imshow(real_R_MA_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-5*np.max(np.abs(cut_left_R_MA)), vmax=5*np.max(np.abs(cut_right_R_MA)))
-        ax4.set_title(f'Re[δN_MA(q)] at E={energy:.2f}', fontsize=14)
-        ax4.set_xlabel('kx (1/a)', fontsize=12)
-        ax4.set_ylabel('ky (1/a)', fontsize=12)
+        ax4.set_title('Re[δN_MA(q)]', fontsize=12)
+        ax4.set_xlabel('$k_x$ (1/a)', fontsize=10)
+        ax4.set_ylabel('$k_y$ (1/a)', fontsize=10)
+        ax4.tick_params(axis='both', which='major', labelsize=11)
+        # Add panel label (d)
+        ax4.text(0.05, 0.95, '(d)', transform=ax4.transAxes, fontsize=12, fontweight='bold',
+                verticalalignment='top', horizontalalignment='left',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         plt.colorbar(im4, ax=ax4, label='Re[R_MA]')
         
         # Panel 5: Imaginary part of R_MA
@@ -1107,30 +1157,39 @@ class QPIvisualiser:
         vmax_imag_R_MA = np.max(np.abs(imag_R_MA_crop))
         im5 = ax5.imshow(imag_R_MA_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-0.1*vmax_imag_R_MA, vmax=0.1*vmax_imag_R_MA)
-        ax5.set_title(f'Im[δN_MA(q)] at E={energy:.2f}', fontsize=14)
-        ax5.set_xlabel('kx (1/a)', fontsize=12)
-        ax5.set_ylabel('ky (1/a)', fontsize=12)
+        ax5.set_title('Im[δN_MA(q)]', fontsize=12)
+        ax5.set_xlabel('$k_x$ (1/a)', fontsize=10)
+        ax5.set_ylabel('$k_y$ (1/a)', fontsize=10)
+        ax5.tick_params(axis='both', which='major', labelsize=11)
+        # Add panel label (e)
+        ax5.text(0.05, 0.95, '(e)', transform=ax5.transAxes, fontsize=12, fontweight='bold',
+                verticalalignment='top', horizontalalignment='left',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         plt.colorbar(im5, ax=ax5, label='Im[R_MA]')
         
         # Panel 6: Azimuthally integrated profiles for Re[R_MA]
         ax6 = fig.add_subplot(gs[1, 2])
-        ax6.plot(q_plot, cut_right_R_MA, 'g-', linewidth=2, label='θ=0 (right)', alpha=0.8)
-        ax6.plot(q_plot, cut_left_R_MA, 'r-', linewidth=2, label='θ=π (left)', alpha=0.8)
+        ax6.plot(q_plot, cut_left_R_MA, 'r-', linewidth=2, label='extracted values', alpha=0.8)
         ax6.axhline(y=0, color='gray', linestyle=':', linewidth=1, alpha=0.5)
         
         # Add expected 2k_F peak position  
         if expected_2kF <= np.max(q_plot):
             ax6.axvline(x=expected_2kF, color='black', linestyle='--', linewidth=2, alpha=0.8, label=f'2k_F = {expected_2kF:.2f}')
         
-        ax6.set_xlabel('|q| (1/a)', fontsize=12)
-        ax6.set_ylabel('Re[δN_MA] (azimuthally integrated)', fontsize=12)
-        ax6.set_title(f'Azimuthal Integration: Re[δN_MA] at E={energy:.2f}', fontsize=14)
-        ax6.legend(loc='best', fontsize=11)
+        ax6.set_xlabel('|q| (1/a)', fontsize=10)
+        ax6.set_ylabel('Re[δN_MA]', fontsize=10)
+        ax6.set_title('Azimuthal Integration: Re[δN_MA]', fontsize=12)
+        ax6.tick_params(axis='both', which='major', labelsize=11)
+        # Add panel label (f)
+        ax6.text(0.05, 0.95, '(f)', transform=ax6.transAxes, fontsize=12, fontweight='bold',
+                verticalalignment='top', horizontalalignment='left',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        ax6.legend(loc='best', fontsize=8)
         ax6.grid(True, alpha=0.3)
         
         # Save figure with tight layout (no suptitle for compact output)
         fourier_filename = os.path.join(frames_dir, f'fourier_analysis_{frame_idx+1:03d}.png')
-        fig.savefig(fourier_filename, dpi=150, bbox_inches='tight', pad_inches=0.1)
+        fig.savefig(fourier_filename, dpi=300, bbox_inches='tight', pad_inches=0.1)
         plt.close(fig)
     
     def create_animation(self, filename: str = 'qpi_animation.mp4', frames_dir: str = None):
@@ -1185,7 +1244,7 @@ class QPIvisualiser:
                 # Save standard QPI frame
                 self.animate_frame(frame_idx)
                 frame_filename = os.path.join(qpi_frames_dir, f'qpi_{frame_idx+1:03d}.png')
-                self.fig.savefig(frame_filename, dpi=150, bbox_inches='tight')
+                self.fig.savefig(frame_filename, dpi=300, bbox_inches='tight')
                 
                 # Save Fourier analysis figure for each energy
                 self.save_fourier_analysis_figure(energy, fourier_frames_dir, frame_idx)
@@ -1281,7 +1340,7 @@ class QPIvisualiser:
             import matplotlib.animation as animation
             
             # Create figure for animation
-            fig = plt.figure(figsize=(24, 16))
+            fig = plt.figure(figsize=(8.3, 7))
             ax = fig.add_subplot(111)
             ax.axis('off')
             
@@ -1379,7 +1438,7 @@ class QPIvisualiser:
                 qpi_frame_files = sorted(glob.glob(os.path.join(qpi_frames_dir, 'qpi_*.png')))
                 
                 # Create figure for animation
-                fig = plt.figure(figsize=(24, 8))
+                fig = plt.figure(figsize=(8.3, 3.5))
                 ax = fig.add_subplot(111)
                 ax.axis('off')
                 
@@ -1441,7 +1500,7 @@ class QPIvisualiser:
         self._update_momentum_plot(fft_display)
         self._update_dispersion_plot(peak_q)
         
-        self.fig.savefig(filename, dpi=150, bbox_inches='tight')
+        self.fig.savefig(filename, dpi=300, bbox_inches='tight')
         print(f"✓ Saved snapshot at E={mid_energy:.2f} to {filename}")
     
     def save_greens_function_plot(self, filename: str = 'greens_function.png', energy: Optional[float] = None):
@@ -1477,7 +1536,7 @@ class QPIvisualiser:
         neg_imag_G_cut = -imag_G_cut  # Plot -Im[G] as in the reference image
         
         # Create figure with 2 vertical subplots
-        fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(10, 8), dpi=150)
+        fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(10, 8), dpi=300)
         
         # Top panel: Re[G] along k_Y=0
         ax_top.plot(k_x, real_G_cut, 'b-', linewidth=2)
@@ -1509,7 +1568,7 @@ class QPIvisualiser:
         plt.subplots_adjust(top=0.92)
         
         # Save the figure
-        fig.savefig(filename, dpi=150, bbox_inches='tight', facecolor='white')
+        fig.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close(fig)
         
         print(f"✓ Saved Green's function 1D cut plot at E={energy:.2f} to {filename}")
@@ -1534,7 +1593,7 @@ class QPIvisualiser:
             os.makedirs(frames_dir, exist_ok=True)
         
         # Set up the figure for animation
-        fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(12, 8), dpi=100)
+        fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(12, 8), dpi=300)
         
         # Get k-space coordinates
         dk = 2 * np.pi / self.params.L
@@ -1612,7 +1671,7 @@ class QPIvisualiser:
             # Save frame if requested
             if frames_dir:
                 frame_filename = os.path.join(frames_dir, f'greens_frame_{frame_idx+1:03d}.png')
-                fig.savefig(frame_filename, dpi=100, bbox_inches='tight', facecolor='white')
+                fig.savefig(frame_filename, dpi=300, bbox_inches='tight', facecolor='white')
             
             return [line_real, line_imag, energy_text]
         
@@ -1624,9 +1683,9 @@ class QPIvisualiser:
         
         # Save animation
         if filename.endswith('.gif'):
-            ani.save(filename, writer='pillow', fps=5, dpi=100)
+            ani.save(filename, writer='pillow', fps=5, dpi=300)
         else:
-            ani.save(filename, writer='ffmpeg', fps=5, bitrate=2000, dpi=100)
+            ani.save(filename, writer='ffmpeg', fps=5, bitrate=2000, dpi=300)
         
         plt.close(fig)
         print(f"✓ Green's function animation saved as: {filename}")
@@ -1651,16 +1710,8 @@ def main():
     
     impurity_positions = [(params.gridsize//2, params.gridsize//2)]
     
-    # Create model based on model_type (None for backward compatibility)
-    model = None
-    if hasattr(params, 'model_type') and params.model_type != "parabolic":
-        from model_factory import create_model
-        model_params = {
-            't': params.t,
-            't_prime': getattr(params, 't_prime', 0.0),
-            'a': params.a
-        }
-        model = create_model(params.model_type, **model_params)
+    # Create simulation with parabolic dispersion only
+    model = None  # Always use parabolic dispersion
     
     simulation = QPISimulation(params, impurity_positions, model)
     visualiser = QPIvisualiser(simulation)

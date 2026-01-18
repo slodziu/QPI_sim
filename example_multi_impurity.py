@@ -4,7 +4,6 @@ Example script showing how to create custom multi-impurity tight-binding configu
 """
 
 from qpi_G_OOP import SystemParameters, QPISimulation, QPIvisualiser
-from model_factory import create_model
 import numpy as np
 
 

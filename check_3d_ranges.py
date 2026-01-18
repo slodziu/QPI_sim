@@ -3,7 +3,6 @@
 Diagnostic script to check energy ranges of our 3D models.
 """
 import numpy as np
-from model_factory import create_model
 
 def check_3d_model_ranges():
     """Check the actual energy ranges of our 3D models."""

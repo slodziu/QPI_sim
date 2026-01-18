@@ -79,7 +79,7 @@ def plot_fs_projection(
 ):
     """Plot Fermi surface projection and gap nodes for a given gap function."""
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-    fig = plt.figure(figsize=(10,16))
+    fig = plt.figure(figsize=(10,12))
     ax = fig.add_subplot(111, projection='3d')
     theta = np.deg2rad(theta_deg)
     colours = ["#9635E5", "#FD0000"]
@@ -213,12 +213,17 @@ def plot_fs_projection(
     ax.set_zticks([])
     ax.set_yticks(np.linspace(-np.pi/a, np.pi/a, 5))
     ax.set_xticks(np.linspace(-np.pi/c_star, np.pi/c_star, 5))
-    ax.set_xticklabels([f"{x:.2f}" for x in np.linspace(-1, 1, 5)], fontsize=18)
-    ax.set_yticklabels([f"{y:.2f}" for y in np.linspace(-1, 1, 5)], fontsize=18)
-    ax.set_xlabel(r"$k_c^* \; (\pi/c^*)$", fontsize=20, labelpad=20)
-    ax.set_ylabel(r"$k_x \; (\pi/a)$", fontsize=20, labelpad=20)
+    ax.set_xticklabels([f"{x:.1f}" for x in np.linspace(-1, 1, 5)], fontsize=28)
+    ax.set_yticklabels([f"{y:.1f}" for y in np.linspace(-1, 1, 5)], fontsize=28)
+    ax.set_xlabel(r"$k_c^* \; (\pi/c^*)$", fontsize=32, labelpad=15)
+    ax.set_ylabel(r"$k_x \; (\pi/a)$", fontsize=32, labelpad=15)
     ax.set_aspect('equal')
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    
+    # THE KEY FIX: Manual position adjustment for 3D plots to prevent axis label cutoff
+    # Parameters: [left, bottom, width, height] - increased space to prevent cutoff
+    ax.set_position([-0.15, -0.2, 1.3, 1.4])
+    
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', pad_inches=0.15)
     print(f"Fermi surface projection plot saved to {output_path}.")
 
     # After plotting nodes, add B2u gap vs kc* plots for kx=0, 1, -1

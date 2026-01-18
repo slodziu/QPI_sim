@@ -1,20 +1,128 @@
 """
-Simple runner script for QPI simulations using predefined configurations.
+QPI simulation runner with predefined configurations.
 
-Usage examples:
-    python run_qpi.py fast_preview
-    python run_qpi.py fast_preview --save-frames
-    python run_qpi.py double_impurity
-    python run_qpi.py high_quality_single --save-frames
+Usage:
+    python run_qpi.py config_name [--save-frames]
+    
+Examples:
+    python run_qpi.py high_quality_single
+    python run_qpi.py random_30_impurities --save-frames
 """
 
 import sys
 import argparse
-from qpi_G_OOP import SystemParameters, QPISimulation, QPIvisualiser
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
+from qpi_G_OOP import SystemParameters, QPISimulation, QPIvisualiser, DEFAULT_LDOS_COLORMAP
 from config import get_config, list_available_configs
-from model_factory import create_model
-from fermi_surface_3d import visualize_tight_binding_fermi_surface
-from true_3d_fermi_surface import visualize_true_3d_fermi_surface
+
+
+class CustomLayoutQPIVisualiser(QPIvisualiser):
+    """QPI Visualiser with custom layout: top real space (full width), bottom two plots (half width each)."""
+    
+    def _setup_figure(self):
+        """Initialize the figure with custom gridspec layout."""
+        # Create figure with balanced layout:
+        # Left: Real space LDOS plot (spans full height)  
+        # Right: Two stacked plots (momentum space top, dispersion bottom)
+        self.fig = plt.figure(figsize=(8, 5), dpi=300)
+        
+        gs = gridspec.GridSpec(2, 2, figure=self.fig, 
+                              height_ratios=[1, 1],
+                              width_ratios=[1.3, 1],
+                              hspace=0.45, wspace=0.5,
+                              top=0.95, bottom=0.08, 
+                              left=0.08, right=0.95)
+        
+        # Left: Real space LDOS plot (spans both rows)
+        self.ax1 = self.fig.add_subplot(gs[:, 0])  # All rows, first column
+        
+        # Right top: Momentum space plot
+        self.ax2 = self.fig.add_subplot(gs[0, 1])  # Top right
+        
+        # Right bottom: Dispersion plot
+        self.ax4 = self.fig.add_subplot(gs[1, 1])  # Bottom right
+        
+        # Set up real space plot (LDOS)
+        self.im1 = self.ax1.imshow(
+            np.zeros((self.params.gridsize, self.params.gridsize)), 
+            origin='lower', cmap=DEFAULT_LDOS_COLORMAP, extent=[0, self.params.L, 0, self.params.L]
+        )
+        self.ax1.set_title("LDOS around impurities", fontsize=12)
+        self.ax1.set_xlabel('x (physical units)', fontsize=10)
+        self.ax1.set_ylabel('y (physical units)', fontsize=10)
+        self.ax1.tick_params(axis='both', which='major', labelsize=8)
+        self.ax1.tick_params(axis='both', which='major', labelsize=12)
+        plt.colorbar(self.im1, ax=self.ax1, label='LDOS').ax.tick_params(labelsize=12)
+        self.ax1.figure.axes[-1].set_ylabel('LDOS', fontsize=10)
+        
+        # Add panel label (a)
+        self.ax1.text(0.02, 0.98, '(a)', transform=self.ax1.transAxes, fontsize=12, fontweight='bold',
+                     verticalalignment='top', horizontalalignment='left',
+                     bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        # Add energy text to real space plot
+        self.energy_text = self.ax1.text(0.02, 0.88, '', transform=self.ax1.transAxes,
+                                        verticalalignment='top', fontsize=9,
+                                        bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        # Set up momentum space plot
+        dk = 2 * np.pi / self.params.L
+        k_actual_max = dk * self.params.gridsize / 2
+        
+        # Set momentum space bounds based on energy range for better focus
+        max_kF = np.sqrt(self.params.E_max)
+        k_zoom = min(k_actual_max, max_kF * 5)  # Show up to 5*kF_max for QPI features
+        
+        self.im2 = self.ax2.imshow(
+            np.zeros((self.params.gridsize, self.params.gridsize)), 
+            origin='lower', cmap='plasma',
+            extent=[-k_zoom, k_zoom, -k_zoom, k_zoom]  # Use zoomed range
+        )
+        self.ax2.set_xlim(-k_zoom, k_zoom)
+        self.ax2.set_ylim(-k_zoom, k_zoom)
+        self.ax2.set_title('Momentum Space: QPI Pattern', fontsize=12)
+        self.ax2.set_xlabel('$k_x$ (1/a)', fontsize=10)
+        self.ax2.set_ylabel('$k_y$ (1/a)', fontsize=10)
+        self.ax2.tick_params(axis='both', which='major', labelsize=8)
+        self.ax2.grid(False)
+        self.ax2.tick_params(axis='both', which='major', labelsize=11)
+        plt.colorbar(self.im2, ax=self.ax2, label='log|FFT(LDOS)|').ax.tick_params(labelsize=11)
+        self.ax2.figure.axes[-1].set_ylabel('log|FFT(LDOS)|', fontsize=10)
+        
+        # Add panel label (b)
+        self.ax2.text(0.05, 0.95, '(b)', transform=self.ax2.transAxes, fontsize=12, fontweight='bold',
+                     verticalalignment='top', horizontalalignment='left',
+                     bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        # Set up dispersion plot
+        self.ax4.set_xlabel('$k_F$ (1/length units)', fontsize=10)
+        self.ax4.set_ylabel('Energy E', fontsize=10)
+        self.ax4.set_title('Dispersion: Theory vs Extracted', fontsize=12)
+        self.ax4.tick_params(axis='both', which='major', labelsize=8)
+        self.ax4.grid(True, alpha=0.3)
+        self.ax4.tick_params(axis='both', which='major', labelsize=11)
+        
+        # Add panel label (c)
+        self.ax4.text(0.05, 0.95, '(c)', transform=self.ax4.transAxes, fontsize=12, fontweight='bold',
+                     verticalalignment='top', horizontalalignment='left',
+                     bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        # Set plot bounds based on energy range
+        k_disp_max = np.sqrt(self.params.E_max) + 1
+        
+        # Plot theoretical dispersion based on model type
+        k_theory = np.linspace(-k_disp_max, k_disp_max, 400)
+        self.theory_lines = self._plot_theoretical_dispersion(k_theory)
+        
+        self.extracted_scatter = self.ax4.scatter(
+            [], [], c='red', s=50, alpha=0.7, label='From q=2k_F peaks'
+        )
+        
+        self.ax4.legend(fontsize=9)
+        self.ax4.set_xlim(-k_disp_max, k_disp_max)
+        self.ax4.set_ylim(self.params.E_min - 2, self.params.E_max + 2)
 
 
 def run_simulation(config_name: str, save_frames: bool = False):
@@ -40,142 +148,19 @@ def run_simulation(config_name: str, save_frames: bool = False):
             rotation_angle=config.rotation_angle,
             disorder_strength=config.disorder_strength,
             zoom_factor=config.zoom_factor,
-            model_type=getattr(config, 'model_type', 'parabolic'),
-            t_prime=getattr(config, 't_prime', 0.0),
-            use_all_bands=getattr(config, 'use_all_bands', False),
-            band_index=getattr(config, 'band_index', 0),
-            # Advanced tight-binding parameters
-            ty=getattr(config, 'ty', 0.6),
-            t_z=getattr(config, 't_z', 0.5),
-            kz_slice=getattr(config, 'kz_slice', 0.0)
+            model_type="parabolic"
         )
         
         # Get impurity positions
         impurity_positions = config.get_impurity_positions()
         print(f"Impurity positions: {len(impurity_positions)} impurities")
-        print(f"Model type: {params.model_type}")
-        
-        # Create tight-binding model
-        model = None
-        if params.model_type != "parabolic":
-            if params.model_type == "square_lattice":
-                model_params = {
-                    't': params.t,
-                    't_prime': params.t_prime,
-                    'a': params.a
-                }
-            elif params.model_type == "graphene":
-                model_params = {
-                    't': params.t,
-                    'a': params.a
-                }
-            elif params.model_type == "cubic_3d":
-                model_params = {
-                    't': params.t,
-                    't_z': getattr(params, 't_z', 0.5),
-                    'a': params.a,
-                    'kz_slice': getattr(params, 'kz_slice', 0.0)
-                }
-            elif params.model_type == "anisotropic":
-                model_params = {
-                    'tx': params.t,
-                    'ty': getattr(params, 'ty', 0.6),
-                    't_prime': params.t_prime,
-                    'a': params.a
-                }
-            elif params.model_type == "honeycomb":
-                model_params = {
-                    't': params.t,
-                    'a': params.a
-                }
-            elif params.model_type == "true_3d_cubic":
-                model_params = {
-                    't': params.t,
-                    't_prime': params.t_prime,
-                    'a': params.a
-                }
-            elif params.model_type == "true_3d_aniso":
-                model_params = {
-                    'tx': params.t,
-                    'ty': getattr(params, 'ty', 0.6),
-                    'tz': getattr(params, 't_z', 0.4),
-                    'a': params.a
-                }
-            elif params.model_type == "true_3d_complex":
-                model_params = {
-                    't1': params.t,
-                    't2': getattr(params, 't_z', 0.3),
-                    't3': getattr(params, 't_prime', 0.1),
-                    'a': params.a
-                }
-            elif params.model_type == "multiband_2band":
-                model_params = {
-                    't1': params.t,
-                    't2': params.t_z, 
-                    'hybridization': params.t_prime,
-                    'offset': 1.0,  # Fixed offset
-                    'a': params.a
-                }
-            elif params.model_type == "multiband_3band":
-                model_params = {
-                    't': params.t,
-                    't_z': params.t_z,
-                    't_inter': params.t_prime,
-                    'a': params.a
-                }
-            elif params.model_type == "multiband_4band":
-                model_params = {
-                    't_d': params.t,
-                    't_p': params.t_z,
-                    't_pd': params.t_prime,
-                    'Delta': 2.0,  # Fixed d-p separation
-                    'a': params.a
-                }
-            elif params.model_type == "ute2_full":
-                model_params = {
-                    't_ff': params.t,
-                    't_fp': params.t_z,
-                    't_pp': params.t_prime,
-                    't_soc': 0.8,  # Fixed SOC strength
-                    'U_onsite': 2.0,
-                    'Te_onsite': 1.5,
-                    'anisotropy_a': 1.0,
-                    'anisotropy_b': 0.8,
-                    'anisotropy_c': 0.6,
-                    'a': params.a
-                }
-            elif params.model_type == "ute2_simplified":
-                model_params = {
-                    't_U': params.t,
-                    't_UTe': params.t_z,
-                    't_aniso_ratio': params.t_prime,
-                    'soc_strength': 0.3,  # Fixed SOC
-                    'a': params.a
-                }
-            else:
-                # Default parameters for unknown models
-                model_params = {
-                    't': params.t,
-                    'a': params.a
-                }
-            
-            model = create_model(params.model_type, **model_params)
-            print(f"Created {params.model_type} model with appropriate parameters")
-            
-            # For tight-binding models, choose appropriate visualization
-            if params.model_type.startswith("true_3d") or params.model_type.startswith("multiband") or params.model_type.startswith("ute2"):
-                print("\n🌟 TRUE 3D MODE: Generating Full 3D Fermi Surface")
-                print("-" * 50)
-                visualize_true_3d_fermi_surface(model, config.name, mu=params.mu)
-            else:
-                print("\n🔬 TIGHT-BINDING MODE: Generating 3D Fermi Surface Only")
-                print("-" * 50)
-                visualize_tight_binding_fermi_surface(model, config.name, mu=params.mu)
-            return True
+        print(f"Using parabolic dispersion model")
         
         # Create and run simulation
         simulation = QPISimulation(params, impurity_positions, model)
-        visualiser = QPIvisualiser(simulation)
+        
+        # Use custom layout visualizer
+        visualiser = CustomLayoutQPIVisualiser(simulation)
         
         # Generate folder structure: outputs/{config_name}/
         import os

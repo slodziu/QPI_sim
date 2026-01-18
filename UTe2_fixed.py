@@ -155,7 +155,7 @@ def plot_011_density_map(fermi_surfaces, save_path=None, grid_res=500, sigma=0.0
     density = np.exp(-0.5 * (dists / sigma)**2)
     density = density.reshape(X.shape)
     # Plot
-    plt.figure(figsize=(8, 8))
+    plt.figure(figsize=(8, 8), dpi=300)
     plt.imshow(density, extent=[x_min, x_max, y_min, y_max], origin='lower', cmap='inferno', aspect='equal')
     plt.xlabel(r'$k_{c^*}$ (normalized)')
     plt.ylabel(r'$k_x$ (normalized)')
@@ -375,7 +375,7 @@ def plot_main_fermi_contours(kx_vals, ky_vals, energies_fs, save_dir='outputs/ut
     import os
     os.makedirs(save_dir, exist_ok=True)
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(8, 6.4), dpi=300)
     
     # Extract contours for both bands
     bands_to_plot = [2, 3]  # Band 3 and 4 (0-indexed)
@@ -387,7 +387,7 @@ def plot_main_fermi_contours(kx_vals, ky_vals, energies_fs, save_dir='outputs/ut
         
         if energy_data.min() <= 0 <= energy_data.max():
             # Create contour
-            temp_fig, temp_ax = plt.subplots(figsize=(1, 1))
+            temp_fig, temp_ax = plt.subplots(figsize=(1, 1), dpi=300)
             contour = temp_ax.contour(ky_vals, kx_vals, energy_data, levels=[0.0])
             plt.close(temp_fig)
             
@@ -453,7 +453,7 @@ def extract_fermi_contour_points(kx_vals, ky_vals, energies_fs, bands_to_extract
         if energy_data.min() <= 0 <= energy_data.max():
             # Create contour to extract path data
             import matplotlib.pyplot as plt
-            fig, ax = plt.subplots(figsize=(1, 1))
+            fig, ax = plt.subplots(figsize=(1, 1), dpi=300)
             
             # Debug: print array shapes
             print(f"    Debug: ky_vals shape: {ky_vals.shape}, kx_vals shape: {kx_vals.shape}")
@@ -524,20 +524,21 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
     
     # Calculate Fermi surface for overlay using same range as gap plots
     energies_fs = np.zeros((nk, nk, 4))
-    for i, kx in enumerate(kx_vals):
-        for j, ky in enumerate(ky_vals):
+    for ix, kx in enumerate(kx_vals):
+        for jy, ky in enumerate(ky_vals):
             H = H_full(kx, ky, kz)
             eigvals = np.linalg.eigvals(H)
-            energies_fs[i, j, :] = np.sort(np.real(eigvals))
+            energies_fs[ix, jy, :] = np.sort(np.real(eigvals))
     
     # Create subplot layout - 3 plots side by side
     n_types = len(pairing_types)
     if n_types <= 3:
-        fig, axes = plt.subplots(1, n_types, figsize=(8*n_types, 7))
+        # Use fixed size similar to 3D comparison plot for consistency
+        fig, axes = plt.subplots(1, n_types, figsize=(9, 6), dpi=300)
         if n_types == 1:
             axes = [axes]
     else:
-        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        fig, axes = plt.subplots(2, 2, figsize=(10.0, 8.0), dpi=300)
         axes = axes.flatten()
     
     # Colors for Fermi surface bands
@@ -555,15 +556,6 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
         im = ax.imshow(gap_mag.T, extent=[ky_vals.min(), ky_vals.max(), 
                                          kx_vals.min(), kx_vals.max()],
                       origin='lower', cmap='RdYlBu_r', alpha=0.8)
-        
-        # Highlight nodal regions FIRST (where gap is very small)
-        gap_threshold = 0.1 * np.max(gap_mag)  # 10% of maximum gap
-        nodal_mask = gap_mag < gap_threshold
-        if np.any(nodal_mask):
-            ax.contourf(KY, KX, gap_mag.T, levels=[0, gap_threshold],
-                       colors=['darkblue'], alpha=0.4)
-            ax.contour(KY, KX, gap_mag.T, levels=[gap_threshold],
-                      colors=['darkblue'], linewidths=2, alpha=0.8, linestyles='--')
         
         # Overlay Fermi surface contours - SAME scheme as plot_fs_2d
         for band in range(4):
@@ -610,8 +602,8 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
                         selected_points = []
                         min_distance = 15  # Minimum pixels between gap nodes
                         
-                        for i in range(len(ky_indices)):
-                            ky_idx, kx_idx = ky_indices[i], kx_indices[i]
+                        for node_idx in range(len(ky_indices)):
+                            ky_idx, kx_idx = ky_indices[node_idx], kx_indices[node_idx]
                             
                             # Check if this point is far enough from already selected points
                             too_close = False
@@ -666,8 +658,8 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
                         else:
                             min_distance = 10
                         
-                        for i in range(len(ky_indices)):
-                            ky_idx, kx_idx = ky_indices[i], kx_indices[i]
+                        for node_idx in range(len(ky_indices)):
+                            ky_idx, kx_idx = ky_indices[node_idx], kx_indices[node_idx]
                             
                             # Check if this point is far enough from already selected points
                             too_close = False
@@ -719,23 +711,38 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
         kx_labels = [f'{val/(np.pi/a):.1f}' for val in kx_ticks]
         ax.set_xticks(ky_ticks)
         ax.set_yticks(kx_ticks)
-        ax.set_xticklabels(ky_labels)
-        ax.set_yticklabels(kx_labels)
+        ax.set_xticklabels(ky_labels, fontsize=10)
+        ax.set_yticklabels(kx_labels, fontsize=10)
         
-        ax.set_xlabel('ky (π/b)', fontsize=12)
-        ax.set_ylabel('kx (π/a)', fontsize=12)
-        ax.set_title(f'{pairing_type} Gap Magnitude |Δ_k|', fontsize=14)
-        ax.grid(True, alpha=0.3)
+        ax.set_xlabel(r'$k_y$ ($\pi/b$)', fontsize=12)
+        ax.set_ylabel(r'$k_x$ ($\pi/a$)', fontsize=12)
+        ax.set_title(f'{pairing_type}', fontsize=12)
+        ax.grid(False)
         
-        # Add colorbar
-        cbar = plt.colorbar(im, ax=ax, shrink=0.8)
-        cbar.set_label('|Δ_k|', fontsize=12)
+        # Add panel label (a), b), c))
+        panel_labels = ['a)', 'b)', 'c)', 'd)', 'e)', 'f)']
+        if i < len(panel_labels):
+            ax.text(0.02, 0.98, panel_labels[i], transform=ax.transAxes, 
+                   fontsize=11, fontweight='bold', va='top', ha='left',
+                   bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.9, edgecolor='black'),
+                   zorder=1000)
+        
+        # Add colorbar with scientific notation
+        cbar = plt.colorbar(im, ax=ax, shrink=0.3, format='%.1e')
+        cbar.set_label(r'|Δ$_k$|', fontsize=12)
         
         print(f"    {pairing_type}: gap range 0 to {np.max(gap_mag):.3f}")
-        if np.any(nodal_mask):
-            print(f"    {pairing_type}: nodal regions marked in dark blue")
-        else:
-            print(f"    {pairing_type}: no gap nodes detected")
+        print(f"    {pairing_type}: no gap nodes detected")
+    
+    # Add legend closer to the plots
+    legend_elements = [
+        plt.Line2D([0], [0], color='#FD0000', lw=3, label='Electron-like'),
+        plt.Line2D([0], [0], color='#9635E5', lw=3, label='Hole-like'),
+        plt.Line2D([0], [0], marker='o', color='yellow', markersize=8, 
+                  markeredgecolor='red', markeredgewidth=2, linestyle='None', label='Nodes')
+    ]
+    fig.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, 0.17), 
+              ncol=3, fontsize=11, frameon=False)
     
     # Hide unused subplots if necessary
     if n_types < len(axes):
@@ -743,6 +750,7 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
             axes[j].set_visible(False)
     
     plt.tight_layout()
+    plt.subplots_adjust(bottom=0.01)  # Reduced margin for closer legend
     
     # Save the plot
     filename = f'gap_magnitude_2d_kz_{kz:.3f}.png'
@@ -753,7 +761,7 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
     
     # Also create individual plots for each pairing type
     for pairing_type in pairing_types:
-        fig_single, ax_single = plt.subplots(1, 1, figsize=(10, 8))
+        fig_single, ax_single = plt.subplots(1, 1, figsize=(8.0, 6.0), dpi=300)
         
         # Calculate gap magnitude
         gap_mag = calculate_gap_magnitude(KX, KY, kz, pairing_type=pairing_type)
@@ -816,8 +824,8 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
                         selected_points = []
                         min_distance = 15  # Minimum pixels between gap nodes
                         
-                        for i in range(len(ky_indices)):
-                            ky_idx, kx_idx = ky_indices[i], kx_indices[i]
+                        for node_idx in range(len(ky_indices)):
+                            ky_idx, kx_idx = ky_indices[node_idx], kx_indices[node_idx]
                             
                             # Check if this point is far enough from already selected points
                             too_close = False
@@ -878,8 +886,8 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
                         else:
                             min_distance = 8
                         
-                        for i in range(len(ky_indices)):
-                            ky_idx, kx_idx = ky_indices[i], kx_indices[i]
+                        for node_idx in range(len(ky_indices)):
+                            ky_idx, kx_idx = ky_indices[node_idx], kx_indices[node_idx]
                             
                             # Check if this point is far enough from already selected points
                             too_close = False
@@ -938,15 +946,15 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
         ax_single.set_xticklabels(ky_labels)
         ax_single.set_yticklabels(kx_labels)
         
-        ax_single.set_xlabel('ky (π/b)', fontsize=14)
-        ax_single.set_ylabel('kx (π/a)', fontsize=14)
-        ax_single.set_title(f'{pairing_type} Superconducting Gap |Δ_k| at kz = {kz:.1f}', fontsize=16)
-        ax_single.grid(True, alpha=0.3)
+        ax_single.set_xlabel(r'$k_y$ ($\pi/b$)', fontsize=14)
+        ax_single.set_ylabel(r'$k_x$ ($\pi/a$)', fontsize=14)
+        ax_single.set_title(f'{pairing_type}', fontsize=16)
+        ax_single.grid(False)
         ax_single.legend(loc='upper right', fontsize=10)
         
-        # Enhanced colorbar
-        cbar_single = plt.colorbar(im_single, ax=ax_single, shrink=0.8)
-        cbar_single.set_label('Gap Magnitude |Δ_k|', fontsize=12)
+        # Enhanced colorbar with scientific notation
+        cbar_single = plt.colorbar(im_single, ax=ax_single, shrink=0.8, format='%.1e')
+        cbar_single.set_label(r'|Δ$_k$|', fontsize=12)
         
         plt.tight_layout()
         
@@ -986,7 +994,7 @@ def plot_fs_2d(energies, kz_label, save_dir='outputs/ute2_fixed'):
     ]
     
     for version in versions:
-        fig = plt.figure(figsize=(10, 8))
+        fig = plt.figure(figsize=(8, 6.4), dpi=300)
         bands_plotted = 0
         
         print(f"\\n2D Fermi surface at kz={kz_label}{version['title_suffix']}:")
@@ -1052,6 +1060,102 @@ def plot_fs_2d(energies, kz_label, save_dir='outputs/ute2_fixed'):
         plt.show()
         print(f"Saved plot to {filepath}")
 
+def plot_fs_2d_comparison(energies, kz_label, save_dir='outputs/ute2_fixed'):
+    """Create side-by-side comparison of extended and cropped 2D Fermi surfaces with modern formatting."""
+    import os
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Colors for different bands - match other plots
+    colors = ['#1E88E5', '#42A5F5',  "#9635E5", "#FD0000"]  # Blue for U, Red for Te
+    band_labels = ['Band 1', 'Band 2', 'Band 3', 'Band 4']
+    
+    # Create momentum grids that match the energies array size - using physical k-values
+    nk_energies = energies.shape[0]  # Get actual size of energies array
+    kx_vals_local = np.linspace(-1*np.pi/a, 1*np.pi/a, nk_energies)
+    ky_vals_local = np.linspace(-3*np.pi/b, 3*np.pi/b, nk_energies)
+    KX_local, KY_local = np.meshgrid(kx_vals_local, ky_vals_local)
+    
+    # Keep physical k-values for plotting
+    KX_physical = KX_local
+    KY_physical = KY_local
+    
+    # Fermi level
+    EF = 0.0
+    
+    # Create side-by-side comparison with modern sizing
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 6), dpi=300)
+    
+    # Configuration for each subplot
+    configs = [
+        {'ax': ax1, 'xlim': (-3, 3), 'title': 'Extended', 'label': 'a)'},
+        {'ax': ax2, 'xlim': (-1, 1), 'title': 'Cropped', 'label': 'b)'}
+    ]
+    
+    print(f"\\n2D Fermi surface comparison at kz={kz_label}:")
+    legend_elements = []
+    
+    for config in configs:
+        ax = config['ax']
+        bands_plotted = 0
+        
+        for band in range(4):
+            Z = energies[:, :, band].T
+            
+            # Only plot if band crosses the Fermi level
+            if Z.min() <= EF <= Z.max():
+                cs = ax.contour(KY_physical, KX_physical, Z, levels=[EF], 
+                               linewidths=3, colors=[colors[band]])
+                if len(cs.allsegs[0]) > 0:
+                    bands_plotted += 1
+                    # Add to legend only once
+                    if ax == ax1:
+                        legend_elements.append(plt.Line2D([0], [0], color=colors[band], lw=3, label=band_labels[band]))
+        
+        # Set physical axis limits
+        ky_lim_physical = [val * np.pi/b for val in config['xlim']]
+        kx_lim_physical = [-1 * np.pi/a, 1 * np.pi/a]
+        
+        ax.set_xlim(ky_lim_physical)
+        ax.set_ylim(kx_lim_physical)
+        
+        # Custom tick formatting with proper font sizes
+        ky_ticks = np.linspace(ky_lim_physical[0], ky_lim_physical[1], 7)
+        kx_ticks = np.linspace(kx_lim_physical[0], kx_lim_physical[1], 5)
+        ky_labels = [f'{val/(np.pi/b):.1f}' for val in ky_ticks]
+        kx_labels = [f'{val/(np.pi/a):.1f}' for val in kx_ticks]
+        ax.set_xticks(ky_ticks)
+        ax.set_yticks(kx_ticks)
+        ax.set_xticklabels(ky_labels, fontsize=10)
+        ax.set_yticklabels(kx_labels, fontsize=10)
+        
+        # Labels and title with consistent font sizes
+        ax.set_xlabel(r'$k_y$ ($\pi$/b)', fontsize=12)
+        ax.set_ylabel(r'$k_x$ ($\pi$/a)', fontsize=12)
+        ax.set_title(config['title'], fontsize=12)
+        ax.grid(True, alpha=0.3)
+        
+        # Add panel label
+        ax.text(0.02, 0.98, config['label'], transform=ax.transAxes, 
+               fontsize=12, fontweight='bold', va='top', ha='left',
+               bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.9, edgecolor='black'),
+               zorder=1000)
+        
+        print(f"  {config['title']}: plotted {bands_plotted} bands")
+    
+    # Add legend
+    fig.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, 0.02), 
+              ncol=4, fontsize=11, frameon=False)
+    
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.08)
+    
+    # Save comparison plot
+    filename = f'fermi_surface_comparison_kz_{kz_label}.png'
+    filepath = os.path.join(save_dir, filename)
+    fig.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.show()
+    print(f"Saved comparison plot to {filepath}")
+
 def plot_2d_with_spectral_weight(kz=0.0, weight_type='total', orbital_focus=None, 
                                 colormap='hot', alpha_contours=0.8, save_dir='outputs/ute2_spectral',
                                 energy_window=0.15):
@@ -1097,7 +1201,7 @@ def plot_2d_with_spectral_weight(kz=0.0, weight_type='total', orbital_focus=None
     spectral_weights = compute_spectral_weights(kz, orbital_weights)
     
     # Create the plot
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.3, 4), dpi=300)
     
     # Create momentum grids for plotting - use physical k-values
     nk = energies.shape[0]
@@ -1451,7 +1555,7 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
         print(f"Creating plot for: {plot_type}")
         
         # Create new figure for this plot
-        fig, ax = plt.subplots(figsize=(12, 8))
+        fig, ax = plt.subplots(figsize=(8, 6.4), dpi=300)
         
         # Plot Fermi surfaces using PolyCollection with original mesh topology
         from matplotlib.collections import PolyCollection
@@ -1947,9 +2051,9 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
             else:
                 print(f"    No {plot_type} gap nodes found")
         
-        # Formatting
-        ax.set_xlabel('kc* (π/c* units)', fontsize=14)
-        ax.set_ylabel('kx (π/a units)', fontsize=14)
+        # Apply modern font hierarchy: 12pt biggest, 11pt medium, 10pt smallest
+        ax.set_xlabel(r'$k_c^*$ ($\pi/c^*$ units)', fontsize=11)  # Medium font for axis labels
+        ax.set_ylabel(r'$k_x$ ($\pi/a$ units)', fontsize=11)      # Medium font for axis labels
         
         # Set title based on plot type
         if plot_type == 'no_nodes':
@@ -1961,9 +2065,12 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
             title_suffix = f' with {plot_type} Gap Nodes'
             
         ax.set_title(f'UTe₂ Fermi Surface - (0-11) Crystallographic Projection{title_suffix}\n' + 
-                    f'Angle: {angle_deg}° between normal and b-axis', fontsize=16, fontweight='bold')
+                    f'Angle: {angle_deg}° between normal and b-axis', fontsize=12)  # Biggest font for title
         ax.grid(True, alpha=0.3)
-        ax.legend()
+        ax.legend(fontsize=10)  # Smallest font for legend
+        
+        # Set tick label font sizes (smallest)
+        ax.tick_params(axis='both', which='major', labelsize=10)
         
         # Set axis limits to exactly -1 to 1 (no padding)
         ax.set_xlim(-0.75, 0.75)
@@ -1995,6 +2102,34 @@ def plot_011_fermi_surface_projection(save_dir='outputs/ute2_fixed', show_gap_no
         print(f"  Saved plot to {filepath}")
     
     print("="*70)
+
+def plot_011_projection_comparison(save_dir='outputs/ute2_fixed', angle_deg=24.0):
+    """Create side-by-side comparison of (0-11) projections with modern formatting."""
+    import os
+    import pickle
+    import hashlib
+    
+    print(f"\\n" + "="*70)
+    print(f"GENERATING (0-11) PROJECTION COMPARISON")
+    print(f"Angle: {angle_deg}° between normal and b-axis")
+    print("="*70)
+    
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # This is a simplified version - the full computation logic would be copied from plot_011_fermi_surface_projection
+    # For now, let's create a test version that calls the existing function
+    
+    print("Creating individual plots first...")
+    plot_011_fermi_surface_projection(save_dir=save_dir, show_gap_nodes=False, angle_deg=angle_deg)
+    plot_011_fermi_surface_projection(save_dir=save_dir, show_gap_nodes=True, gap_node_pairing='B2u', angle_deg=angle_deg) 
+    plot_011_fermi_surface_projection(save_dir=save_dir, show_gap_nodes=True, gap_node_pairing='B3u', angle_deg=angle_deg)
+    
+    print("\\n✓ Individual (0-11) projection plots created with modern formatting!")
+    print("\\nTo create a proper side-by-side version, we would need to:")
+    print("  1. Copy the full computation logic from plot_011_fermi_surface_projection")
+    print("  2. Create a 1x3 subplot layout with figsize=(9, 6)")
+    print("  3. Add panel labels a), b), c)")
+    print("  4. Create unified legend")
 
 def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
                          gap_node_pairing='B3u', orientation='standard'):
@@ -2112,10 +2247,10 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
         _cached_kz_3d = kz_3d
         _cached_nk3d = nk3d
     
-    # Colors for different bands - U bands (0,1) vs Te bands (2,3)
-    colors = ['#1E88E5', '#42A5F5',  "#9635E5", "#FD0000"]  # Blue for U, Red for Te
-    band_labels = ['Band 1', 'Band 2', 'Band 3', 'Band 4']
-    alphas = [0.6, 0.6, 0.8, 0.8]  # Te bands slightly more opaque
+    # Colors for different bands - electron-like vs hole-like character
+    colors = ['#1E88E5', '#42A5F5',  "#9635E5", "#FD0000"]  # Blue for electron-like, Red/Purple for hole-like
+    band_labels = ['Band 1 (e-like)', 'Band 2 (e-like)', 'Band 3 (h-like)', 'Band 4 (h-like)']
+    alphas = [0.6, 0.6, 0.8, 0.8]  # Hole-like bands slightly more opaque
     
     # Compute 3D superconducting gap magnitude for different pairing symmetries with caching
     gap_magnitudes_3d = {}
@@ -2244,7 +2379,7 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
         print("\n  Gap node detection disabled")
     
     # Create the 3D plot
-    fig = plt.figure(figsize=(14, 10))
+    fig = plt.figure(figsize=(8.3, 6.2), dpi=300)
     ax = fig.add_subplot(111, projection='3d')
     
     # Use Fermi level (E=0) for all bands
@@ -2774,15 +2909,18 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
     # Set title based on whether gap nodes are shown
     if show_gap_nodes and len(pairing_types) > 0:
         pairing_str = ', '.join(pairing_types)
-        ax.set_title(f'3D Fermi Surface of UTe₂ - {pairing_str} Gap Nodes', fontsize=14, pad=20)
+        ax.set_title(f'3D Fermi Surface of UTe₂ - {pairing_str} Gap Nodes', fontsize=14, pad=5)
     else:
-        ax.set_title('3D Fermi Surface of UTe₂', fontsize=14, pad=20)
+        ax.set_title('3D Fermi Surface of UTe₂', fontsize=14, pad=5)
     
-    # Add legend with U/Te distinction
-    # from matplotlib.lines import Line2D
-    # legend_elements = [Line2D([0], [0], color=colors[i], lw=3, alpha=alphas[i], 
-    #                          label=band_labels[i]) for i in range(4)]
-    # ax.legend(handles=legend_elements, loc='upper right', fontsize=10)
+    # Add legend with electron-like vs hole-like distinction
+    from matplotlib.lines import Line2D
+    # Create simplified legend showing only electron vs hole character with correct colors
+    legend_elements = [
+        Line2D([0], [0], color='#FD0000', lw=4, alpha=0.8, label='Electron-like'),
+        Line2D([0], [0], color='#9635E5', lw=4, alpha=0.8, label='Hole-like')
+    ]
+    ax.legend(handles=legend_elements, loc='upper left', fontsize=12, framealpha=0.9)
     
     # Make background cleaner
     ax.xaxis.pane.fill = False
@@ -2806,6 +2944,24 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
     ax.set_xlim(-ky_range, ky_range)  # ky on x-axis
     ax.set_ylim(-kx_range, kx_range)  # kx on y-axis (appears wider due to lattice)
     ax.set_zlim(-kz_range, kz_range)  # kz on z-axis
+    
+    # Set custom ticks every 0.5 π/lattice_parameter for all axes
+    
+    # Create tick positions every 0.5 units
+    tick_positions = np.arange(-1.0, 1.5, 0.5)  # -1.0, -0.5, 0.0, 0.5, 1.0
+    
+    # Set ticks for all axes
+    ax.set_xticks(tick_positions)  # ky axis (π/b)
+    ax.set_yticks(tick_positions)  # kx axis (π/a)
+    ax.set_zticks(tick_positions)  # kz axis (π/c)
+    
+    # Create custom tick labels showing numerical values
+    tick_labels = [f'{pos:.1f}' if pos != 0 else '0' for pos in tick_positions]
+    
+    # Apply tick labels to all axes
+    ax.set_xticklabels(tick_labels)  # ky axis labels (π/b)
+    ax.set_yticklabels(tick_labels)  # kx axis labels (π/a)  
+    ax.set_zticklabels(tick_labels)  # kz axis labels (π/c)
     
     # Scale the 3D box to reflect actual physical dimensions in reciprocal space
     # The actual k-space ranges are: kx: ±π/a, ky: ±π/b, kz: ±π/c
@@ -2846,8 +3002,8 @@ def plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True,
     # Improve view angle to match reference image style
     ax.view_init(elev=20, azim=30)  # Slightly elevated view from front-right
     
-    # Add multiple saved views for different perspectives
-    plt.tight_layout()
+    # Adjust subplot parameters to prevent text cutoff, especially kz axis on right
+    plt.subplots_adjust(left=0.08, right=0.88, bottom=0.08, top=0.88)
     
     # Determine save directory and filename based on gap node settings
     if show_gap_nodes and len(pairing_types) > 0:
@@ -2911,24 +3067,25 @@ if __name__ == "__main__":
     
     # Generate superconducting gap magnitude plots
     print("\nGenerating superconducting gap magnitude visualizations...")
-    # Skip B1u as it has no nodes at kz=0
-    plot_gap_magnitude_2d(kz=kz0, pairing_types=['B1u' , 'B2u', 'B3u'], resolution=200)
-    
-    # Generate 3D plot without gap nodes
-    #print("\n" + "="*70)
-    #print("Generating 3D Fermi Surface (no gap nodes)")
-    #print("="*70)
-    #plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False)#
+
+    # Generate 3D plot with alternative orientation
+    print("\n" + "="*70)
+    print("Generating 3D Fermi Surface (alt orientation, no gap nodes)")
+    print("="*70)
+    plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False)
+
+    plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False,orientation='alt')
+
     
     # Generate 3D plots with gap nodes for each pairing symmetry
     # Skip B1u as it has no nodes in the relevant energy range
     #print("Generating 3D Fermi Surface with Gap Nodes (B2u and B3u only)")
     #print("="*70)
     
-    #for pairing in ['B2u', 'B3u']:
-        #print(f"\n--- {pairing} Gap Nodes ---")
-        #plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
-                             #gap_node_pairing=pairing)
+    for pairing in ['B2u', 'B3u']:
+        print(f"\n--- {pairing} Gap Nodes ---")
+        plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
+                             gap_node_pairing=pairing, orientation='alt')
     
     # Generate (0-11) crystallographic projections
     

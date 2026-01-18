@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
+Same-Energy QPI Comparison Tool
+
 Generate single-frame comparisons at the same energy for different impurity counts.
-This helps verify that ring radius is consistent at the same energy.
+This helps verify that QPI ring radii are consistent at the same energy across
+different impurity configurations, validating the simulation accuracy.
 """
 
 import sys
@@ -10,6 +13,9 @@ import copy
 from qpi_G_OOP import SystemParameters, GreensFunction, ImpuritySystem, QPISimulation, QPIVisualizer
 from config import RANDOM_10_IMPURITIES, RANDOM_30_IMPURITIES, setup_n_random_positions
 import matplotlib.pyplot as plt
+
+# LDOS colormap for comparison plots - can be customized
+LDOS_COLORMAP = 'coolwarm'  # Perceptually uniform for comparisons
 
 def run_comparison(E_test=50.0):
     """Run comparison at a specific energy."""
@@ -100,7 +106,7 @@ def run_comparison(E_test=50.0):
         
         # LDOS
         ax = axes[i, 0]
-        im = ax.imshow(data['LDOS'], origin='lower', cmap='seismic')
+        im = ax.imshow(data['LDOS'], origin='lower', cmap=LDOS_COLORMAP)
         ax.set_title(f'{n_imp} impurities: LDOS at E={E_test:.1f}')
         plt.colorbar(im, ax=ax)
         
