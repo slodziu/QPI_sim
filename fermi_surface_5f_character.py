@@ -39,10 +39,12 @@ def compute_5f_character_on_fermi_contours(kz=0.0, resolution=512):
         for j, ky in enumerate(ky_vals):
             H = H_full(kx, ky, kz)
             eigenvals, eigenvecs = np.linalg.eigh(H)
-            energies[i, j, :] = eigenvals
+            # Sort eigenvalues and eigenvectors to match UTe2_fixed.py
+            idx = np.argsort(np.real(eigenvals))
+            energies[i, j, :] = np.real(eigenvals[idx])
             # Calculate 5f character (assuming index 0 is the relevant f-orbital)
             for n in range(4):
-                character_5f[i, j, n] = abs(eigenvecs[0, n])**2 
+                character_5f[i, j, n] = abs(eigenvecs[0, idx[n]])**2 
 
     # 3. SYMMETRIZATION STEP (Crucial for "Publication Quality")
     # UTe2 (Immm) has mirror symmetries. We enforce them to remove numerical noise.

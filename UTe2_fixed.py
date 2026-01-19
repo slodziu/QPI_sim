@@ -18,26 +18,24 @@ b = 0.61
 c = 1.39   
 
 # (0-11) plane crystallographic parameters
-# c* ≈ 0.76 nm is the projected lattice spacing in the (0-11) plane
-# This is NOT the reciprocal lattice parameter, but the effective spacing
-c_star = 0.76  # nm, projected lattice spacing in (0-11) plane
+c_star = 0.76  # nm, intertellurium distance
 
 
-# U parameters (verified against paper)
-muU = -0.355
+# U parameters 
+muU = -0.35
 DeltaU = 0.38
 tU = 0.17
 tpU = 0.08
-tch_U = 0.015
+tch_U = 0.01
 tpch_U = 0.01
 tz_U = -0.0375
 
-# Te parameters (updated to match paper exactly)
+# Te parameters 
 muTe = -2.25
 DeltaTe = -1.4
 tTe = -1.5  # hopping along Te(2) chain in b direction
 tch_Te = 0  # hopping between chains in a direction 
-tz_Te = -0.05  # hopping between chains along c axis
+tz_Te = -0.05 # hopping between chains along c axis
 delta = 0.13 #try 0.1 later
 
 # momentum grid for kx-ky plane (in nm^-1, will be converted to π/a, π/b units for plotting)
@@ -59,25 +57,25 @@ def HU_block(kx, ky, kz):
         H[0,0] = diag
         H[1,1] = diag
         H[0,1] = real_off + complex_amp
-        H[1,0] = real_off + np.conj(complex_amp)
+        H[1,0] = real_off + np.conj(complex_amp)  # Properly conjugated
     else:
-        # Vectorissed
+        # Vectorized
         shape = kx.shape
         H = np.zeros(shape + (2, 2), dtype=complex)
         H[..., 0, 0] = diag
         H[..., 1, 1] = diag
         H[..., 0, 1] = real_off + complex_amp
-        H[..., 1, 0] = real_off + np.conj(complex_amp)
+        H[..., 1, 0] = real_off + np.conj(complex_amp)  # Properly conjugated
     return H
 
 def HTe_block(kx, ky, kz):
     """2x2 Hamiltonian for Te orbitals - Vectorized version"""
-    # Diagonal elements: μTe (no chain hopping since tch_Te = 0 in paper)
-    diag = muTe
+    # Diagonal elements: μTe - 2t_{ch,Te} cos(k_x a)
+    diag = muTe - 2*tch_Te*np.cos(kx*a)
     # Off-diagonal elements from paper
     real_off = -DeltaTe
     complex_term1 = -tTe * np.exp(-1j * ky * b)  # hopping along b direction
-    complex_term2 = -tz_Te * np.cos(kz * c / 2) * np.cos(kx * a / 2) * np.cos(ky * b / 2)
+    complex_term2 = -2*tz_Te * np.cos(kz * c / 2) * np.cos(kx * a / 2) * np.cos(ky * b / 2)
     
     # Handle both scalar and array inputs
     if np.isscalar(kx):
@@ -85,7 +83,7 @@ def HTe_block(kx, ky, kz):
         H[0,0] = diag
         H[1,1] = diag
         H[0,1] = real_off + complex_term1 + complex_term2
-        H[1,0] = real_off + np.conj(complex_term1) + complex_term2  #
+        H[1,0] = real_off + np.conj(complex_term1) + np.conj(complex_term2)  # Fixed: conjugate both terms
     else:
         # Vectorized: shape (..., 2, 2)
         shape = kx.shape
@@ -93,7 +91,7 @@ def HTe_block(kx, ky, kz):
         H[..., 0, 0] = diag
         H[..., 1, 1] = diag
         H[..., 0, 1] = real_off + complex_term1 + complex_term2
-        H[..., 1, 0] = real_off + np.conj(complex_term1) + complex_term2
+        H[..., 1, 0] = real_off + np.conj(complex_term1) + np.conj(complex_term2)  # Fixed: conjugate both terms
     return H
 
 def H_full(kx, ky, kz):
@@ -128,6 +126,66 @@ def H_full(kx, ky, kz):
 import matplotlib.pyplot as plt
 from scipy.spatial import cKDTree
 import numpy as np
+
+def verify_hamiltonian_hermiticity():
+    """Verify that the Hamiltonian is Hermitian (H† = H)"""
+    print("\n=== Hamiltonian Hermiticity Check ===")
+    
+    # Test at several k-points
+    test_points = [
+        (0, 0, 0),
+        (np.pi/(2*a), np.pi/(2*b), np.pi/(2*c)),
+        (np.pi/a, 0, 0),
+        (0, np.pi/b, 0),
+        (0, 0, np.pi/c),
+        (np.pi/a, np.pi/b, np.pi/c)
+    ]
+    
+    all_hermitian = True
+    
+    for i, (kx, ky, kz) in enumerate(test_points):
+        print(f"\nTest point {i+1}: kx={kx/(np.pi/a):.2f}π/a, ky={ky/(np.pi/b):.2f}π/b, kz={kz/(np.pi/c):.2f}π/c")
+        
+        # Test individual blocks
+        HU = HU_block(kx, ky, kz)
+        HTe = HTe_block(kx, ky, kz)
+        H_full_matrix = H_full(kx, ky, kz)
+        
+        # Check HU block
+        HU_hermitian = np.allclose(HU, HU.conj().T, atol=1e-12)
+        print(f"  HU block Hermitian: {HU_hermitian}")
+        if not HU_hermitian:
+            print(f"    Max deviation: {np.max(np.abs(HU - HU.conj().T))}")
+            all_hermitian = False
+        
+        # Check HTe block  
+        HTe_hermitian = np.allclose(HTe, HTe.conj().T, atol=1e-12)
+        print(f"  HTe block Hermitian: {HTe_hermitian}")
+        if not HTe_hermitian:
+            print(f"    Max deviation: {np.max(np.abs(HTe - HTe.conj().T))}")
+            all_hermitian = False
+        
+        # Check full matrix
+        H_hermitian = np.allclose(H_full_matrix, H_full_matrix.conj().T, atol=1e-12)
+        print(f"  Full H matrix Hermitian: {H_hermitian}")
+        if not H_hermitian:
+            print(f"    Max deviation: {np.max(np.abs(H_full_matrix - H_full_matrix.conj().T))}")
+            all_hermitian = False
+        
+        # Check eigenvalues are real
+        eigenvals = np.linalg.eigvals(H_full_matrix)
+        max_imag = np.max(np.abs(np.imag(eigenvals)))
+        print(f"  Max imaginary part of eigenvalues: {max_imag:.2e}")
+        if max_imag > 1e-10:
+            all_hermitian = False
+    
+    if all_hermitian:
+        print("\n✓ All Hamiltonian matrices are properly Hermitian!")
+    else:
+        print("\n✗ Some matrices are not Hermitian - check implementation")
+    
+    print("=" * 40)
+    return all_hermitian
 
 def plot_011_density_map(fermi_surfaces, save_path=None, grid_res=500, sigma=0.01):
     """
@@ -198,6 +256,48 @@ def verify_model_parameters():
         print(" All parameters match the paper exactly!")
     else:
         print("✗ Some parameters don't match - check implementation")
+    print("=" * 40)
+
+def verify_matrix_structure():
+    """Verify the matrix structure matches expected UTe2 tight-binding form"""
+    print("\\n=== Matrix Structure Verification ===")
+    
+    # Test at a generic k-point
+    kx, ky, kz = np.pi/(3*a), np.pi/(4*b), np.pi/(5*c)
+    
+    # Get individual blocks
+    HU = HU_block(kx, ky, kz)
+    HTe = HTe_block(kx, ky, kz)
+    H_full_matrix = H_full(kx, ky, kz)
+    
+    print(f"Testing at kx={kx/(np.pi/a):.3f}π/a, ky={ky/(np.pi/b):.3f}π/b, kz={kz/(np.pi/c):.3f}π/c\\n")
+    
+    # Expected structure checks
+    print("HU block (2x2) structure:")
+    print(f"  H[0,0] = H[1,1] (diagonal equality): {abs(HU[0,0] - HU[1,1]) < 1e-12}")
+    print(f"  H[0,1] = H[1,0]* (Hermitian): {abs(HU[0,1] - HU[1,0].conj()) < 1e-12}")
+    print(f"  Off-diagonal has complex part: {abs(np.imag(HU[0,1])) > 1e-12}")
+    
+    print("\\nHTe block (2x2) structure:")
+    print(f"  H[0,0] = H[1,1] (diagonal equality): {abs(HTe[0,0] - HTe[1,1]) < 1e-12}")
+    print(f"  H[0,1] = H[1,0]* (Hermitian): {abs(HTe[0,1] - HTe[1,0].conj()) < 1e-12}")
+    print(f"  Off-diagonal has complex part: {abs(np.imag(HTe[0,1])) > 1e-12}")
+    
+    print("\\nFull 4x4 matrix structure:")
+    print(f"  U block in top-left: {np.allclose(H_full_matrix[:2, :2], HU)}")
+    print(f"  Te block in bottom-right: {np.allclose(H_full_matrix[2:, 2:], HTe)}")
+    print(f"  Hybridization strength δ = {delta}: {abs(H_full_matrix[0,2] - delta) < 1e-12}")
+    print(f"  Upper-right = (Lower-left)†: {np.allclose(H_full_matrix[:2, 2:], H_full_matrix[2:, :2].conj().T)}")
+    
+    # Print actual matrix values for inspection
+    print(f"\\nHU matrix:")
+    print(f"  [{HU[0,0].real:8.4f}+{HU[0,1].imag:7.4f}i  {HU[0,1].real:8.4f}+{HU[0,1].imag:7.4f}i]")  
+    print(f"  [{HU[1,0].real:8.4f}+{HU[1,0].imag:7.4f}i  {HU[1,1].real:8.4f}+{HU[1,1].imag:7.4f}i]")
+    
+    print(f"\\nHTe matrix:")
+    print(f"  [{HTe[0,0].real:8.4f}+{HTe[0,1].imag:7.4f}i  {HTe[0,1].real:8.4f}+{HTe[0,1].imag:7.4f}i]")  
+    print(f"  [{HTe[1,0].real:8.4f}+{HTe[1,0].imag:7.4f}i  {HTe[1,1].real:8.4f}+{HTe[1,1].imag:7.4f}i]")
+    
     print("=" * 40)
 
 def band_energies_on_slice(kz, resolution=300):
@@ -518,8 +618,8 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
     
     # Create momentum grid with physical k-values
     nk = resolution
-    kx_vals = np.linspace(-np.pi/a, np.pi/a, nk)
-    ky_vals = np.linspace(-np.pi/b, np.pi/b, nk)  # Reduced range for gap plots
+    kx_vals = np.linspace(-np.pi/a, np.pi/a, nk)  # -1 to 1 in π/a units
+    ky_vals = np.linspace(-3*np.pi/b, 3*np.pi/b, nk)  # Extended range: -3 to 3 in π/b units
     KX, KY = np.meshgrid(kx_vals, ky_vals)
     
     # Calculate Fermi surface for overlay using same range as gap plots
@@ -705,7 +805,7 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
         ax.set_ylim(kx_vals.min(), kx_vals.max())
         
         # Custom tick formatting to show π/a and π/b units
-        ky_ticks = np.linspace(ky_vals.min(), ky_vals.max(), 5)
+        ky_ticks = np.linspace(ky_vals.min(), ky_vals.max(), 7)  # More ticks for extended range
         kx_ticks = np.linspace(kx_vals.min(), kx_vals.max(), 5)
         ky_labels = [f'{val/(np.pi/b):.1f}' for val in ky_ticks]
         kx_labels = [f'{val/(np.pi/a):.1f}' for val in kx_ticks]
@@ -3072,9 +3172,9 @@ if __name__ == "__main__":
     print("\n" + "="*70)
     print("Generating 3D Fermi Surface (alt orientation, no gap nodes)")
     print("="*70)
-    plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False)
+    #plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False)
 
-    plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False,orientation='alt')
+    #plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False,orientation='alt')
 
     
     # Generate 3D plots with gap nodes for each pairing symmetry
@@ -3082,10 +3182,8 @@ if __name__ == "__main__":
     #print("Generating 3D Fermi Surface with Gap Nodes (B2u and B3u only)")
     #print("="*70)
     
-    for pairing in ['B2u', 'B3u']:
-        print(f"\n--- {pairing} Gap Nodes ---")
-        plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=True, 
-                             gap_node_pairing=pairing, orientation='alt')
+
+    plot_gap_magnitude_2d(kz=0, pairing_types=['B2u', 'B3u'], save_dir='outputs/ute2_fixed')
     
     # Generate (0-11) crystallographic projections
     
