@@ -20,23 +20,94 @@ c = 1.39
 # (0-11) plane crystallographic parameters
 c_star = 0.76  # nm, intertellurium distance
 
+# Parameter sets for different physical scenarios
+parameter_sets = {
+    'DFT': {
+        'delta': 0.1,  # hybridization
+        'muU': -0.35, 'DeltaU': 0.4, 'tU': 0.15, 'tpU': 0.08, 
+        'tch_U': 0.01, 'tpch_U': 0, 'tz_U': -0.03,
+        'muTe': -1.8, 'DeltaTe': -1.5, 'tTe': -1.5, 
+        'tch_Te': 0, 'tz_Te': -0.05
+    },
+    'QuantumOscillation': {
+        'delta': 0.1,  # using same hybridization as DFT 
+        'muU': -0.17, 'DeltaU': 0.05, 'tU': 0.1, 'tpU': 0.08,
+        'tch_U': 0.01, 'tpch_U': 0, 'tz_U': 0.04,
+        'muTe': -1.8, 'DeltaTe': -1.5, 'tTe': -1.5,
+        'tch_Te': -0.03, 'tz_Te': -0.5
+    },
+    'QPIFS': {
+        'delta': 0.1,  # using same hybridization as DFT 
+        'muU': -0.17, 'DeltaU': -0.05, 'tU': 0.1, 'tpU': 0.08,
+        'tch_U': 0.01, 'tpch_U': 0, 'tz_U': 0.04,
+        'muTe': -1.8, 'DeltaTe': -1.5, 'tTe': -1.5,
+        'tch_Te': -0.03, 'tz_Te': -0.5
+    },
+    'odd_parity_paper': {
+        'delta': 0.13,  
+        'muU': -0.355, 'DeltaU': 0.38, 'tU': 0.17, 'tpU': 0.08,
+        'tch_U': 0.015, 'tpch_U': 0.01, 'tz_U': -0.0375,
+        'muTe': -2.25, 'DeltaTe': -1.4, 'tTe': -1.5,
+        'tch_Te': 0, 'tz_Te': -0.05
+    }
+}
 
+# Current parameter set (default to odd_parity_paper, matching original hardcoded values)
+current_parameter_set = 'odd_parity_paper'
+
+def set_parameters(param_set_name):
+    """Set global parameters from the specified parameter set"""
+    global muU, DeltaU, tU, tpU, tch_U, tpch_U, tz_U
+    global muTe, DeltaTe, tTe, tch_Te, tz_Te, delta
+    global current_parameter_set
+    
+    if param_set_name not in parameter_sets:
+        raise ValueError(f"Unknown parameter set: {param_set_name}. Available sets: {list(parameter_sets.keys())}")
+    
+    params = parameter_sets[param_set_name]
+    
+    # Set U parameters
+    muU = params['muU']
+    DeltaU = params['DeltaU'] 
+    tU = params['tU']
+    tpU = params['tpU']
+    tch_U = params['tch_U']
+    tpch_U = params['tpch_U']
+    tz_U = params['tz_U']
+    
+    # Set Te parameters
+    muTe = params['muTe']
+    DeltaTe = params['DeltaTe']
+    tTe = params['tTe']
+    tch_Te = params['tch_Te']
+    tz_Te = params['tz_Te']
+    
+    # Set hybridization
+    delta = params['delta']
+    
+    current_parameter_set = param_set_name
+    print(f"Set parameters for: {param_set_name}")
+
+# Initialize with default parameter set
+set_parameters(current_parameter_set)
+
+# These will be set by set_parameters() function above, but declare them for clarity:
 # U parameters 
-muU = -0.35
-DeltaU = 0.38
-tU = 0.17
-tpU = 0.08
-tch_U = 0.01
-tpch_U = 0.01
-tz_U = -0.0375
+muU = None
+DeltaU = None
+tU = None
+tpU = None
+tch_U = None
+tpch_U = None
+tz_U = None
 
 # Te parameters 
-muTe = -2.25
-DeltaTe = -1.4
-tTe = -1.5  # hopping along Te(2) chain in b direction
-tch_Te = 0  # hopping between chains in a direction 
-tz_Te = -0.05 # hopping between chains along c axis
-delta = 0.13 #try 0.1 later
+muTe = None
+DeltaTe = None
+tTe = None
+tch_Te = None
+tz_Te = None
+delta = None 
 
 # momentum grid for kx-ky plane (in nm^-1, will be converted to π/a, π/b units for plotting)
 nk = 201  # Reduced for faster computation
