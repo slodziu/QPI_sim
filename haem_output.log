@@ -1,0 +1,2339 @@
+Set parameters for: odd_parity_paper
+🚀 HAEM CALCULATION WITH CORRECTED PHYSICS
+✓ Proper τ₃ projection in full Nambu space
+✓ Mandatory Fermi surface filtering
+✓ Comprehensive debug output
+✓ Antisymmetrization before real part
+✓ q→0 contamination guards
+
+💡 To run validation tests first: python phase_character.py validate
+
+Set parameters for: odd_parity_paper
+=== 1D HAEM Line Plot (Publication Quality) ===
+CONFIGURATION:
+  • Fixed energy: E = 200 µeV
+  • Vectors: p1, p2, p5, p6 (literature coordinates)
+  • Path sampling: 100 points per vector
+  • k-space density: nk = 80 (high precision)
+  • T-matrices pre-computed once per pairing type
+  • Output: Single 2D line plot with all vectors
+
+
+============================================================
+Processing B2u pairing symmetry
+============================================================
+
+Pre-computing T-matrices at E = 200.0 µeV...
+  Broadening η = 30.00 µeV
+  k-space grid: 50×50 = 2500 points
+  Gap params for B2u: {'C0': 0.0, 'C1': 0.0003, 'C2': 0.0003, 'C3': 0.0003}
+  Test d-vector at (kx=0.1, ky=0.1): [0.00000000e+00 0.00000000e+00 1.22965542e-05]
+  T-matrices computed in 0.3s
+
+Computing HAEM along vector p1...
+  Vector p1: (0.290, 0.000) → k-space (2.222, 0.000)
+  Point 1/50...
+    q = (0.000, 0.000), |q| = 0.000
+[DEBUG] q magnitude = 4.53e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.260e-03 (complex magnitude: 3.961e-03)
+[DEBUG] q magnitude = 4.53e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.260e-03 (complex magnitude: 3.961e-03)
+[DEBUG] q magnitude = 9.07e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.662e-03 (complex magnitude: 8.445e-03)
+[DEBUG] q magnitude = 9.07e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.662e-03 (complex magnitude: 8.445e-03)
+[DEBUG] q magnitude = 1.36e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.273e-03 (complex magnitude: 1.033e-02)
+[DEBUG] q magnitude = 1.36e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.273e-03 (complex magnitude: 1.033e-02)
+[DEBUG] q magnitude = 1.81e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.337e-03 (complex magnitude: 7.361e-03)
+[DEBUG] q magnitude = 1.81e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.337e-03 (complex magnitude: 7.361e-03)
+[DEBUG] q magnitude = 2.27e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -1.366e-03 (complex magnitude: 4.298e-03)
+[DEBUG] q magnitude = 2.27e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -1.366e-03 (complex magnitude: 4.298e-03)
+[DEBUG] q magnitude = 2.72e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -5.688e-04 (complex magnitude: 1.788e-03)
+[DEBUG] q magnitude = 2.72e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -5.688e-04 (complex magnitude: 1.788e-03)
+[DEBUG] q magnitude = 3.17e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: 6.285e-05 (complex magnitude: 2.231e-04)
+[DEBUG] q magnitude = 3.17e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: 6.284e-05 (complex magnitude: 2.231e-04)
+[DEBUG] q magnitude = 3.63e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.519e-04 (complex magnitude: 1.433e-03)
+[DEBUG] q magnitude = 3.63e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.519e-04 (complex magnitude: 1.433e-03)
+[DEBUG] q magnitude = 4.08e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.737e-04 (complex magnitude: 1.810e-03)
+[DEBUG] q magnitude = 4.08e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.737e-04 (complex magnitude: 1.810e-03)
+[DEBUG] q magnitude = 4.53e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.409e-04 (complex magnitude: 1.703e-03)
+[DEBUG] q magnitude = 4.53e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.409e-04 (complex magnitude: 1.703e-03)
+[DEBUG] q magnitude = 4.99e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.795e-04 (complex magnitude: 1.507e-03)
+[DEBUG] q magnitude = 4.99e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.795e-04 (complex magnitude: 1.507e-03)
+[DEBUG] q magnitude = 5.44e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.424e-04 (complex magnitude: 1.390e-03)
+[DEBUG] q magnitude = 5.44e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.424e-04 (complex magnitude: 1.390e-03)
+[DEBUG] q magnitude = 5.90e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.336e-04 (complex magnitude: 1.362e-03)
+[DEBUG] q magnitude = 5.90e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.336e-04 (complex magnitude: 1.362e-03)
+[DEBUG] q magnitude = 6.35e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.439e-04 (complex magnitude: 1.395e-03)
+[DEBUG] q magnitude = 6.35e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.439e-04 (complex magnitude: 1.395e-03)
+[DEBUG] q magnitude = 6.80e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.650e-04 (complex magnitude: 1.461e-03)
+[DEBUG] q magnitude = 6.80e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.650e-04 (complex magnitude: 1.461e-03)
+[DEBUG] q magnitude = 7.26e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.917e-04 (complex magnitude: 1.545e-03)
+[DEBUG] q magnitude = 7.26e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.917e-04 (complex magnitude: 1.545e-03)
+[DEBUG] q magnitude = 7.71e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.213e-04 (complex magnitude: 1.638e-03)
+[DEBUG] q magnitude = 7.71e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.213e-04 (complex magnitude: 1.638e-03)
+[DEBUG] q magnitude = 8.16e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.525e-04 (complex magnitude: 1.736e-03)
+[DEBUG] q magnitude = 8.16e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.526e-04 (complex magnitude: 1.736e-03)
+[DEBUG] q magnitude = 8.62e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.849e-04 (complex magnitude: 1.838e-03)
+[DEBUG] q magnitude = 8.62e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.849e-04 (complex magnitude: 1.838e-03)
+[DEBUG] q magnitude = 9.07e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.184e-04 (complex magnitude: 1.943e-03)
+[DEBUG] q magnitude = 9.07e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.185e-04 (complex magnitude: 1.943e-03)
+[DEBUG] q magnitude = 9.52e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.535e-04 (complex magnitude: 2.053e-03)
+[DEBUG] q magnitude = 9.52e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.535e-04 (complex magnitude: 2.053e-03)
+[DEBUG] q magnitude = 9.98e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.906e-04 (complex magnitude: 2.170e-03)
+[DEBUG] q magnitude = 9.98e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.906e-04 (complex magnitude: 2.170e-03)
+[DEBUG] q magnitude = 1.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.09e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.09e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  Point 26/50...
+    q = (1.134, 0.000), |q| = 1.134
+[DEBUG] q magnitude = 1.13e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.13e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.27e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.27e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.32e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.32e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.36e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.36e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.41e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.41e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.45e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.45e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.54e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.54e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.59e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.59e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.63e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.63e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.68e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.68e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.77e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.77e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.81e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.81e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.90e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.90e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.95e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.95e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.00e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.00e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.09e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.09e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.13e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.13e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  p1 complete: range [-2.17e-08, 6.41e-08]
+
+Computing HAEM along vector p2...
+  Vector p2: (0.430, 1.000) → k-space (3.295, 5.150)
+  Point 1/50...
+    q = (0.000, 0.000), |q| = 0.000
+[DEBUG] q magnitude = 1.25e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -1.237e-03 (complex magnitude: 3.956e-03)
+[DEBUG] q magnitude = 1.25e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -1.237e-03 (complex magnitude: 3.956e-03)
+[DEBUG] q magnitude = 2.50e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: -1.827e-04 (complex magnitude: 6.047e-04)
+[DEBUG] q magnitude = 2.50e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: -1.827e-04 (complex magnitude: 6.047e-04)
+[DEBUG] q magnitude = 3.74e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 3.519e-04 (complex magnitude: 1.117e-03)
+[DEBUG] q magnitude = 3.74e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 3.519e-04 (complex magnitude: 1.117e-03)
+[DEBUG] q magnitude = 4.99e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 8.020e-04 (complex magnitude: 2.521e-03)
+[DEBUG] q magnitude = 4.99e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 8.020e-04 (complex magnitude: 2.521e-03)
+[DEBUG] q magnitude = 6.24e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.383e-03 (complex magnitude: 4.348e-03)
+[DEBUG] q magnitude = 6.24e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.383e-03 (complex magnitude: 4.348e-03)
+[DEBUG] q magnitude = 7.49e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.703e-03 (complex magnitude: 5.355e-03)
+[DEBUG] q magnitude = 7.49e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.703e-03 (complex magnitude: 5.355e-03)
+[DEBUG] q magnitude = 8.73e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.747e-03 (complex magnitude: 5.497e-03)
+[DEBUG] q magnitude = 8.73e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.747e-03 (complex magnitude: 5.497e-03)
+[DEBUG] q magnitude = 9.98e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.563e-03 (complex magnitude: 4.916e-03)
+[DEBUG] q magnitude = 9.98e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.563e-03 (complex magnitude: 4.916e-03)
+[DEBUG] q magnitude = 1.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.75e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.75e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.00e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.00e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] |q|=2.62, FS: 14 pts, Tr(τ₃GTG)=-1.33e-04-4.26e-03j
+[DEBUG] q magnitude = 2.75e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.75e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  Point 26/50...
+    q = (1.681, 2.628), |q| = 3.119
+[DEBUG] q magnitude = 3.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.61e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.61e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 6.11e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 6.11e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  p2 complete: range [-4.19e-08, 2.96e-08]
+
+Computing HAEM along vector p5...
+  Vector p5: (-0.140, 1.000) → k-space (-1.073, 5.150)
+  Point 1/50...
+    q = (0.000, 0.000), |q| = 0.000
+[DEBUG] q magnitude = 1.07e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: 2.288e-04 (complex magnitude: 7.277e-04)
+[DEBUG] q magnitude = 1.07e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: 2.288e-04 (complex magnitude: 7.276e-04)
+[DEBUG] q magnitude = 2.15e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.711e-03 (complex magnitude: 8.547e-03)
+[DEBUG] q magnitude = 2.15e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.711e-03 (complex magnitude: 8.547e-03)
+[DEBUG] q magnitude = 3.22e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.728e-03 (complex magnitude: 1.175e-02)
+[DEBUG] q magnitude = 3.22e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.728e-03 (complex magnitude: 1.175e-02)
+[DEBUG] q magnitude = 4.29e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.889e-03 (complex magnitude: 1.225e-02)
+[DEBUG] q magnitude = 4.29e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.889e-03 (complex magnitude: 1.225e-02)
+[DEBUG] q magnitude = 5.37e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.606e-03 (complex magnitude: 1.136e-02)
+[DEBUG] q magnitude = 5.37e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.606e-03 (complex magnitude: 1.136e-02)
+[DEBUG] q magnitude = 6.44e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.223e-03 (complex magnitude: 1.015e-02)
+[DEBUG] q magnitude = 6.44e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.223e-03 (complex magnitude: 1.015e-02)
+[DEBUG] q magnitude = 7.52e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.884e-03 (complex magnitude: 9.085e-03)
+[DEBUG] q magnitude = 7.52e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.884e-03 (complex magnitude: 9.085e-03)
+[DEBUG] q magnitude = 8.59e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.518e-03 (complex magnitude: 7.934e-03)
+[DEBUG] q magnitude = 8.59e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.518e-03 (complex magnitude: 7.934e-03)
+[DEBUG] q magnitude = 9.66e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.249e-03 (complex magnitude: 7.089e-03)
+[DEBUG] q magnitude = 9.66e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.249e-03 (complex magnitude: 7.089e-03)
+[DEBUG] q magnitude = 1.07e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.07e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.29e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.29e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.40e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.40e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.61e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.61e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 1.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 1.93e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.93e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.15e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.15e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.36e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.36e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.47e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.47e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.58e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.58e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  Point 26/50...
+    q = (-0.547, 2.628), |q| = 2.684
+[DEBUG] q magnitude = 2.68e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.68e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.79e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.79e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.90e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.90e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 3.01e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.01e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.11e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.11e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 3.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 3.33e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.33e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.44e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 3.44e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 3.54e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.54e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.65e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.65e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.76e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.76e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.97e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.97e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.08e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.08e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.19e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 4.19e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 4.29e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.29e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.40e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.40e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.51e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.51e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.94e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.94e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.05e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.05e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.15e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.15e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.26e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.26e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  p5 complete: range [-1.44e-08, 7.36e-08]
+
+Computing HAEM along vector p6...
+  Vector p6: (0.570, 0.000) → k-space (4.368, 0.000)
+  Point 1/50...
+    q = (0.000, 0.000), |q| = 0.000
+[DEBUG] q magnitude = 8.91e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.574e-03 (complex magnitude: 8.168e-03)
+[DEBUG] q magnitude = 8.91e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.574e-03 (complex magnitude: 8.168e-03)
+[DEBUG] q magnitude = 1.78e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.409e-03 (complex magnitude: 7.589e-03)
+[DEBUG] q magnitude = 1.78e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.409e-03 (complex magnitude: 7.589e-03)
+[DEBUG] q magnitude = 2.67e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -6.441e-04 (complex magnitude: 2.025e-03)
+[DEBUG] q magnitude = 2.67e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -6.441e-04 (complex magnitude: 2.025e-03)
+[DEBUG] q magnitude = 3.57e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.153e-04 (complex magnitude: 1.318e-03)
+[DEBUG] q magnitude = 3.57e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.153e-04 (complex magnitude: 1.318e-03)
+[DEBUG] q magnitude = 4.46e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.513e-04 (complex magnitude: 1.736e-03)
+[DEBUG] q magnitude = 4.46e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.513e-04 (complex magnitude: 1.736e-03)
+[DEBUG] q magnitude = 5.35e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.475e-04 (complex magnitude: 1.406e-03)
+[DEBUG] q magnitude = 5.35e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.475e-04 (complex magnitude: 1.406e-03)
+[DEBUG] q magnitude = 6.24e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.401e-04 (complex magnitude: 1.383e-03)
+[DEBUG] q magnitude = 6.24e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.401e-04 (complex magnitude: 1.383e-03)
+[DEBUG] q magnitude = 7.13e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.840e-04 (complex magnitude: 1.521e-03)
+[DEBUG] q magnitude = 7.13e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.840e-04 (complex magnitude: 1.521e-03)
+[DEBUG] q magnitude = 8.02e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.427e-04 (complex magnitude: 1.705e-03)
+[DEBUG] q magnitude = 8.02e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.427e-04 (complex magnitude: 1.705e-03)
+[DEBUG] q magnitude = 8.91e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.067e-04 (complex magnitude: 1.906e-03)
+[DEBUG] q magnitude = 8.91e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.067e-04 (complex magnitude: 1.906e-03)
+[DEBUG] q magnitude = 9.80e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.762e-04 (complex magnitude: 2.125e-03)
+[DEBUG] q magnitude = 9.80e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.762e-04 (complex magnitude: 2.125e-03)
+[DEBUG] q magnitude = 1.07e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.07e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.16e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.16e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.34e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.34e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.43e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.43e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.52e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.52e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.60e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.60e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.69e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.69e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.78e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.78e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.96e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.96e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.05e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.05e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.14e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.14e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+  Point 26/50...
+    q = (2.228, 0.000), |q| = 2.228
+[DEBUG] q magnitude = 2.23e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.23e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.32e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.32e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.41e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.41e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.58e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.58e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.67e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.67e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.76e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.76e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.85e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.85e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.94e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.94e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.03e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.03e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.21e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.21e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.30e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.30e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.39e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.39e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.48e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.48e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.57e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.57e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.65e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.65e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.92e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.92e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.01e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.01e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.10e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.10e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.19e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.19e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.28e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.28e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  p6 complete: range [-2.10e-08, 7.17e-08]
+
+============================================================
+B2u completed in 10.1s (0.2 min)
+Saved to: outputs/phase_character/haem_1d_lines/odd_parity_paper/haem_1d_B2u_E200ueV_nk50.png
+============================================================
+
+
+============================================================
+Processing B3u pairing symmetry
+============================================================
+
+Pre-computing T-matrices at E = 200.0 µeV...
+  Broadening η = 30.00 µeV
+  k-space grid: 50×50 = 2500 points
+  Gap params for B3u: {'C0': 0.0, 'C1': 0.0003, 'C2': 0.0003, 'C3': 0.0003}
+  Test d-vector at (kx=0.1, ky=0.1): [0.00000000e+00 0.00000000e+00 1.82886531e-05]
+  T-matrices computed in 0.3s
+
+Computing HAEM along vector p1...
+  Vector p1: (0.290, 0.000) → k-space (2.222, 0.000)
+  Point 1/50...
+    q = (0.000, 0.000), |q| = 0.000
+[DEBUG] q magnitude = 4.53e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.309e-03 (complex magnitude: 4.116e-03)
+[DEBUG] q magnitude = 4.53e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.309e-03 (complex magnitude: 4.116e-03)
+[DEBUG] q magnitude = 9.07e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.650e-03 (complex magnitude: 8.407e-03)
+[DEBUG] q magnitude = 9.07e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.650e-03 (complex magnitude: 8.408e-03)
+[DEBUG] q magnitude = 1.36e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.272e-03 (complex magnitude: 1.033e-02)
+[DEBUG] q magnitude = 1.36e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.272e-03 (complex magnitude: 1.033e-02)
+[DEBUG] q magnitude = 1.81e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.338e-03 (complex magnitude: 7.362e-03)
+[DEBUG] q magnitude = 1.81e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.338e-03 (complex magnitude: 7.362e-03)
+[DEBUG] q magnitude = 2.27e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -1.367e-03 (complex magnitude: 4.300e-03)
+[DEBUG] q magnitude = 2.27e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -1.367e-03 (complex magnitude: 4.300e-03)
+[DEBUG] q magnitude = 2.72e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -5.695e-04 (complex magnitude: 1.790e-03)
+[DEBUG] q magnitude = 2.72e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -5.695e-04 (complex magnitude: 1.790e-03)
+[DEBUG] q magnitude = 3.17e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: 6.269e-05 (complex magnitude: 2.226e-04)
+[DEBUG] q magnitude = 3.17e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: 6.268e-05 (complex magnitude: 2.226e-04)
+[DEBUG] q magnitude = 3.63e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.522e-04 (complex magnitude: 1.434e-03)
+[DEBUG] q magnitude = 3.63e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.522e-04 (complex magnitude: 1.434e-03)
+[DEBUG] q magnitude = 4.08e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.741e-04 (complex magnitude: 1.812e-03)
+[DEBUG] q magnitude = 4.08e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.741e-04 (complex magnitude: 1.812e-03)
+[DEBUG] q magnitude = 4.53e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.411e-04 (complex magnitude: 1.703e-03)
+[DEBUG] q magnitude = 4.53e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.411e-04 (complex magnitude: 1.703e-03)
+[DEBUG] q magnitude = 4.99e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.795e-04 (complex magnitude: 1.508e-03)
+[DEBUG] q magnitude = 4.99e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.795e-04 (complex magnitude: 1.508e-03)
+[DEBUG] q magnitude = 5.44e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.423e-04 (complex magnitude: 1.390e-03)
+[DEBUG] q magnitude = 5.44e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.423e-04 (complex magnitude: 1.390e-03)
+[DEBUG] q magnitude = 5.90e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.335e-04 (complex magnitude: 1.362e-03)
+[DEBUG] q magnitude = 5.90e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.335e-04 (complex magnitude: 1.362e-03)
+[DEBUG] q magnitude = 6.35e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.438e-04 (complex magnitude: 1.395e-03)
+[DEBUG] q magnitude = 6.35e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.438e-04 (complex magnitude: 1.395e-03)
+[DEBUG] q magnitude = 6.80e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.649e-04 (complex magnitude: 1.461e-03)
+[DEBUG] q magnitude = 6.80e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.649e-04 (complex magnitude: 1.461e-03)
+[DEBUG] q magnitude = 7.26e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.917e-04 (complex magnitude: 1.545e-03)
+[DEBUG] q magnitude = 7.26e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.917e-04 (complex magnitude: 1.545e-03)
+[DEBUG] q magnitude = 7.71e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.213e-04 (complex magnitude: 1.638e-03)
+[DEBUG] q magnitude = 7.71e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.213e-04 (complex magnitude: 1.638e-03)
+[DEBUG] q magnitude = 8.16e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.525e-04 (complex magnitude: 1.736e-03)
+[DEBUG] q magnitude = 8.16e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.525e-04 (complex magnitude: 1.736e-03)
+[DEBUG] q magnitude = 8.62e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.849e-04 (complex magnitude: 1.838e-03)
+[DEBUG] q magnitude = 8.62e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.849e-04 (complex magnitude: 1.838e-03)
+[DEBUG] q magnitude = 9.07e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.185e-04 (complex magnitude: 1.943e-03)
+[DEBUG] q magnitude = 9.07e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.185e-04 (complex magnitude: 1.943e-03)
+[DEBUG] q magnitude = 9.52e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.535e-04 (complex magnitude: 2.053e-03)
+[DEBUG] q magnitude = 9.52e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.535e-04 (complex magnitude: 2.053e-03)
+[DEBUG] q magnitude = 9.98e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.906e-04 (complex magnitude: 2.170e-03)
+[DEBUG] q magnitude = 9.98e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.906e-04 (complex magnitude: 2.170e-03)
+[DEBUG] q magnitude = 1.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.09e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.09e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  Point 26/50...
+    q = (1.134, 0.000), |q| = 1.134
+[DEBUG] q magnitude = 1.13e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.13e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.27e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.27e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.32e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.32e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.36e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.36e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.41e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.41e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.45e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.45e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.54e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.54e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.59e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.59e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.63e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.63e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.68e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.68e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.77e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.77e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.81e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.81e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.90e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.90e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.95e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.95e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.00e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.00e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.09e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.09e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.13e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.13e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  p1 complete: range [-2.03e-08, 4.38e-08]
+
+Computing HAEM along vector p2...
+  Vector p2: (0.430, 1.000) → k-space (3.295, 5.150)
+  Point 1/50...
+    q = (0.000, 0.000), |q| = 0.000
+[DEBUG] q magnitude = 1.25e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -1.213e-03 (complex magnitude: 3.880e-03)
+[DEBUG] q magnitude = 1.25e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -1.213e-03 (complex magnitude: 3.880e-03)
+[DEBUG] q magnitude = 2.50e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: -1.613e-04 (complex magnitude: 5.381e-04)
+[DEBUG] q magnitude = 2.50e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: -1.613e-04 (complex magnitude: 5.381e-04)
+[DEBUG] q magnitude = 3.74e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 3.710e-04 (complex magnitude: 1.175e-03)
+[DEBUG] q magnitude = 3.74e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 3.710e-04 (complex magnitude: 1.175e-03)
+[DEBUG] q magnitude = 4.99e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 8.165e-04 (complex magnitude: 2.566e-03)
+[DEBUG] q magnitude = 4.99e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 8.165e-04 (complex magnitude: 2.566e-03)
+[DEBUG] q magnitude = 6.24e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.393e-03 (complex magnitude: 4.378e-03)
+[DEBUG] q magnitude = 6.24e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.393e-03 (complex magnitude: 4.378e-03)
+[DEBUG] q magnitude = 7.49e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.709e-03 (complex magnitude: 5.375e-03)
+[DEBUG] q magnitude = 7.49e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.709e-03 (complex magnitude: 5.376e-03)
+[DEBUG] q magnitude = 8.73e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.752e-03 (complex magnitude: 5.513e-03)
+[DEBUG] q magnitude = 8.73e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.752e-03 (complex magnitude: 5.513e-03)
+[DEBUG] q magnitude = 9.98e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.568e-03 (complex magnitude: 4.930e-03)
+[DEBUG] q magnitude = 9.98e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 1.568e-03 (complex magnitude: 4.930e-03)
+[DEBUG] q magnitude = 1.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.75e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.75e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.00e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.00e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.75e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.75e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  Point 26/50...
+    q = (1.681, 2.628), |q| = 3.119
+[DEBUG] q magnitude = 3.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.24e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.49e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.61e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.61e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.99e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 6.11e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 6.11e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  p2 complete: range [-3.66e-08, 1.81e-08]
+
+Computing HAEM along vector p5...
+  Vector p5: (-0.140, 1.000) → k-space (-1.073, 5.150)
+  Point 1/50...
+    q = (0.000, 0.000), |q| = 0.000
+[DEBUG] q magnitude = 1.07e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: 2.718e-04 (complex magnitude: 8.590e-04)
+[DEBUG] q magnitude = 1.07e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] δρ(q,E) final: 2.718e-04 (complex magnitude: 8.590e-04)
+[DEBUG] q magnitude = 2.15e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.692e-03 (complex magnitude: 8.487e-03)
+[DEBUG] q magnitude = 2.15e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.692e-03 (complex magnitude: 8.487e-03)
+[DEBUG] q magnitude = 3.22e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.725e-03 (complex magnitude: 1.174e-02)
+[DEBUG] q magnitude = 3.22e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.725e-03 (complex magnitude: 1.174e-02)
+[DEBUG] q magnitude = 4.29e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.890e-03 (complex magnitude: 1.226e-02)
+[DEBUG] q magnitude = 4.29e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.890e-03 (complex magnitude: 1.226e-02)
+[DEBUG] q magnitude = 5.37e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.609e-03 (complex magnitude: 1.136e-02)
+[DEBUG] q magnitude = 5.37e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.609e-03 (complex magnitude: 1.137e-02)
+[DEBUG] q magnitude = 6.44e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.227e-03 (complex magnitude: 1.016e-02)
+[DEBUG] q magnitude = 6.44e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -3.227e-03 (complex magnitude: 1.016e-02)
+[DEBUG] q magnitude = 7.52e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.887e-03 (complex magnitude: 9.097e-03)
+[DEBUG] q magnitude = 7.52e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.887e-03 (complex magnitude: 9.097e-03)
+[DEBUG] q magnitude = 8.59e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.521e-03 (complex magnitude: 7.944e-03)
+[DEBUG] q magnitude = 8.59e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.521e-03 (complex magnitude: 7.944e-03)
+[DEBUG] q magnitude = 9.66e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.252e-03 (complex magnitude: 7.099e-03)
+[DEBUG] q magnitude = 9.66e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.252e-03 (complex magnitude: 7.099e-03)
+[DEBUG] q magnitude = 1.07e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.07e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.18e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.29e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.29e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.40e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.40e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.61e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.61e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 1.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 1.93e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.93e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.04e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.15e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.15e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.36e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.36e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.47e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.47e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.58e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.58e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  Point 26/50...
+    q = (-0.547, 2.628), |q| = 2.684
+[DEBUG] q magnitude = 2.68e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.68e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.79e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.79e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.90e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.90e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 3.01e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.01e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.11e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.11e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 3.22e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 3.33e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.33e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.44e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 3.44e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 3.54e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.54e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.65e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.65e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.76e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.76e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.86e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.97e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.97e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.08e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.08e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.19e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 4.19e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 4.29e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.29e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.40e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.40e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.51e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.51e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.62e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.72e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.94e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.94e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.05e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.05e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.15e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.15e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.26e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 5.26e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  p5 complete: range [-1.28e-08, 5.10e-08]
+
+Computing HAEM along vector p6...
+  Vector p6: (0.570, 0.000) → k-space (4.368, 0.000)
+  Point 1/50...
+    q = (0.000, 0.000), |q| = 0.000
+[DEBUG] q magnitude = 8.91e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.561e-03 (complex magnitude: 8.128e-03)
+[DEBUG] q magnitude = 8.91e-02
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.561e-03 (complex magnitude: 8.128e-03)
+[DEBUG] q magnitude = 1.78e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.410e-03 (complex magnitude: 7.590e-03)
+[DEBUG] q magnitude = 1.78e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -2.410e-03 (complex magnitude: 7.590e-03)
+[DEBUG] q magnitude = 2.67e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -6.449e-04 (complex magnitude: 2.027e-03)
+[DEBUG] q magnitude = 2.67e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: -6.449e-04 (complex magnitude: 2.027e-03)
+[DEBUG] q magnitude = 3.57e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.155e-04 (complex magnitude: 1.319e-03)
+[DEBUG] q magnitude = 3.57e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.155e-04 (complex magnitude: 1.319e-03)
+[DEBUG] q magnitude = 4.46e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.515e-04 (complex magnitude: 1.736e-03)
+[DEBUG] q magnitude = 4.46e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.515e-04 (complex magnitude: 1.736e-03)
+[DEBUG] q magnitude = 5.35e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.475e-04 (complex magnitude: 1.406e-03)
+[DEBUG] q magnitude = 5.35e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.475e-04 (complex magnitude: 1.406e-03)
+[DEBUG] q magnitude = 6.24e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.401e-04 (complex magnitude: 1.383e-03)
+[DEBUG] q magnitude = 6.24e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.401e-04 (complex magnitude: 1.383e-03)
+[DEBUG] q magnitude = 7.13e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.839e-04 (complex magnitude: 1.521e-03)
+[DEBUG] q magnitude = 7.13e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 4.839e-04 (complex magnitude: 1.521e-03)
+[DEBUG] q magnitude = 8.02e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.427e-04 (complex magnitude: 1.705e-03)
+[DEBUG] q magnitude = 8.02e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 5.427e-04 (complex magnitude: 1.705e-03)
+[DEBUG] q magnitude = 8.91e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.067e-04 (complex magnitude: 1.906e-03)
+[DEBUG] q magnitude = 8.91e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.068e-04 (complex magnitude: 1.906e-03)
+[DEBUG] q magnitude = 9.80e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.763e-04 (complex magnitude: 2.125e-03)
+[DEBUG] q magnitude = 9.80e-01
+[PERF] Boosting η: 3.00e-05 → 4.00e-03 for performance
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] Valid FS k-points: 14/14
+[DEBUG] δρ(q,E) final: 6.763e-04 (complex magnitude: 2.125e-03)
+[DEBUG] q magnitude = 1.07e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.07e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.16e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.16e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] |q|=1.25, FS: 14 pts, Tr(τ₃GTG)=3.33e-05-3.06e-03j
+[DEBUG] q magnitude = 1.25e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.34e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.34e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.43e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.43e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.52e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.52e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.60e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.60e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.69e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.69e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.78e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.78e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.87e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.96e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 1.96e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.05e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.05e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.14e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+[DEBUG] q magnitude = 2.14e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[WARN] |Tr(τ₃ GTG)| << |Tr(GTG)| - τ₃ projection may be ineffective
+  Point 26/50...
+    q = (2.228, 0.000), |q| = 2.228
+[DEBUG] q magnitude = 2.23e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.23e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.32e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.32e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.41e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.41e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.50e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.58e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.58e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.67e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.67e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.76e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.76e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.85e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.85e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.94e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 2.94e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.03e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.03e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.12e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] |q|=3.12, FS: 14 pts, Tr(τ₃GTG)=2.32e-05+3.02e-03j
+[DEBUG] q magnitude = 3.21e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.21e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.30e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.30e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.39e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.39e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.48e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.48e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.57e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.57e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.65e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.65e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.74e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.83e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.92e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 3.92e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.01e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.01e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.10e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.10e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.19e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.19e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.28e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.28e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+[DEBUG] q magnitude = 4.37e+00
+[DEBUG] Coarse FS detection: 14/625 points (2.2%)
+  p6 complete: range [-2.00e-08, 5.51e-08]
+
+============================================================
+B3u completed in 9.7s (0.2 min)
+Saved to: outputs/phase_character/haem_1d_lines/odd_parity_paper/haem_1d_B3u_E200ueV_nk50.png
+============================================================
+
+
+✓ ALL PLOTS GENERATED SUCCESSFULLY
