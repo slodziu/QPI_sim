@@ -148,6 +148,54 @@ def fermi_surface_weight(kx, ky, kz, threshold=0.001):
     """Single k-point wrapper"""
     return fermi_surface_weight_vectorized(np.array([[kx]]), np.array([[ky]]), kz, threshold)[0, 0]
 
+def compute_delta_N_element_no_weights(qx, qy, qz, energy, pairing_type, T_matrix, eta=1e-5, nk=150):
+    """δN(q,E) without Fermi surface weighting - pure theoretical formula"""
+    dk = 2*np.pi / nk
+    kx_range = np.linspace(-np.pi/a + qx/2, np.pi/a - qx/2, nk)
+    ky_range = np.linspace(-np.pi/b + qy/2, np.pi/b - qy/2, nk)
+    
+    KX, KY = np.meshgrid(kx_range, ky_range, indexing='ij')
+    
+    # No fermi surface weighting - use all k-points equally
+    G_k_array = compute_green_function_vectorized(KX, KY, qz, energy, pairing_type, eta)
+    G_k_plus_q_array = compute_green_function_vectorized(KX + qx, KY + qy, qz, energy, pairing_type, eta)
+    
+    # Vectorized matrix multiplication: G(k) @ T @ G(k+q)
+    shape = G_k_array.shape
+    n_points_total = shape[0] * shape[1]
+    
+    matrix_elements = np.zeros(n_points_total, dtype=complex)
+    G_k_flat = G_k_array.reshape(n_points_total, 8, 8)
+    G_kq_flat = G_k_plus_q_array.reshape(n_points_total, 8, 8)
+    
+    for i in range(n_points_total):
+        product = G_k_flat[i] @ T_matrix @ G_kq_flat[i] 
+        # Upper-left 4x4 electron block, first orbital spin-up
+        matrix_elements[i] = product[0, 0]
+    
+    # Simple k-space average
+    normalization = (dk/(2*np.pi))**2
+    delta_N_sum = np.mean(matrix_elements) * (2*np.pi)**2 / (dk)**2 * normalization
+    
+    return np.imag(delta_N_sum) / np.pi
+
+def compute_haem_signal_comparison(qx, qy, qz, energy, pairing_type, V_imp=0.15, eta=1e-5, nk=50):
+    """Compare HAEM with and without Fermi weights"""
+    T_matrix_pos = compute_t_matrix(energy, pairing_type, V_imp, eta, 30, qz)
+    T_matrix_neg = compute_t_matrix(-energy, pairing_type, V_imp, eta, 30, qz)
+    
+    # With fermi weights
+    delta_N_pos_weighted = compute_delta_N_element(qx, qy, qz, energy, pairing_type, T_matrix_pos, eta, nk)
+    delta_N_neg_weighted = compute_delta_N_element(qx, qy, qz, -energy, pairing_type, T_matrix_neg, eta, nk)
+    haem_weighted = delta_N_pos_weighted - delta_N_neg_weighted
+    
+    # Without fermi weights
+    delta_N_pos_pure = compute_delta_N_element_no_weights(qx, qy, qz, energy, pairing_type, T_matrix_pos, eta, nk)
+    delta_N_neg_pure = compute_delta_N_element_no_weights(qx, qy, qz, -energy, pairing_type, T_matrix_neg, eta, nk)
+    haem_pure = delta_N_pos_pure - delta_N_neg_pure
+    
+    return haem_weighted, haem_pure
+
 def compute_delta_N_element(qx, qy, qz, energy, pairing_type, T_matrix, eta=1e-5, nk=150):
     """Vectorized δN(q,E) = (1/π)Im∑_k[G₀(k,E)T(E)G₀(k+q,E)]₁₁"""
     dk = 2*np.pi / nk
@@ -310,6 +358,213 @@ def compute_energy_scan_vectorized(pairing_types=['B2u', 'B3u'], energy_range=(1
 # Backward compatibility wrapper
 compute_energy_scan = compute_energy_scan_vectorized
 
+def compute_haem_along_vector(qx, qy, qz, energy, pairing_type, n_points=20, V_imp=0.15, eta=1e-5, use_fermi_weights=True):
+    """Compute HAEM signal along a q-vector from origin to (qx,qy) at fixed energy"""
+    t_values = np.linspace(0.05, 1.0, n_points)  # Avoid t=0 (no scattering)
+    haem_values = np.zeros(n_points)
+    
+    # Pre-compute T-matrices (same for all points along vector)
+    T_matrix_pos = compute_t_matrix(energy, pairing_type, V_imp, eta, 30, qz)
+    T_matrix_neg = compute_t_matrix(-energy, pairing_type, V_imp, eta, 30, qz)
+    
+    for i, t in enumerate(t_values):
+        qx_t = t * qx
+        qy_t = t * qy
+        
+        if use_fermi_weights:
+            delta_N_pos = compute_delta_N_element(qx_t, qy_t, qz, energy, pairing_type, T_matrix_pos, eta, 25)
+            delta_N_neg = compute_delta_N_element(qx_t, qy_t, qz, -energy, pairing_type, T_matrix_neg, eta, 25)
+        else:
+            delta_N_pos = compute_delta_N_element_no_weights(qx_t, qy_t, qz, energy, pairing_type, T_matrix_pos, eta, 25)
+            delta_N_neg = compute_delta_N_element_no_weights(qx_t, qy_t, qz, -energy, pairing_type, T_matrix_neg, eta, 25)
+        
+        haem_values[i] = delta_N_pos - delta_N_neg
+    
+    return t_values, haem_values
+
+def plot_diagnostics(save_dir='outputs/phase_character'):
+    """Plot diagnostic information to understand HAEM signal issues"""
+    os.makedirs(save_dir, exist_ok=True)
+    
+    print("🔧 Running diagnostic plots...")
+    
+    # 1. Fermi surface weights
+    kx_range = np.linspace(-np.pi/a, np.pi/a, 100)
+    ky_range = np.linspace(-np.pi/b, np.pi/b, 100)
+    KX, KY = np.meshgrid(kx_range, ky_range, indexing='ij')
+    
+    fs_weights = fermi_surface_weight_vectorized(KX, KY, 0)
+    
+    # 2. Gap magnitudes for both pairing types
+    d_b2u = d_vector(KX, KY, 0, 'B2u')
+    d_b3u = d_vector(KX, KY, 0, 'B3u')
+    
+    gap_mag_b2u = np.linalg.norm(d_b2u, axis=-1)
+    gap_mag_b3u = np.linalg.norm(d_b3u, axis=-1)
+    
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+    
+    # Fermi surface weights
+    im1 = axes[0,0].contourf(KX*a/(2*np.pi), KY*b/(2*np.pi), fs_weights, levels=50, cmap='viridis')
+    axes[0,0].set_title('Fermi Surface Weights', fontsize=14, fontweight='bold')
+    axes[0,0].set_xlabel('kx (2π/a)')
+    axes[0,0].set_ylabel('ky (2π/b)')
+    plt.colorbar(im1, ax=axes[0,0])
+    
+    # B2u gap magnitude
+    im2 = axes[0,1].contourf(KX*a/(2*np.pi), KY*b/(2*np.pi), gap_mag_b2u*1e6, levels=50, cmap='Reds')
+    axes[0,1].set_title('B2u Gap Magnitude (µeV)', fontsize=14, fontweight='bold')
+    axes[0,1].set_xlabel('kx (2π/a)')
+    axes[0,1].set_ylabel('ky (2π/b)')
+    plt.colorbar(im2, ax=axes[0,1])
+    
+    # B3u gap magnitude  
+    im3 = axes[0,2].contourf(KX*a/(2*np.pi), KY*b/(2*np.pi), gap_mag_b3u*1e6, levels=50, cmap='Blues')
+    axes[0,2].set_title('B3u Gap Magnitude (µeV)', fontsize=14, fontweight='bold')
+    axes[0,2].set_xlabel('kx (2π/a)')
+    axes[0,2].set_ylabel('ky (2π/b)')
+    plt.colorbar(im3, ax=axes[0,2])
+    
+    # Local density of states at different energies
+    energies_test = [50e-6, 100e-6, 200e-6]  
+    for i, energy in enumerate(energies_test):
+        G_loc_b2u = compute_local_green_function(energy, 'B2u', eta=1e-4, nk=50)
+        ldos_b2u = -np.imag(G_loc_b2u[0,0]) / np.pi  # First orbital, spin-up
+        
+        G_loc_b3u = compute_local_green_function(energy, 'B3u', eta=1e-4, nk=50)
+        ldos_b3u = -np.imag(G_loc_b3u[0,0]) / np.pi
+        
+        if i < 3:  # Only plot first 3
+            axes[1,i].bar(['B2u', 'B3u'], [ldos_b2u, ldos_b3u], color=['red', 'blue'], alpha=0.7)
+            axes[1,i].set_title(f'LDOS at E = {energy*1e6:.0f} µeV', fontsize=12, fontweight='bold')
+            axes[1,i].set_ylabel('LDOS (states/eV)')
+            axes[1,i].grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    # Save diagnostics
+    diag_file = os.path.join(save_dir, 'haem_diagnostics.png')
+    plt.savefig(diag_file, dpi=300, bbox_inches='tight')
+    print(f"🔧 Diagnostic plots saved: {diag_file}")
+    
+    plt.show()
+    
+    # Print statistics
+    print(f"\n🔍 Diagnostic Summary:")
+    print(f"   Max Fermi weight: {np.max(fs_weights):.2e}")
+    print(f"   Effective FS area: {np.sum(fs_weights > 1e-6) / fs_weights.size:.1%}")
+    print(f"   B2u gap range: {np.min(gap_mag_b2u)*1e6:.1f} - {np.max(gap_mag_b2u)*1e6:.1f} µeV")
+    print(f"   B3u gap range: {np.min(gap_mag_b3u)*1e6:.1f} - {np.max(gap_mag_b3u)*1e6:.1f} µeV")
+
+def investigate_haem_spikes(qx, qy, qz, energy, pairing_type, V_imp=0.15, eta=1e-5):
+    """Investigate why HAEM signal has spikes - diagnose the matrix elements"""
+    print(f"\n🔍 Investigating HAEM spikes for q=({qx*a/(2*np.pi):.3f}, {qy*b/(2*np.pi):.3f})×2π/(a,b)")
+    
+    # Test along the vector
+    t_values = np.linspace(0.1, 1.0, 10)
+    
+    T_matrix_pos = compute_t_matrix(energy, pairing_type, V_imp, eta, 30, qz)
+    T_matrix_neg = compute_t_matrix(-energy, pairing_type, V_imp, eta, 30, qz)
+    
+    results = []
+    for t in t_values:
+        # Test both methods
+        qx_t, qy_t = t * qx, t * qy
+        
+        haem_weighted, haem_pure = compute_haem_signal_comparison(qx_t, qy_t, qz, energy, pairing_type, V_imp, eta, 25)
+        
+        # Also look at individual matrix elements 
+        # Sample a few k-points to see what's happening
+        kx_test, ky_test = 0.2*np.pi/a, 0.1*np.pi/b
+        G_k = compute_green_function(kx_test, ky_test, qz, energy, pairing_type, eta)
+        G_kq = compute_green_function(kx_test + qx_t, ky_test + qy_t, qz, energy, pairing_type, eta)
+        
+        product = G_k @ T_matrix_pos @ G_kq
+        
+        results.append({
+            't': t,
+            'haem_weighted': haem_weighted,
+            'haem_pure': haem_pure,
+            'matrix_00': product[0,0], # electron, orbital 1, spin up
+            'matrix_11': product[1,1], # electron, orbital 1, spin down  
+            'matrix_22': product[2,2], # electron, orbital 2, spin up
+            'G_k_00': G_k[0,0],
+            'G_kq_00': G_kq[0,0],
+            'T_00': T_matrix_pos[0,0]
+        })
+    
+    # Print results
+    print("     t    HAEM(wt)  HAEM(pure)  Matrix[0,0]     G(k)[0,0]    G(k+q)[0,0]")
+    print("   " + "="*70)
+    for r in results:
+        print(f"   {r['t']:.1f}  {r['haem_weighted']:8.2e}  {r['haem_pure']:8.2e}  "
+              f"{r['matrix_00']:10.2e}  {r['G_k_00']:10.2e}  {r['G_kq_00']:10.2e}")
+    
+    return results
+
+def plot_haem_along_vectors(pairing_types=['B2u', 'B3u'], fixed_energy=100e-6, save_dir='outputs/phase_character', use_fermi_weights=True):
+    """Plot HAEM signal along each q-vector at fixed energy"""
+    os.makedirs(save_dir, exist_ok=True)
+    
+    q_vectors, q_labels = generate_q_vectors(8)
+    
+    weight_str = "with Fermi weights" if use_fermi_weights else "without Fermi weights"
+    print(f"🎯 Computing HAEM along vectors at E = {fixed_energy*1e6:.0f} µeV ({weight_str})")
+    
+    n_vectors = len(q_vectors)
+    n_cols = 2
+    n_rows = (n_vectors + 1) // 2
+    
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4*n_rows))
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+    if n_cols == 1:
+        axes = axes.reshape(-1, 1)
+    
+    colors = {'B2u': '#1f77b4', 'B3u': '#ff7f0e'}
+    linestyles = {'B2u': '-', 'B3u': '--'}
+    
+    for i, ((qx, qy), vector_label) in enumerate(zip(q_vectors, q_labels)):
+        row, col = i // n_cols, i % n_cols
+        ax = axes[row, col]
+        
+        qx_2pi = qx * a / (2*np.pi)
+        qy_2pi = qy * b / (2*np.pi)
+        
+        for pairing_type in pairing_types:
+            print(f"   Computing {pairing_type} for {vector_label}...")
+            t_values, haem_values = compute_haem_along_vector(qx, qy, 0, fixed_energy, pairing_type, 
+                                                            use_fermi_weights=use_fermi_weights)
+            
+            ax.plot(t_values, haem_values, color=colors[pairing_type], 
+                   linestyle=linestyles[pairing_type], linewidth=2.5, 
+                   label=f'{pairing_type}', alpha=0.8, marker='o', markersize=4)
+            ax.fill_between(t_values, 0, haem_values, color=colors[pairing_type], alpha=0.2)
+        
+        ax.axhline(y=0, color='black', linestyle='-', alpha=0.3, linewidth=0.8)
+        ax.set_xlabel('Position along q-vector (t)', fontsize=11)
+        ax.set_ylabel(f'ρ⁻(t×q, {fixed_energy*1e6:.0f}µeV)', fontsize=11)
+        ax.set_title(f'{vector_label}: q = ({qx_2pi:.3f}, {qy_2pi:.3f}) × 2π/(a,b)', 
+                    fontsize=12, fontweight='bold')
+        ax.legend(fontsize=10)
+        ax.grid(True, alpha=0.3)
+        ax.set_xlim(0, 1)
+    
+    # Hide unused subplots
+    for i in range(n_vectors, n_rows * n_cols):
+        row, col = i // n_cols, i % n_cols
+        axes[row, col].set_visible(False)
+    
+    plt.tight_layout()
+    
+    # Save plot
+    weight_suffix = "weighted" if use_fermi_weights else "pure"
+    vector_path_file = os.path.join(save_dir, f'haem_along_vectors_E{fixed_energy*1e6:.0f}ueV_{weight_suffix}.png')
+    plt.savefig(vector_path_file, dpi=300, bbox_inches='tight')
+    print(f"🎯 Vector path plots saved: {vector_path_file}")
+    
+    plt.show()
+
 def plot_individual_vectors(results, save_dir='outputs/phase_character'):
     """Plot HAEM signal ρ⁻(E) for each individual q-vector"""
     os.makedirs(save_dir, exist_ok=True)
@@ -448,21 +703,65 @@ def main():
     # Set UTe2 parameters
     set_parameters('odd_parity_paper')
     
-    # Compute energy scan (vectorized for speed)
+    # Compute energy scan (vectorized for speed) - adjusted parameters
+    print("\n📊 Computing energy-resolved HAEM signals...")
     results = compute_energy_scan_vectorized(
         pairing_types=['B2u', 'B3u'],
-        energy_range=(-100e-6, 100e-6),  
-        n_energies=15,   
+        energy_range=(50e-6, 500e-6),   # Increased to probe different energy scales
+        n_energies=20,   
         kz=0,  
-        V_imp=0.1,      
-        eta=2e-5,       
+        V_imp=0.2,       # Increased impurity strength for clearer signal
+        eta=5e-5,        # Increased broadening for smoother curves
         use_q_average=False,
-        n_patches=10      # Reduced for speed
+        n_patches=8
     )
     
     # Plot both averaged comparison and individual vectors
     plot_haem_comparison(results)
     plot_individual_vectors(results)
+    
+    # NEW: Plot HAEM signal along each q-vector at fixed energy (both methods)
+    print("\n🎯 Computing HAEM signals along q-vectors...")
+    plot_haem_along_vectors(
+        pairing_types=['B2u', 'B3u'], 
+        fixed_energy=200e-6,  # Energy near gap scale
+        use_fermi_weights=True
+    )
+    
+    print("\n🎯 Computing HAEM signals along q-vectors (without Fermi weights)...")
+    plot_haem_along_vectors(
+        pairing_types=['B2u', 'B3u'], 
+        fixed_energy=200e-6,
+        use_fermi_weights=False  
+    )
+    
+    # Plot diagnostics to understand the system
+    print("\n🔧 Generating diagnostic plots...")
+    plot_diagnostics()
+    
+    # Diagnostic: Investigate the spiky behavior
+    print("\n🔬 Investigating spiky HAEM behavior...")
+    qx_test, qy_test = 0.290 * 2*np.pi/a, 0.000 * 2*np.pi/b  # p1 vector
+    investigate_haem_spikes(qx_test, qy_test, 0, 200e-6, 'B2u', V_imp=0.2, eta=5e-5)
+    
+    # Compare with and without fermi weights
+    print("\n📊 Comparing HAEM with vs without Fermi weights:")
+    haem_weighted, haem_pure = compute_haem_signal_comparison(qx_test, qy_test, 0, 200e-6, 'B2u', V_imp=0.2, eta=5e-5, nk=30)
+    print(f"   With Fermi weights: {haem_weighted:.3e}")
+    print(f"   Without weights:    {haem_pure:.3e}")
+    print(f"   Ratio (pure/weighted): {haem_pure/haem_weighted if haem_weighted != 0 else 'inf':.2f}")
+    
+    # Diagnostic: Check a single point calculation
+    print("\n🔬 Diagnostic calculation:")
+    qx, qy = 0.290 * 2*np.pi/a, 0.000 * 2*np.pi/b  # p1 vector
+    energy = 200e-6
+    haem_b2u = compute_haem_signal(qx, qy, 0, energy, 'B2u', V_imp=0.2, eta=5e-5, nk_t=50, nk_ldos=50)
+    haem_b3u = compute_haem_signal(qx, qy, 0, energy, 'B3u', V_imp=0.2, eta=5e-5, nk_t=50, nk_ldos=50)
+    
+    print(f"   Single point (q=p1, E={energy*1e6:.0f}µeV):")
+    print(f"   B2u: ρ⁻ = {haem_b2u:.3e}")
+    print(f"   B3u: ρ⁻ = {haem_b3u:.3e}")
+    print(f"   Ratio: {abs(haem_b2u/haem_b3u) if haem_b3u != 0 else 'inf':.2f}")
     
     print("\n✅ HAEM calculation completed successfully!")
 

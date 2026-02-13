@@ -5,7 +5,7 @@ UTe2 Simple Fermi Contour Plotter
 Minimal script for creating clean UTe2 Fermi surface contours
 """
 from matplotlib.collections import LineCollection
-from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import RegularGridInterpolator, interp1d
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -99,7 +99,7 @@ def H_full(kx, ky, kz):
     H[0,2] = H[1,3] = H[2,0] = H[3,1] = delta
     return H
 
-def calculate_jdos(energies, weights_5f, kx_vals, ky_vals):
+def calculate_jdos(energies, weights_5f, kx_vals, ky_vals, lattice_a=0.41, lattice_b=0.61):
     """
     Calculate JDOS using 5f-weighted spectral function and FFT autocorrelation
     
@@ -133,8 +133,18 @@ def calculate_jdos(energies, weights_5f, kx_vals, ky_vals):
     
     print(f"    Spectral function range: {spectral_function.min():.4f} to {spectral_function.max():.4f}")
     
-    # Calculate JDOS using FFT-based autocorrelation 
-    A_fft = fft.fft2(spectral_function)
+    # Apply Hanning window to reduce edge effects from FFT periodic boundary conditions
+    print(f"    Applying Hanning window to reduce FFT edge artifacts...")
+    hanning_x = np.hanning(len(kx_vals))
+    hanning_y = np.hanning(len(ky_vals))
+    window_2d = np.outer(hanning_x, hanning_y)
+    
+    # Apply window to spectral function
+    windowed_spectral = spectral_function * window_2d
+    print(f"    Windowed spectral function range: {windowed_spectral.min():.4f} to {windowed_spectral.max():.4f}")
+    
+    # Calculate JDOS using FFT-based autocorrelation with windowed data
+    A_fft = fft.fft2(windowed_spectral)
     J_grid = fft.ifft2(np.abs(A_fft)**2)
     JDOS = np.real(fft.fftshift(J_grid))
     
@@ -151,8 +161,26 @@ def calculate_jdos(energies, weights_5f, kx_vals, ky_vals):
     
     print(f"    JDOS range: {JDOS.min():.4f} to {JDOS.max():.4f}")
     print(f"    JDOS momentum transfer ranges: qx ∈ [{qx_vals.min():.3f}, {qx_vals.max():.3f}], qy ∈ [{qy_vals.min():.3f}, {qy_vals.max():.3f}]")
+    print(f"    JDOS in plot units: qx ∈ [{(qx_vals/(np.pi/lattice_a)).min():.3f}, {(qx_vals/(np.pi/lattice_a)).max():.3f}] π/a, qy ∈ [{(qy_vals/(np.pi/lattice_b)).min():.3f}, {(qy_vals/(np.pi/lattice_b)).max():.3f}] π/b")
     
-    return JDOS, qx_vals, qy_vals
+    # Cap high intensity values to enhance visibility of other features
+    print(f"    Capping JDOS values above 70 to improve contrast...")
+    
+    JDOS_filtered = JDOS.copy()
+    intensity_cap = 70.0
+    
+    # Count how many values are above the cap
+    above_cap = np.sum(JDOS > intensity_cap)
+    total_points = JDOS.size
+    
+    # Apply intensity cap
+    JDOS_filtered = np.clip(JDOS, 0, intensity_cap)
+    
+    print(f"    Original JDOS max: {JDOS.max():.4f}, capped at: {intensity_cap}")
+    print(f"    Values above cap: {above_cap} / {total_points} ({100*above_cap/total_points:.1f}%)")
+    print(f"    Filtered JDOS range: {JDOS_filtered.min():.4f} to {JDOS_filtered.max():.4f}")
+    
+    return JDOS_filtered, qx_vals, qy_vals
 
 def create_fermi_contours(param_set_name, kz=0, resolution=512, plot_fermi_surface=True, plot_combined=True, plot_jdos=True):
     """Create clean Fermi surface contours using UTe2_fixed.py method"""
@@ -161,9 +189,10 @@ def create_fermi_contours(param_set_name, kz=0, resolution=512, plot_fermi_surfa
     # Set parameters for this run
     set_parameters(param_set_name)
     
-    # Create momentum grid matching the paper's convention
-    kx_vals = np.linspace(-1 * np.pi/a, 1 * np.pi/a, resolution)
-    ky_vals = np.linspace(-3 * np.pi/b, 3 * np.pi/b, resolution)
+    # Create momentum grid with extra padding to avoid windowing effects at edges
+    # We want JDOS coverage to ±1.5π/a, ±3π/b, so sample beyond this range
+    kx_vals = np.linspace(-2.5 * np.pi/a, 2.5 * np.pi/a, resolution)  # Extended padding for windowing
+    ky_vals = np.linspace(-4.5 * np.pi/b, 4.5 * np.pi/b, resolution)  # Extended padding for windowing
     
     # Compute band energies and 5f orbital weights
     energies = np.zeros((resolution, resolution, 4))
@@ -185,7 +214,10 @@ def create_fermi_contours(param_set_name, kz=0, resolution=512, plot_fermi_surfa
                 sorted_evec = evecs[:, sort_idx[n]]
                 # 5f weight = |ψ_n(0)|² + |ψ_n(1)|² (first two components are U 5f orbitals)
                 weight_5f = np.sum(np.abs(sorted_evec[:2])**2)
-                weights_5f[i, j, n] = weight_5f
+                
+                # Modulate weights with abs(cosine) having peaks every π/b
+                cosine_modulation = np.abs(np.cos(ky * b))
+                weights_5f[i, j, n] = weight_5f * cosine_modulation
     
     if plot_fermi_surface:
         # Combined Fermi surface plot for both bands
@@ -196,35 +228,73 @@ def create_fermi_contours(param_set_name, kz=0, resolution=512, plot_fermi_surfa
             energy_data = energies[:, :, band_idx]
             weight_data = weights_5f[:, :, band_idx]
             print(f"  {label}: Energy range {energy_data.min():.4f} to {energy_data.max():.4f} eV")
-            print(f"  {label}: 5f weight range {weight_data.min():.3f} to {weight_data.max():.3f}")
+            print(f"  {label}: 5f weight range {weight_data.min():.3f} to {weight_data.max():.3f} (cosine modulated)")
             if energy_data.min() <= 0 <= energy_data.max():
                 print(f"    ✓ {label} crosses Fermi level")
-                temp_fig, temp_ax = plt.subplots()
-                contour = temp_ax.contour(ky_vals, kx_vals, energy_data, levels=[0.0])
+                # Use higher resolution contours for smoother curves
+                temp_fig, temp_ax = plt.subplots(figsize=(1, 1), dpi=150)
+                contour = temp_ax.contour(ky_vals, kx_vals, energy_data, levels=[0.0], linewidths=0.5)
                 plt.close(temp_fig)
-                interpolator = RegularGridInterpolator((kx_vals, ky_vals), weight_data, method='linear', bounds_error=False, fill_value=0)
+                
+                # Use cubic interpolation for smoother weight interpolation
+                interpolator = RegularGridInterpolator((kx_vals, ky_vals), weight_data, method='cubic', bounds_error=False, fill_value=0)
                 for path in contour.allsegs[0]:
                     if len(path) > 1:
                         kx_contour = path[:, 1]
                         ky_contour = path[:, 0]
-                        contour_points = np.column_stack([kx_contour, ky_contour])
-                        interpolated_weights = interpolator(contour_points)
-                        x = ky_contour / (np.pi/b)
-                        y = kx_contour / (np.pi/a)
+                        # Interpolate more points along the contour for smoother segments
+                        
+                        # Create parameter for interpolation along the contour
+                        distances = np.cumsum(np.concatenate(([0], np.sqrt(np.diff(kx_contour)**2 + np.diff(ky_contour)**2))))
+                        
+                        # Increase point density by factor of 10 for smoother segments
+                        smooth_distances = np.linspace(0, distances[-1], len(distances) * 10)
+                        
+                        # Interpolate coordinates smoothly
+                        if len(distances) > 3:  # Need at least 4 points for cubic interpolation
+                            try:
+                                interp_kx = interp1d(distances, kx_contour, kind='cubic', bounds_error=False, fill_value='extrapolate')
+                                interp_ky = interp1d(distances, ky_contour, kind='cubic', bounds_error=False, fill_value='extrapolate')
+                                
+                                smooth_kx = interp_kx(smooth_distances)
+                                smooth_ky = interp_ky(smooth_distances)
+                            except:
+                                # Fall back to linear if cubic fails
+                                interp_kx = interp1d(distances, kx_contour, kind='linear', bounds_error=False, fill_value='extrapolate')
+                                interp_ky = interp1d(distances, ky_contour, kind='linear', bounds_error=False, fill_value='extrapolate')
+                                
+                                smooth_kx = interp_kx(smooth_distances)
+                                smooth_ky = interp_ky(smooth_distances)
+                        else:
+                            # Use original points if too few for interpolation
+                            smooth_kx = kx_contour
+                            smooth_ky = ky_contour
+                        
+                        # Get interpolated weights at smooth points
+                        smooth_contour_points = np.column_stack([smooth_kx, smooth_ky])
+                        interpolated_weights = interpolator(smooth_contour_points)
+                        
+                        # Convert to plot coordinates
+                        x = smooth_ky / (np.pi/b)
+                        y = smooth_kx / (np.pi/a)
+                        
+                        # Create segments with smoothly interpolated weights
                         for i in range(len(x)-1):
                             all_segments.append([[x[i], y[i]], [x[i+1], y[i+1]]])
                             all_weights.append((interpolated_weights[i] + interpolated_weights[i+1]) / 2)
             else:
                 print(f"    ✗ {label} does not cross Fermi level")
         if all_segments:
-            lc = LineCollection(all_segments, array=np.array(all_weights), cmap='YlOrRd', linewidths=4)
+            # Use smoother, thicker lines with anti-aliasing
+            lc = LineCollection(all_segments, array=np.array(all_weights), cmap='YlOrRd', linewidths=3, 
+                              antialiased=True, capstyle='round', joinstyle='round')
             ax.add_collection(lc)
-        # Style combined plot
-        ax.set_xlim(-3, 3)
-        ax.set_ylim(-1, 1)
+        # Style combined plot - keep same display range as before despite extended calculation grid
+        ax.set_xlim(-3, 3)  # qy range
+        ax.set_ylim(-1, 1)  # qx range - display range for Fermi surface
         ax.set_xlabel('ky (π/b units)', fontsize=14)
         ax.set_ylabel('kx (π/a units)', fontsize=14)
-        ax.set_title(f'UTe2 Combined 5f-Weighted Fermi Surface\n({param_set_name}), kz = {kz:.3f}', fontsize=16)
+        ax.set_title(f'UTe2 Combined 5f-Weighted Fermi Surface (Cosine Modulated)\n({param_set_name}), kz = {kz:.3f}', fontsize=16)
         ax.grid(True, alpha=0.3)
         ax.axhline(0, color='k', linestyle='--', alpha=0.5)
         ax.axvline(0, color='k', linestyle='--', alpha=0.5)
@@ -236,13 +306,100 @@ def create_fermi_contours(param_set_name, kz=0, resolution=512, plot_fermi_surfa
             sm.set_array([])
             cbar = fig.colorbar(sm, ax=ax, orientation='vertical', fraction=0.045, pad=0.04)
             cbar.set_label('5f Orbital Weight', fontsize=14)
-        fig.suptitle(f'UTe2 Combined 5f-Weighted Fermi Surface ({param_set_name}), kz = {kz:.3f}', fontsize=18, y=0.98)
+        fig.suptitle(f'UTe2 Combined 5f-Weighted Fermi Surface (Cosine Modulated) ({param_set_name}), kz = {kz:.3f}', fontsize=18, y=0.98)
         os.makedirs('outputs/fermi_countours_clean', exist_ok=True)
-        save_path = f'outputs/fermi_countours_clean/ute2_fermi_5f_combined_{param_set_name.lower()}_kz_{kz:.3f}.png'
+        save_path = f'outputs/fermi_countours_clean/ute2_fermi_5f_combined_cosine_{param_set_name.lower()}_kz_{kz:.3f}.png'
         plt.tight_layout()
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
         print(f"Saved combined plot to: {save_path}")
+        print("="*60)
+    
+    if plot_jdos:
+        print(f"\nCalculating JDOS with cosine-modulated spectral weights...")
+        
+        # Calculate JDOS using the cosine-modulated 5f weights
+        JDOS, qx_vals, qy_vals = calculate_jdos(energies, weights_5f, kx_vals, ky_vals, a, b)
+        
+        # Create JDOS plot
+        fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
+        
+        # Convert q-space to units of π/a and π/b for consistency
+        qx_plot = qx_vals / (np.pi/a)  # Convert to π/a units
+        qy_plot = qy_vals / (np.pi/b)  # Convert to π/b units
+        
+        # Plot JDOS with linear scale
+        im = ax.imshow(JDOS, extent=[qy_plot.min(), qy_plot.max(), qx_plot.min(), qx_plot.max()], 
+                      origin='lower', cmap='plasma', aspect='auto')
+        
+        # Style the plot
+        ax.set_xlabel('qy (π/b units)', fontsize=14)
+        ax.set_ylabel('qx (π/a units)', fontsize=14)
+        ax.set_title(f'JDOS with Cosine-Modulated 5f Weights\n({param_set_name}), kz = {kz:.3f}', fontsize=16)
+        ax.grid(True, alpha=0.3)
+        ax.axhline(0, color='w', linestyle='--', alpha=0.7, linewidth=1)
+        ax.axvline(0, color='w', linestyle='--', alpha=0.7, linewidth=1)
+        
+        # Add first Brillouin Zone rectangle (±1π/a, ±1π/b)
+        from matplotlib.patches import Rectangle
+        bz_rect = Rectangle((-1, -1), 2, 2, linewidth=2, edgecolor='white', 
+                           facecolor='none', linestyle='--', alpha=0.8)
+        ax.add_patch(bz_rect)
+        
+        # Add specific wavevectors (given in 2π/a, 2π/b units, convert to π/a, π/b for plotting)
+        wavevectors = {
+            'p1': (0.130, 0.00),
+            'p2': (0.374, 1.000), 
+            'p3': (0.130, 2.000),
+            'p4': (0.000, 2.00),
+            'p5': (-0.244, 1.000),
+            'p6': (0.619, 0.000)
+        }
+        
+        # Plot wavevectors as arrows from origin with different colors
+        colors = ['red', 'orange', 'yellow', 'green', 'cyan', 'magenta']
+        
+        for i, (label, (qx_2pi, qy_2pi)) in enumerate(wavevectors.items()):
+            # Convert from 2π/a, 2π/b units to π/a, π/b units
+            qx_pi = qx_2pi * 2  # qx in π/a units
+            qy_pi = qy_2pi * 2  # qy in π/b units
+            
+            # Plot coordinates: x-axis is qy, y-axis is qx
+            plot_x = qy_pi  # qy goes on x-axis
+            plot_y = qx_pi  # qx goes on y-axis
+            
+            # Only plot if within display range
+            if (-3 <= plot_x <= 3) and (-1.5 <= plot_y <= 1.5):
+                color = colors[i % len(colors)]
+                
+                # Draw arrow from origin to point
+                ax.annotate('', xy=(plot_x, plot_y), xytext=(0, 0),
+                           arrowprops=dict(arrowstyle='->', color=color, alpha=0.7, 
+                                         lw=2, shrinkA=0, shrinkB=0))
+                
+                # Add point marker at the end
+                ax.plot(plot_x, plot_y, 'o', color=color, markersize=6, 
+                       markeredgecolor='black', markeredgewidth=1, alpha=0.8)
+                
+                # Add label slightly offset from the point
+                ax.annotate(label, (plot_x, plot_y), xytext=(8, 8), textcoords='offset points', 
+                           color=color, fontweight='bold', fontsize=10, alpha=0.9)
+        
+        # Set reasonable plot limits
+        ax.set_xlim(-2.5, 2.5)  # qy range
+        ax.set_ylim(-1.4, 1.4)  # qx range - extended to ±1.5
+        
+        # Add colorbar
+        cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=0.045, pad=0.04)
+        cbar.set_label('JDOS (arbitrary units)', fontsize=14)
+        
+        # Save JDOS plot
+        fig.suptitle(f'Joint Density of States - Cosine Modulated ({param_set_name}), kz = {kz:.3f}', fontsize=18, y=0.98)
+        jdos_save_path = f'outputs/fermi_countours_clean/ute2_jdos_cosine_{param_set_name.lower()}_kz_{kz:.3f}.png'
+        plt.tight_layout()
+        plt.savefig(jdos_save_path, dpi=300, bbox_inches='tight')
+        plt.show()
+        print(f"Saved JDOS plot to: {jdos_save_path}")
         print("="*60)
 
 
@@ -252,8 +409,7 @@ if __name__ == "__main__":
     print("Testing Multiple Parameter Sets")
     print("=" * 60)
     
-    # Run all parameter sets
+    # Run all parameter sets with higher resolution for smoother contours
     for param_set in ['odd_parity_paper']:
         print(f"\n{'='*20} {param_set} Parameters {'='*20}")
-        for kz_val in np.linspace(0, np.pi/c, 10):
-            create_fermi_contours(param_set, kz=kz_val, resolution=301)
+        create_fermi_contours(param_set, kz=0, resolution=701)

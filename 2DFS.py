@@ -169,10 +169,7 @@ def main():
     print("UTe2 2D Fermi Surface Visualization at kz = 0")
     print("Using corrected Hamiltonian from UTe2_fixed.py")
     print("="*60)
-    
-    # Quick verification of imported Hamiltonian
-    verify_hamiltonian_hermiticity()
-    
+
     # Parameters
     kz = 0.0  # Fixed kz value
     resolution = 300  # Grid resolution (match UTe2_fixed.py)

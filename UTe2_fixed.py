@@ -88,10 +88,7 @@ def set_parameters(param_set_name):
     current_parameter_set = param_set_name
     print(f"Set parameters for: {param_set_name}")
 
-# Initialize with default parameter set
-set_parameters(current_parameter_set)
-
-# These will be set by set_parameters() function above, but declare them for clarity:
+# Initialize parameters (will be set by set_parameters function)
 # U parameters 
 muU = None
 DeltaU = None
@@ -107,7 +104,10 @@ DeltaTe = None
 tTe = None
 tch_Te = None
 tz_Te = None
-delta = None 
+delta = None
+
+# Initialize with default parameter set
+set_parameters(current_parameter_set)
 
 # momentum grid for kx-ky plane (in nm^-1, will be converted to π/a, π/b units for plotting)
 nk = 201  # Reduced for faster computation
