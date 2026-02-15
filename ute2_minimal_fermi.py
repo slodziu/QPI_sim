@@ -163,11 +163,11 @@ def calculate_jdos(energies, weights_5f, kx_vals, ky_vals, lattice_a=0.41, latti
     print(f"    JDOS momentum transfer ranges: qx ∈ [{qx_vals.min():.3f}, {qx_vals.max():.3f}], qy ∈ [{qy_vals.min():.3f}, {qy_vals.max():.3f}]")
     print(f"    JDOS in plot units: qx ∈ [{(qx_vals/(np.pi/lattice_a)).min():.3f}, {(qx_vals/(np.pi/lattice_a)).max():.3f}] π/a, qy ∈ [{(qy_vals/(np.pi/lattice_b)).min():.3f}, {(qy_vals/(np.pi/lattice_b)).max():.3f}] π/b")
     
-    # Cap high intensity values to enhance visibility of other features
-    print(f"    Capping JDOS values above 70 to improve contrast...")
+    # Cap high intensity values to enhance visibility of other features (top 5%)
+    print(f"    Capping brightest 5% of JDOS values to improve contrast...")
     
     JDOS_filtered = JDOS.copy()
-    intensity_cap = 70.0
+    intensity_cap = np.percentile(JDOS,99.5)  
     
     # Count how many values are above the cap
     above_cap = np.sum(JDOS > intensity_cap)
@@ -176,7 +176,7 @@ def calculate_jdos(energies, weights_5f, kx_vals, ky_vals, lattice_a=0.41, latti
     # Apply intensity cap
     JDOS_filtered = np.clip(JDOS, 0, intensity_cap)
     
-    print(f"    Original JDOS max: {JDOS.max():.4f}, capped at: {intensity_cap}")
+    print(f"    Original JDOS max: {JDOS.max():.4f}, capped at 95th percentile: {intensity_cap:.4f}")
     print(f"    Values above cap: {above_cap} / {total_points} ({100*above_cap/total_points:.1f}%)")
     print(f"    Filtered JDOS range: {JDOS_filtered.min():.4f} to {JDOS_filtered.max():.4f}")
     
@@ -192,7 +192,7 @@ def create_fermi_contours(param_set_name, kz=0, resolution=512, plot_fermi_surfa
     # Create momentum grid with extra padding to avoid windowing effects at edges
     # We want JDOS coverage to ±1.5π/a, ±3π/b, so sample beyond this range
     kx_vals = np.linspace(-2.5 * np.pi/a, 2.5 * np.pi/a, resolution)  # Extended padding for windowing
-    ky_vals = np.linspace(-4.5 * np.pi/b, 4.5 * np.pi/b, resolution)  # Extended padding for windowing
+    ky_vals = np.linspace(-6 * np.pi/b, 6 * np.pi/b, resolution)  # Extended padding for windowing
     
     # Compute band energies and 5f orbital weights
     energies = np.zeros((resolution, resolution, 4))
@@ -219,7 +219,7 @@ def create_fermi_contours(param_set_name, kz=0, resolution=512, plot_fermi_surfa
                 cosine_modulation = np.abs(np.cos(ky * b))
                 weights_5f[i, j, n] = weight_5f * cosine_modulation
     
-    if plot_fermi_surface:
+    if plot_fermi_surface and plot_combined:
         # Combined Fermi surface plot for both bands
         fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
         all_segments = []
@@ -321,6 +321,29 @@ def create_fermi_contours(param_set_name, kz=0, resolution=512, plot_fermi_surfa
         # Calculate JDOS using the cosine-modulated 5f weights
         JDOS, qx_vals, qy_vals = calculate_jdos(energies, weights_5f, kx_vals, ky_vals, a, b)
         
+        # Save JDOS data for later use (e.g., projection to different planes)
+        os.makedirs('raw_data_out/JDOS', exist_ok=True)
+        jdos_data_path = f'raw_data_out/JDOS/ute2_jdos_data_{param_set_name.lower()}_res_{resolution}.npz'
+        
+        # Save all relevant data
+        np.savez(jdos_data_path,
+                JDOS=JDOS,
+                qx_vals=qx_vals,
+                qy_vals=qy_vals,
+                kx_vals=kx_vals,
+                ky_vals=ky_vals,
+                energies=energies,
+                weights_5f=weights_5f,
+                # Metadata
+                param_set_name=param_set_name,
+                kz=kz,
+                lattice_a=a,
+                lattice_b=b,
+                lattice_c=c,
+                resolution=resolution)
+        
+        print(f"  Saved JDOS data to: {jdos_data_path}")
+        
         # Create JDOS plot
         fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
         
@@ -357,7 +380,7 @@ def create_fermi_contours(param_set_name, kz=0, resolution=512, plot_fermi_surfa
         }
         
         # Plot wavevectors as arrows from origin with different colors
-        colors = ['red', 'orange', 'yellow', 'green', 'cyan', 'magenta']
+        colors = ['white', 'orange', 'yellow', 'green', 'cyan', 'black']
         
         for i, (label, (qx_2pi, qy_2pi)) in enumerate(wavevectors.items()):
             # Convert from 2π/a, 2π/b units to π/a, π/b units
@@ -375,7 +398,7 @@ def create_fermi_contours(param_set_name, kz=0, resolution=512, plot_fermi_surfa
                 # Draw arrow from origin to point
                 ax.annotate('', xy=(plot_x, plot_y), xytext=(0, 0),
                            arrowprops=dict(arrowstyle='->', color=color, alpha=0.7, 
-                                         lw=2, shrinkA=0, shrinkB=0))
+                                         lw=6, shrinkA=0, shrinkB=0))
                 
                 # Add point marker at the end
                 ax.plot(plot_x, plot_y, 'o', color=color, markersize=6, 
@@ -412,4 +435,4 @@ if __name__ == "__main__":
     # Run all parameter sets with higher resolution for smoother contours
     for param_set in ['odd_parity_paper']:
         print(f"\n{'='*20} {param_set} Parameters {'='*20}")
-        create_fermi_contours(param_set, kz=0, resolution=701)
+        create_fermi_contours(param_set, kz=0, resolution=2001,plot_combined=False, plot_jdos=True)
