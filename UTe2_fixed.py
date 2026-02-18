@@ -49,6 +49,13 @@ parameter_sets = {
         'tch_U': 0.015, 'tpch_U': 0.01, 'tz_U': -0.0375,
         'muTe': -2.25, 'DeltaTe': -1.4, 'tTe': -1.5,
         'tch_Te': 0, 'tz_Te': -0.05
+    },
+        'odd_parity_paper_2': {
+        'delta': 0.13,  
+        'muU': -0.355, 'DeltaU': 0.38, 'tU': 0.205, 'tpU': 0.08,
+        'tch_U': 0.015, 'tpch_U': 0.01, 'tz_U': -0.03755,
+        'muTe': -2.25, 'DeltaTe': -1.4, 'tTe': -1.5,
+        'tch_Te': 0, 'tz_Te': -0.05
     }
 }
 
