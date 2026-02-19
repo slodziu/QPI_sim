@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import json
+from scipy.interpolate import RegularGridInterpolator
 
 
 def load_jdos_data(kz=0.0, data_dir='raw_data_out/week16'):
@@ -146,7 +147,7 @@ def plot_jdos(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_parity_paper', use_
     # Plot JDOS with qy on x-axis, qx on y-axis
     # imshow expects [rows, columns] = [qx, qy] which plots qx on y-axis, qy on x-axis
     im = ax.imshow(jdos, extent=[qy_plot.min(), qy_plot.max(), qx_plot.min(), qx_plot.max()], 
-                  origin='lower', cmap='plasma', aspect='auto')
+                  origin='lower', cmap='gray_r', aspect='auto')
     
     # Style
     ax.set_xlabel(r'$q_y$ (π/b)', fontsize=16, fontweight='bold')
@@ -159,12 +160,16 @@ def plot_jdos(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_parity_paper', use_
                 fontsize=18, fontweight='bold')
     
     # Grid
-    ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
-    ax.axhline(0, color='w', linestyle='-', alpha=0.7, linewidth=1)
-    ax.axvline(0, color='w', linestyle='-', alpha=0.7, linewidth=1)
+    ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5, color='gray')
+    
+    # Add first Brillouin Zone rectangle (±π/a, ±π/b)
+    from matplotlib.patches import Rectangle
+    bz_rect = Rectangle((-1, -1), 2, 2, linewidth=2, edgecolor='red',
+                       facecolor='none', linestyle='--', alpha=0.8)
+    ax.add_patch(bz_rect)
     
     # Set axis limits
-    ax.set_xlim(qy_plot.min(), qy_plot.max())
+    ax.set_xlim(qy_plot.min()*0.5, qy_plot.max()*0.5)
     ax.set_ylim(qx_plot.min()*0.8, qx_plot.max()*0.8)
     ax.set_aspect('equal', adjustable='box')
     
@@ -241,7 +246,7 @@ def plot_jdos(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_parity_paper', use_
     cbar.ax.tick_params(labelsize=11)
     
     # Background
-    ax.set_facecolor('black')
+    ax.set_facecolor('white')
     fig.patch.set_facecolor('white')
     
     # Save
@@ -251,6 +256,202 @@ def plot_jdos(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_parity_paper', use_
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
     print(f"  Saved JDOS plot to: {save_path}")
+    
+    plt.show()
+    
+    return fig, ax
+
+
+def plot_jdos_011_projection(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_parity_paper'):
+    """
+    Plot JDOS projected onto the (0-11) plane with qc* on x-axis, qx on y-axis.
+    
+    The (0-11) plane projection converts ky -> kc* where:
+    c* = b/(2sin(theta)) = 0.612/(2*0.4) = 0.76 nm
+    
+    This function properly interpolates the JDOS data onto the new (0-11) grid.
+    
+    Parameters:
+    - jdos: JDOS array
+    - qx_vals, qy_vals: momentum transfer grids (in original coordinates)
+    - kz: out-of-plane momentum
+    - param_set: parameter set name
+    """
+    print("\nPlotting JDOS on (0-11) plane projection...")
+    
+    from UTe2_fixed import a, b
+    
+    # Define c* for the (0-11) plane
+    # c* = b/(2*sin(theta)), with b = 0.612 nm and sin(theta) = 0.4
+    # c* = 0.76 nm, which gives c*/c = 0.5
+    # The scaling factor from ky to kc* is 0.5
+    c_star = 0.76  # nm
+    scaling_factor = 0.5
+    print(f"  c* = {c_star:.3f} nm")
+    print(f"  Scaling factor ky->kc*: {scaling_factor}")
+    print(f"  b = {b:.3f} nm")
+    
+    # Convert original axes to dimensionless units (π/a, π/b)
+    qx_pi_a = qx_vals / (np.pi / a)  # qx in π/a units
+    qy_pi_b = qy_vals / (np.pi / b)  # qy in π/b units
+    
+    print(f"  Original q-space: qx=[{qx_pi_a.min():.2f}, {qx_pi_a.max():.2f}] π/a")
+    print(f"  Original q-space: qy=[{qy_pi_b.min():.2f}, {qy_pi_b.max():.2f}] π/b")
+    
+    # Create interpolator for the original JDOS data
+    print("  Creating interpolator for JDOS data...")
+    interpolator = RegularGridInterpolator((qx_pi_a, qy_pi_b), jdos,
+                                          method='linear', bounds_error=False, fill_value=0)
+    
+    # Create the new (0-11) coordinate grids
+    # qx stays the same, qc* is qy scaled by 0.5
+    qx_011 = qx_pi_a  # π/a units, unchanged
+    qc_011_pi_cstar = qy_pi_b * scaling_factor  # π/c* units, compressed by 0.5
+    
+    print(f"  Transformed q-space: qx=[{qx_011.min():.2f}, {qx_011.max():.2f}] π/a")
+    print(f"  Transformed q-space: qc*=[{qc_011_pi_cstar.min():.2f}, {qc_011_pi_cstar.max():.2f}] π/c*")
+    
+    # Create meshgrid for the new (0-11) coordinates
+    qx_011_grid, qc_011_grid = np.meshgrid(qx_011, qc_011_pi_cstar, indexing='ij')
+    
+    # Map (0-11) coordinates back to original (001) coordinates for interpolation
+    # qx unchanged, qc* needs to be expanded back to qy
+    qx_orig_for_interp = qx_011_grid  # qx unchanged
+    qy_orig_for_interp = qc_011_grid / scaling_factor  # Expand qc* back to qy coordinates
+    
+    # Interpolate JDOS at these points
+    print("  Interpolating JDOS onto (0-11) grid...")
+    interp_points = np.column_stack([qx_orig_for_interp.ravel(), qy_orig_for_interp.ravel()])
+    JDOS_011_flat = interpolator(interp_points)
+    JDOS_011 = JDOS_011_flat.reshape(qx_011_grid.shape)
+    
+    print(f"  Interpolated JDOS range: {JDOS_011.min():.4f} to {JDOS_011.max():.4f}")
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
+    
+    # Plot JDOS with qc* on x-axis, qx on y-axis
+    im = ax.imshow(JDOS_011, 
+                  extent=[qc_011_pi_cstar.min(), qc_011_pi_cstar.max(), 
+                         qx_011.min(), qx_011.max()], 
+                  origin='lower', cmap='gray_r', aspect='auto')
+    
+    # Style
+    ax.set_xlabel(r'$q_{c^*}$ (π/c*)', fontsize=16, fontweight='bold')
+    ax.set_ylabel(r'$q_x$ (π/a)', fontsize=16, fontweight='bold')
+    
+    # Title
+    weight_str = '5f-Weighted'
+    ax.set_title(f'UTe₂ JDOS on (0-11) Plane ({weight_str})\n' +
+                f'kz={kz:.3f}, {param_set}', 
+                fontsize=18, fontweight='bold')
+    
+    # Grid
+    ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5, color='gray')
+    
+    # Add first Brillouin Zone rectangle (±π/a, ±π/c*)
+    from matplotlib.patches import Rectangle
+    bz_rect = Rectangle((-1, -1), 2, 2, linewidth=2, edgecolor='red',
+                       facecolor='none', linestyle='--', alpha=0.8)
+    ax.add_patch(bz_rect)
+    
+    # Set axis limits
+    ax.set_xlim(qc_011_pi_cstar.min()*0.8, qc_011_pi_cstar.max()*0.8)
+    ax.set_ylim(qx_011.min()*0.8, qx_011.max()*0.8)
+    ax.set_aspect('equal', adjustable='box')
+    
+    # Add projected wavevectors p1-p6 from origin (0,0)
+    print("  Adding projected wavevectors from origin...")
+    
+    # Original wavevector definitions (in units of 2π/a, 2π/b)
+    wavevectors_original = {
+        'p1': (0.29, 0),
+        'p2': (0.43, 1),
+        'p3': (0.29, 2),
+        'p4': (0, 2),
+        'p5': (-0.14, 1),
+        'p6': (0.57, 0)
+    }
+    
+    # Convert to π/a, π/b units (multiply by 2)
+    wavevectors_pi = {k: (v[0]*2, v[1]*2) for k, v in wavevectors_original.items()}
+    
+    # Project to (0-11) plane: convert qy (π/b units) to qc* (π/c* units)
+    # qc* [π/c*] = qy [π/b] * scaling_factor
+    wavevectors_projected = {}
+    for label, (qx_pi_a, qy_pi_b) in wavevectors_pi.items():
+        qx_proj = qx_pi_a  # qx stays the same
+        qc_proj = qy_pi_b * scaling_factor  # convert from π/b to π/c*
+        wavevectors_projected[label] = (qx_proj, qc_proj)
+        print(f"    {label}: ({qx_pi_a:.2f}, {qy_pi_b:.2f}) π/a,π/b -> ({qx_proj:.2f}, {qc_proj:.2f}) π/a,π/c*")
+    
+    # Colors for wavevectors
+    vector_colors = {
+        'p1': '#FF0000',  # Red
+        'p2': '#0000FF',  # Blue
+        'p3': '#FFFF00',  # Yellow
+        'p4': '#00FF00',  # Green
+        'p5': '#FF8800',  # Orange
+        'p6': '#FF00FF'   # Magenta
+    }
+    
+    # Label positioning offsets and alignments (adjusted for new coordinates)
+    label_positions = {
+        'p1': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
+        'p2': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
+        'p3': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
+        'p4': {'offset': (0.0, 0.12), 'ha': 'center', 'va': 'bottom'},
+        'p5': {'offset': (-0.10, 0.08), 'ha': 'right', 'va': 'bottom'},
+        'p6': {'offset': (0.10, 0.0), 'ha': 'left', 'va': 'center'}
+    }
+    
+    # Plot wavevectors from origin
+    origin = (0, 0)  # (qx, qc*) = (0, 0)
+    
+    for label, (qx_proj, qc_proj) in wavevectors_projected.items():
+        # Endpoint is the projected vector
+        endpoint = (qx_proj, qc_proj)
+        
+        # Plot arrow (qc* on x-axis, qx on y-axis)
+        ax.annotate('', 
+                   xy=(endpoint[1], endpoint[0]),  # (qc*, qx)
+                   xytext=(origin[1], origin[0]),  # (qc*, qx)
+                   arrowprops=dict(arrowstyle='->', color=vector_colors[label], 
+                                  lw=3, alpha=0.9, shrinkA=0, shrinkB=0))
+        
+        # Add marker at endpoint
+        ax.plot(endpoint[1], endpoint[0], 'o', color=vector_colors[label], 
+               markersize=8, markeredgecolor='black', markeredgewidth=1.5, zorder=10)
+        
+        # Add label with smart positioning
+        pos_info = label_positions[label]
+        label_qc = endpoint[1] + pos_info['offset'][0]
+        label_qx = endpoint[0] + pos_info['offset'][1]
+        
+        ax.text(label_qc, label_qx, label, 
+               color='black', fontsize=12, fontweight='bold',
+               horizontalalignment=pos_info['ha'],
+               verticalalignment=pos_info['va'],
+               bbox=dict(boxstyle='round,pad=0.3', 
+                        facecolor='white', edgecolor='black', linewidth=1.5, alpha=0.95),
+               zorder=11)
+    
+    # Colorbar
+    cbar = plt.colorbar(im, ax=ax, label='JDOS (arbitrary units)', orientation='vertical',
+                       fraction=0.045, pad=0.04)
+    cbar.ax.tick_params(labelsize=11)
+    
+    # Background
+    ax.set_facecolor('white')
+    fig.patch.set_facecolor('white')
+    
+    # Save
+    os.makedirs('outputs/week16', exist_ok=True)
+    save_path = f'outputs/week16/jdos_011_projection_kz_{kz:.3f}.png'
+    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
+    print(f"  Saved (0-11) projection JDOS plot to: {save_path}")
     
     plt.show()
     
@@ -269,9 +470,13 @@ def main():
         energies, weights_5f, kx_vals, ky_vals, weighted=True
     )
     
-    # Plot JDOS
+    # Plot JDOS in standard kx-ky plane
     fig, ax = plot_jdos(jdos, qx_vals, qy_vals, kz=kz,
                        param_set=metadata['param_set'], use_log=False)
+    
+    # Plot JDOS projected onto (0-11) plane
+    fig_011, ax_011 = plot_jdos_011_projection(jdos, qx_vals, qy_vals, kz=kz,
+                                               param_set=metadata['param_set'])
     
     # Save JDOS data
     output_dir = 'raw_data_out/week16'

@@ -19,6 +19,35 @@ import time
 from UTe2_fixed import H_full, a, b, c, set_parameters
 
 # =============================================================================
+# BRILLOUIN ZONE FOLDING
+# =============================================================================
+
+def fold_to_first_bz(kx, ky, kz):
+    """
+    Fold k-points back to first Brillouin zone using periodic boundary conditions
+    
+    Important for umklapp processes where k+q goes outside [-π/a, π/a] × [-π/b, π/b]
+    
+    Args:
+        kx, ky, kz: Momentum components (can be outside first BZ)
+        
+    Returns:
+        kx_folded, ky_folded, kz_folded: Folded back to first BZ
+    """
+    # BZ boundaries
+    kx_max = np.pi / a
+    ky_max = np.pi / b
+    kz_max = np.pi / c
+    
+    # Fold using modulo arithmetic: k_folded = ((k + k_max) % (2*k_max)) - k_max
+    # This maps any k to [-k_max, k_max]
+    kx_folded = ((kx + kx_max) % (2 * kx_max)) - kx_max
+    ky_folded = ((ky + ky_max) % (2 * ky_max)) - ky_max
+    kz_folded = ((kz + kz_max) % (2 * kz_max)) - kz_max
+    
+    return kx_folded, ky_folded, kz_folded
+
+# =============================================================================
 # FERMI SURFACE IDENTIFICATION
 # =============================================================================
 
@@ -112,6 +141,9 @@ def find_relevant_k_points_for_q(qx, qy, fs_grid, fs_weights, kz=0, threshold=0.
     """
     print(f"   Finding k-points where both k and k+q on FS...")
     
+    # Use looser threshold for k+q check (original threshold too strict after shift)
+    threshold_kpq = threshold * 10  # 0.01 instead of 0.001
+    
     relevant_k = []
     relevant_weights = []
     kpq_weights = []
@@ -121,12 +153,12 @@ def find_relevant_k_points_for_q(qx, qy, fs_grid, fs_weights, kz=0, threshold=0.
             continue
             
         # Check if k+q is also near FS
-        kx_pq = kx + qx
-        ky_pq = ky + qy
+        # CRITICAL: Fold k+q back to first BZ for umklapp processes
+        kx_pq, ky_pq, kz_pq = fold_to_first_bz(kx + qx, ky + qy, kz)
         
-        H_kpq = H_full(kx_pq, ky_pq, kz)
+        H_kpq = H_full(kx_pq, ky_pq, kz_pq)
         eigenvals_kpq = np.linalg.eigvalsh(H_kpq)
-        weight_kpq = np.exp(-np.min(np.abs(eigenvals_kpq))**2 / threshold**2)
+        weight_kpq = np.exp(-np.min(np.abs(eigenvals_kpq))**2 / threshold_kpq**2)
         
         if weight_kpq > 0.01:
             relevant_k.append((kx, ky))
@@ -164,7 +196,10 @@ def compute_delta_N_adaptive(qx, qy, qz, energy, pairing_type, T_matrix,
     ky_arr = rel_k[:, 1].reshape(-1, 1)
     
     G_k_array = compute_green_function_vectorized(kx_arr, ky_arr, qz, energy, pairing_type, eta)
-    G_kpq_array = compute_green_function_vectorized(kx_arr + qx, ky_arr + qy, qz, energy, pairing_type, eta)
+    
+    # CRITICAL: Fold k+q back to first BZ for umklapp processes
+    kx_pq_arr, ky_pq_arr, qz_folded = fold_to_first_bz(kx_arr + qx, ky_arr + qy, qz)
+    G_kpq_array = compute_green_function_vectorized(kx_pq_arr, ky_pq_arr, qz_folded, energy, pairing_type, eta)
     
     # Compute matrix elements
     n_points = len(rel_k)
@@ -189,14 +224,32 @@ def compute_delta_N_adaptive(qx, qy, qz, energy, pairing_type, T_matrix,
 def compute_haem_adaptive(vectors_dict, pairing_types=['B2u', 'B3u'],
                          energy_range=(1e-6, 3e-4), n_energies=20,
                          kz=0, V_imp=0.03, eta=5e-5,
-                         nk_coarse=100, refinement=5):
+                         nk_coarse=100, refinement=5, nk_t=100):
     """
     Adaptive HAEM calculation focusing on FS regions
+    
+    Args:
+        vectors_dict: Dictionary {label: (qx_2pi, qy_2pi)}
+        pairing_types: List of pairing symmetries
+        energy_range: (E_min, E_max) in eV
+        n_energies: Number of energy points
+        kz: Out-of-plane momentum
+        V_imp: Impurity potential strength
+        eta: Broadening parameter
+        nk_coarse: Coarse grid for FS identification (default: 100)
+        refinement: Dense sampling factor around each FS point (default: 5)
+        nk_t: T-matrix k-space resolution (default: 100)
     """
     from HAEMUTe2 import compute_t_matrix
     
     print("🚀 Adaptive HAEM Calculation")
     print("="*70)
+    print(f"   FS identification: {nk_coarse}×{nk_coarse} coarse grid")
+    print(f"   FS refinement: {refinement}×{refinement} dense patches")
+    print(f"   T-matrix resolution: {nk_t}×{nk_t}")
+    print(f"   Energy range: {energy_range[0]*1e6:.0f}-{energy_range[1]*1e6:.0f} µeV")
+    print(f"   V_imp = {V_imp:.3f} eV, η = {eta*1e6:.0f} µeV")
+    print()
     
     # Step 1: Identify FS regions (do this once)
     fs_points_coarse = find_fermi_surface_regions(kz, nk_coarse)
@@ -206,20 +259,19 @@ def compute_haem_adaptive(vectors_dict, pairing_types=['B2u', 'B3u'],
     results = {}
     
     for pairing_type in pairing_types:
-        print(f"\n📊 Computing {pairing_type}...")
+        print(f"\n🔬 Computing {pairing_type} pairing...")
         start_time = time.time()
         
-        # Pre-compute T-matrices
-        print(f"   Pre-computing T-matrices...")
+        # Pre-compute T-matrices for all energies
+        print(f"   📊 Pre-computing T-matrices (resolution: {nk_t}×{nk_t})...")
         T_matrices_pos = []
         T_matrices_neg = []
         
         for i, energy in enumerate(energies):
             if (i + 1) % 5 == 0:
                 print(f"      Progress: {i+1}/{n_energies}")
-            # T-matrix uses standard approach (could also optimize this)
-            T_pos = compute_t_matrix(energy, pairing_type, V_imp, eta, nk=100, kz=kz)
-            T_neg = compute_t_matrix(-energy, pairing_type, V_imp, eta, nk=100, kz=kz)
+            T_pos = compute_t_matrix(energy, pairing_type, V_imp, eta, nk=nk_t, kz=kz)
+            T_neg = compute_t_matrix(-energy, pairing_type, V_imp, eta, nk=nk_t, kz=kz)
             T_matrices_pos.append(T_pos)
             T_matrices_neg.append(T_neg)
         
@@ -267,7 +319,7 @@ def main():
     set_parameters('odd_parity_paper')
     
     vectors_dict = {
-        'p2': (0.43, 1.0),
+        'p2': (0.374, 1.000),
         'p5': (-0.244, 1.000),
         'p6': (0.619, 0.000)
     }
@@ -277,14 +329,16 @@ def main():
     
     results = compute_haem_adaptive(
         vectors_dict=vectors_dict,
-        pairing_types=['B2u'],  # Test with one first
-        energy_range=(1e-6, 3e-4),
-        n_energies=10,  # Fewer for testing
+        pairing_types=['B2u', 'B3u'],
+        energy_range=(1e-6, 6e-4),
+        n_energies=35,
         kz=0,
         V_imp=0.03,
         eta=5e-5,
-        nk_coarse=100,  # Coarse FS identification
-        refinement=3    # Dense sampling factor
+        nk_coarse=200,  # Coarse FS identification
+        refinement=3,   # Dense sampling factor
+        nk_t=100
+                        # T-matrix resolution
     )
     
     # Quick plot

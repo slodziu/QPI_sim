@@ -28,7 +28,7 @@ def calculate_5f_weighted_fermi_surface(kz=0.0, resolution=512):
     
     # Create k-space grid
     kx_vals = np.linspace(-2*np.pi/a, 2*np.pi/a, resolution)
-    ky_vals = np.linspace(-3*np.pi/b, 3*np.pi/b, resolution)
+    ky_vals = np.linspace(-6*np.pi/b, 6*np.pi/b, resolution)
     
     # Create meshgrid and flatten for vectorized computation
     KX, KY = np.meshgrid(kx_vals, ky_vals, indexing='ij')
@@ -542,7 +542,7 @@ def main():
 
     # Calculate Fermi surface with 5f weights
     kz = 0.0  # 2D slice at kz=0
-    resolution = 1023  # Good balance of speed and quality
+    resolution = 2001  # Good balance of speed and quality
     
     energies, weights_5f, kx_vals, ky_vals = calculate_5f_weighted_fermi_surface(
         kz=kz, resolution=resolution

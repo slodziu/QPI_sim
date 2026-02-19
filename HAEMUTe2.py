@@ -244,8 +244,14 @@ def compute_delta_N_element_integrated(qx, qy, qz, energy, pairing_type, T_matri
     Integration scheme (Cartesian grid):
         - Create grid of points around (qx, qy)
         - Keep only points within radius: |q' - q| < R
+        - **CRITICAL**: Only sample points within 1st BZ (auto-crops circle)
         - Compute δN at each point
         - Simple average: ⟨δN⟩ = (1/N) Σᵢ δN(qᵢ)
+    
+    For vectors near BZ edge (e.g., p2 with qy ≈ 2π/b):
+        - Uses partial circle (half-moon) entirely within 1st BZ
+        - Avoids mixing physically different scattering processes
+        - Preserves experimental resolution averaging
     
     Args:
         qx, qy: Center q-vector in absolute units
@@ -259,11 +265,15 @@ def compute_delta_N_element_integrated(qx, qy, qz, energy, pairing_type, T_matri
         n_grid: Grid size (n_grid x n_grid points sampled, default: 5)
         
     Returns:
-        Average δN over points within the disk
+        Average δN over points within the disk AND within 1st BZ
     """
     # Convert radius to absolute units
     q_radius_x = q_radius * 2*np.pi / a
     q_radius_y = q_radius * 2*np.pi / b
+    
+    # BZ boundaries
+    qx_max = np.pi / a
+    qy_max = np.pi / b
     
     # Create grid around q-vector
     qx_range = np.linspace(qx - q_radius_x, qx + q_radius_x, n_grid)
@@ -271,9 +281,14 @@ def compute_delta_N_element_integrated(qx, qy, qz, energy, pairing_type, T_matri
     
     delta_N_values = []
     
-    # Sample all points in grid that fall within the circle
+    # Sample all points in grid that fall within the circle AND within 1st BZ
     for qx_sample in qx_range:
         for qy_sample in qy_range:
+            # CRITICAL: Check if point is within 1st Brillouin Zone
+            # This allows partial circles near BZ edge (avoids folding artifacts)
+            if abs(qx_sample) > qx_max or abs(qy_sample) > qy_max:
+                continue  # Skip points outside 1st BZ
+            
             # Check if point is within radius
             dx = (qx_sample - qx) / q_radius_x
             dy = (qy_sample - qy) / q_radius_y
@@ -307,7 +322,8 @@ def compute_haem_signal(qx, qy, qz, energy, pairing_type, V_imp=0.15, eta=1e-5, 
 
 def compute_haem_energy_scan_specific_vectors(vectors_dict, pairing_types=['B2u', 'B3u'], 
                                              energy_range=(10e-6, 500e-6), n_energies=50,
-                                             kz=0, V_imp=0.15, eta=1e-5, q_radius=0.05):
+                                             kz=0, V_imp=0.15, eta=1e-5, q_radius=0.05,
+                                             nk_t=70, nk_ldos=60, n_grid=5):
     """
     Compute HAEM signal as a function of energy for specific q-vectors
     
@@ -323,6 +339,9 @@ def compute_haem_energy_scan_specific_vectors(vectors_dict, pairing_types=['B2u'
         V_imp: Impurity potential strength
         eta: Broadening parameter
         q_radius: Radius for q-space integration (in units of 2π/a)
+        nk_t: T-matrix k-space resolution (default: 70)
+        nk_ldos: LDOS k-space resolution (default: 60)
+        n_grid: q-space integration grid size (default: 5)
         
     Returns:
         Dictionary with results for each pairing type and vector
@@ -331,9 +350,11 @@ def compute_haem_energy_scan_specific_vectors(vectors_dict, pairing_types=['B2u'
     print(f"   Energy range: {energy_range[0]*1e6:.0f}-{energy_range[1]*1e6:.0f} µeV")
     print(f"   Number of energies: {n_energies}")
     print(f"   Vectors: {list(vectors_dict.keys())}")
-    print(f"   q-space integration radius: {q_radius:.3f} × 2π/a")
+    print(f"   q-space integration: {q_radius:.3f} × 2π/a, grid {n_grid}×{n_grid}")
+    print(f"   T-matrix resolution: {nk_t}×{nk_t}")
+    print(f"   LDOS resolution: {nk_ldos}×{nk_ldos}")
     print(f"   kz = {kz*1.39/np.pi:.2f}π/c")
-    print(f"   V_imp = {V_imp:.3f} eV")
+    print(f"   V_imp = {V_imp:.3f} eV, η = {eta*1e6:.0f} µeV")
     
     energies = np.linspace(energy_range[0], energy_range[1], n_energies)
     
@@ -344,11 +365,9 @@ def compute_haem_energy_scan_specific_vectors(vectors_dict, pairing_types=['B2u'
         start_time = time.time()
         
         # Pre-compute T-matrices for all energies
-        print(f"   Pre-computing T-matrices...")
+        print(f"   Pre-computing T-matrices (resolution: {nk_t}×{nk_t})...")
         T_matrices_pos = []
         T_matrices_neg = []
-        nk_t = 70  # T-matrix k-space resolution
-        nk_ldos = 60  # LDOS k-space resolution
         for i, energy in enumerate(energies):
             if (i + 1) % 5 == 0:
                 print(f"      T-matrix progress: {i+1}/{n_energies}")
@@ -377,12 +396,13 @@ def compute_haem_energy_scan_specific_vectors(vectors_dict, pairing_types=['B2u'
                     continue
                     
                 # Integrate over disk around q-vector (matches experimental finite resolution)
+                # Auto-crops to 1st BZ (uses partial circles near boundaries)
                 delta_N_pos = compute_delta_N_element_integrated(qx, qy, qz_val, energy, pairing_type, 
                                                                  T_matrices_pos[i], eta, nk_ldos, 
-                                                                 q_radius=q_radius, n_grid=5)
+                                                                 q_radius=q_radius, n_grid=n_grid)
                 delta_N_neg = compute_delta_N_element_integrated(qx, qy, qz_val, -energy, pairing_type, 
                                                                  T_matrices_neg[i], eta, nk_ldos,
-                                                                 q_radius=q_radius, n_grid=5)
+                                                                 q_radius=q_radius, n_grid=n_grid)
                 haem_values.append(delta_N_pos - delta_N_neg)
                 
                 if (i + 1) % 10 == 0:
@@ -494,92 +514,6 @@ def load_haem_results(filepath='raw_data_out/haem_ute2/haem_results.npz'):
 # =============================================================================
 # PLOTTING FUNCTIONS
 # =============================================================================
-
-def plot_haem_vs_energy_paper_style(results, vectors_dict, save_dir='outputs/haem_ute2'):
-    """
-    Plot HAEM signal vs energy in the style of Sharma et al. paper
-    
-    Creates a figure similar to Fig. 1d in the paper showing ρ⁻(E) vs E
-    for different pairing symmetries.
-    """
-    os.makedirs(save_dir, exist_ok=True)
-    
-    pairing_types = list(results.keys())
-    vector_labels = list(vectors_dict.keys())
-    energies = results[pairing_types[0]]['energies']
-    
-    # Create figure with subplots for each vector
-    n_vectors = len(vector_labels)
-    fig, axes = plt.subplots(1, n_vectors, figsize=(6*n_vectors, 5))
-    
-    if n_vectors == 1:
-        axes = [axes]
-    
-    # Colors matching the paper style
-    colors = {
-        'B2u': '#E91E63',  # Magenta/Pink for B2u
-        'B3u': '#000000'   # Black for B3u
-    }
-    
-    linestyles = {
-        'B2u': '-',
-        'B3u': '-'
-    }
-    
-    labels = {
-        'B2u': r'$\rho^-_{s_+}$',
-        'B3u': r'$\rho^-_{s_-}$'
-    }
-    
-    for idx, vector_label in enumerate(vector_labels):
-        ax = axes[idx]
-        
-        qx_2pi, qy_2pi = vectors_dict[vector_label]
-        
-        # Plot each pairing type
-        for pairing_type in pairing_types:
-            vector_data = results[pairing_type]['vectors'][vector_label]
-            
-            # Normalize to make comparison clear
-            if np.max(np.abs(vector_data)) > 0:
-                vector_data_norm = vector_data / np.max(np.abs(vector_data))
-            else:
-                vector_data_norm = vector_data
-            
-            ax.plot(energies, vector_data_norm, 
-                   color=colors[pairing_type], 
-                   linestyle=linestyles[pairing_type], 
-                   linewidth=2.5, 
-                   label=labels[pairing_type],
-                   alpha=0.9)
-        
-        # Formatting to match paper style
-        ax.axhline(y=0, color='gray', linestyle='-', alpha=0.5, linewidth=1)
-        ax.set_xlabel('Energy (meV)', fontsize=14, fontweight='bold')
-        ax.set_ylabel(r'$\rho^-$(E) (normalized)', fontsize=14, fontweight='bold')
-        ax.set_title(f'{vector_label}: q = ({qx_2pi:.2f}, {qy_2pi:.2f}) × 2π/(a,b)', 
-                    fontsize=13, fontweight='bold')
-        ax.legend(fontsize=12, frameon=True, loc='best')
-        ax.grid(True, alpha=0.3, linestyle='--')
-        ax.tick_params(labelsize=12)
-        
-        # Convert µeV to meV for x-axis
-        ax.set_xlim(energies[0]/1000, energies[-1]/1000)
-        
-        # Adjust tick labels
-        xticks = ax.get_xticks()
-        ax.set_xticklabels([f'{x:.1f}' for x in xticks])
-    
-    plt.tight_layout()
-    
-    # Save figure
-    plot_file = os.path.join(save_dir, 'haem_vs_energy_paper_style.png')
-    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
-    print(f"\n📊 Paper-style plot saved: {plot_file}")
-    
-    plt.show()
-    
-    return fig, axes
 
 
 def plot_haem_combined(results, vectors_dict, save_dir='outputs/haem_ute2'):
@@ -726,23 +660,19 @@ def main():
     print(f"\n📍 Vectors to analyze:")
     for label, (qx, qy) in vectors_dict.items():
         print(f"   {label}: ({qx:+.2f}, {qy:+.2f}) × 2π/(a,b)")
-    
-    # Compute HAEM energy scan
-    print("\n⚡ Performance settings:")
-    print("   T-matrix k-resolution: 70×70")
-    print("   LDOS k-resolution: 60×60")
-    print("   q-integration grid: 5×5 (~20 points per disk)")
-    print("   Expected time: ~8-12 min per pairing type\n")
-    
+
     results = compute_haem_energy_scan_specific_vectors(
         vectors_dict=vectors_dict,
         pairing_types=['B2u', 'B3u'],
-        energy_range=(1e-6, 3e-4), 
+        energy_range=(1e-6, 4e-4), 
         n_energies=20,
         kz=0,
         V_imp=0.03,  # Weak impurity potential (30 meV) as per HAEM paper
         eta=5e-5,  # Increased broadening for smoother signal (50 µeV)
-        q_radius=0.08  # Integration radius around q-vectors (4% of BZ)
+        q_radius=0.08,  # Integration radius around q-vectors (4% of BZ)
+        nk_t=200,  # T-matrix resolution
+        nk_ldos=200,  # LDOS resolution
+        n_grid=10  # q-integration grid
     )
     
     # Save results for later analysis

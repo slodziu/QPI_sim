@@ -1,28 +1,3 @@
-Set parameters for: odd_parity_paper
-🚀 HAEM CALCULATION WITH CORRECTED PHYSICS
-✓ Proper τ₃ projection in full Nambu space
-✓ Mandatory Fermi surface filtering
-✓ Comprehensive debug output
-✓ Antisymmetrization before real part
-✓ q→0 contamination guards
-
-💡 To run validation tests first: python phase_character.py validate
-
-Set parameters for: odd_parity_paper
-=== 1D HAEM Line Plot (Publication Quality) ===
-CONFIGURATION:
-  • Fixed energy: E = 200 µeV
-  • Vectors: p1, p2, p5, p6 (literature coordinates)
-  • Path sampling: 100 points per vector
-  • k-space density: nk = 80 (high precision)
-  • T-matrices pre-computed once per pairing type
-  • Output: Single 2D line plot with all vectors
-
-
-============================================================
-Processing B2u pairing symmetry
-============================================================
-
 Pre-computing T-matrices at E = 200.0 µeV...
   Broadening η = 30.00 µeV
   k-space grid: 50×50 = 2500 points
