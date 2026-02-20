@@ -156,9 +156,9 @@ for band in range(energies_arr.shape[2]):
 # Position them on the E=0 plane (Emin)
 for i, label in enumerate(labels):
     # Starting point (adjust to a known FS point, e.g., (0.8, 0))
-    ax.quiver(0.8, 0, Emin*E_scale, qx_arr[i], qy_arr[i], 0, 
+    ax.quiver(-0.39, -2, Emin*E_scale, qx_arr[i], qy_arr[i], 0, 
               color='black', length=1.0, pivot='tail', linewidth=2)
-    ax.text(0.8 + qx_arr[i], 0 + qy_arr[i], Emin*E_scale, label, fontsize=10, weight='bold')
+    ax.text(-0.39+ qx_arr[i], 0 + qy_arr[i], Emin*E_scale, label, fontsize=10, weight='bold')
 
 ax.set_xlabel(r'$k_x$ ($\pi/a$)')
 ax.set_ylabel(r'$k_y$ ($\pi/b$)')
@@ -166,6 +166,7 @@ ax.set_zlabel('Energy (meV)')
 ax.set_zlim([Emin * E_scale, Emax * E_scale])
 
 plt.title(f'UTe2 Gap Evolution: {pairing} Symmetry\nRed/Blue = Phase Sign')
+plt.savefig('outputs/week16/UTe2_gap_stack_B3u.png', dpi=300)
 plt.show()
 
 # --- Fermi surface contour legend ---
@@ -193,4 +194,5 @@ ax.set_ylim([ky_plot[0], ky_plot[-1]])
 ax.set_box_aspect([1, (ky_plot[-1]-ky_plot[0])/(kx_plot[-1]-kx_plot[0]), (Emax-Emin)/(kx_plot[-1]-kx_plot[0])])
 ax.set_zlim([Emin, Emax])
 plt.tight_layout()
-plt.show()
+
+print("3D gap stack plot saved as 'outputs/week16/UTe2_gap_stack_B3u.png'")
