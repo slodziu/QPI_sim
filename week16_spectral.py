@@ -27,8 +27,8 @@ def calculate_5f_weighted_fermi_surface(kz=0.0, resolution=512):
     print(f"Resolution: {resolution}×{resolution}")
     
     # Create k-space grid
-    kx_vals = np.linspace(-2*np.pi/a, 2*np.pi/a, resolution)
-    ky_vals = np.linspace(-6*np.pi/b, 6*np.pi/b, resolution)
+    kx_vals = np.linspace(-np.pi/a, np.pi/a, resolution)
+    ky_vals = np.linspace(-3*np.pi/b, 3*np.pi/b, resolution)
     
     # Create meshgrid and flatten for vectorized computation
     KX, KY = np.meshgrid(kx_vals, ky_vals, indexing='ij')
@@ -168,8 +168,7 @@ def plot_5f_weighted_fermi_contours(energies, weights_5f, kx_vals, ky_vals,
     # Style the plot
     ax.set_xlabel(r'$k_y$ (π/b)', fontsize=16, fontweight='bold')
     ax.set_ylabel(r'$k_x$ (π/a)', fontsize=16, fontweight='bold')
-    ax.set_title(f'UTe₂ Fermi Surface with U 5f Orbital Weighting\n' +
-                f'(Black = max 5f character, White = no 5f character, kz={kz:.3f})', 
+    ax.set_title(f'UTe₂ Fermi Surface with U 5f Orbital Weighting', 
                 fontsize=18, fontweight='bold')
     
     # Add grid
@@ -360,10 +359,8 @@ def plot_5f_cosine_modulated_fermi_contours(energies, weights_5f, kx_vals, ky_va
     # Style the plot
     ax.set_xlabel(r'$k_y$ (π/b)', fontsize=16, fontweight='bold')
     ax.set_ylabel(r'$k_x$ (π/a)', fontsize=16, fontweight='bold')
-    ax.set_title(f'UTe₂ Fermi Surface with |cos(ky)|-Modulated U 5f Weighting\n' +
-                f'(Black = max 5f × |cos(ky)|, White = zero, kz={kz:.3f})', 
+    ax.set_title(f'UTe₂ Fermi Surface with U 5f Orbital Weighting', 
                 fontsize=18, fontweight='bold')
-    
     # Add grid
     ax.grid(True, alpha=0.2, linestyle='--', linewidth=0.5)
     ax.axhline(0, color='k', linestyle='-', alpha=0.2, linewidth=1)
@@ -385,11 +382,11 @@ def plot_5f_cosine_modulated_fermi_contours(energies, weights_5f, kx_vals, ky_va
     # Wavevector definitions (in units of 2π/a, 2π/b)
     wavevectors = {
         'p1': (0.29, 0),
-        'p2': (0.43, 1),
+        'p2': (0.44, 1),
         'p3': (0.29, 2),
         'p4': (0, 2),
-        'p5': (-0.14, 1),
-        'p6': (0.57, 0)
+        'p5': (-0.15, 1),
+        'p6': (0.59, 0)
     }
     
     # Convert to units of π/a, π/b (multiply by 2)
@@ -415,7 +412,7 @@ def plot_5f_cosine_modulated_fermi_contours(energies, weights_5f, kx_vals, ky_va
     vector_colors = {
         'p1': '#FF0000',  # Red
         'p2': '#0000FF',  # Blue
-        'p3': '#FFFF00',  # Yellow
+        'p3': "#9738737A",  
         'p4': '#00FF00',  # Green
         'p5': '#FF8800',  # Orange
         'p6': '#FF00FF'   # Magenta
@@ -459,13 +456,12 @@ def plot_5f_cosine_modulated_fermi_contours(energies, weights_5f, kx_vals, ky_va
         label_kx = endpoint[0] + pos_info['offset'][1]
         
         ax.text(label_ky, label_kx, label, 
-               color='black', fontsize=12, fontweight='bold',
+               color=vector_colors[label], fontsize=12, fontweight='bold',
                horizontalalignment=pos_info['ha'],
                verticalalignment=pos_info['va'],
                bbox=dict(boxstyle='round,pad=0.3', 
-                        facecolor='white', edgecolor='black', linewidth=1.5, alpha=0.95),
+                facecolor='white', edgecolor=vector_colors[label], linewidth=1.5, alpha=0.95),
                zorder=11)
-    
     # Set axis limits
     ax.set_xlim(-3.0, 3.0)
     ax.set_ylim(-1.0, 1.0)
@@ -549,7 +545,7 @@ def main():
     )
     
     # Save data for JDOS calculation
-    save_jdos_data(energies, weights_5f, kx_vals, ky_vals, kz=kz, param_set=param_set)
+    #save_jdos_data(energies, weights_5f, kx_vals, ky_vals, kz=kz, param_set=param_set)
 
     
     fig, ax = plot_5f_cosine_modulated_fermi_contours(

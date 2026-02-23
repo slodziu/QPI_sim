@@ -142,7 +142,7 @@ def plot_jdos(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_parity_paper', use_
     print(f"  q-space: qx=[{qx_plot.min():.2f}, {qx_plot.max():.2f}] π/a, qy=[{qy_plot.min():.2f}, {qy_plot.max():.2f}] π/b")
     
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
+    fig, ax = plt.subplots(figsize=(8, 3), dpi=300)
     
     # Plot JDOS with qy on x-axis, qx on y-axis
     # imshow expects [rows, columns] = [qx, qy] which plots qx on y-axis, qy on x-axis
@@ -150,14 +150,9 @@ def plot_jdos(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_parity_paper', use_
                   origin='lower', cmap='gray_r', aspect='auto')
     
     # Style
-    ax.set_xlabel(r'$q_y$ (π/b)', fontsize=16, fontweight='bold')
-    ax.set_ylabel(r'$q_x$ (π/a)', fontsize=16, fontweight='bold')
+    ax.set_xlabel(r'$q_y$ (π/b)', fontsize=10, fontweight='bold')
+    ax.set_ylabel(r'$q_x$ (π/a)', fontsize=10, fontweight='bold')
     
-    # Title
-    weight_str = '5f-Weighted'
-    ax.set_title(f'UTe₂ JDOS (All Bands, {weight_str})\n' +
-                f'kz={kz:.3f}, {param_set}', 
-                fontsize=18, fontweight='bold')
     
     # Grid
     ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5, color='gray')
@@ -176,64 +171,58 @@ def plot_jdos(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_parity_paper', use_
     # Add wavevectors p1-p6 from origin (0,0)
     print("  Adding wavevectors from origin...")
     
-    # Wavevector definitions (in units of 2π/a, 2π/b)
+    # Wavevector definitions (in units of 2π/a, 2π/b), excluding p3 and p4
     wavevectors = {
         'p1': (0.29, 0),
-        'p2': (0.43, 1),
-        'p3': (0.29, 2),
-        'p4': (0, 2),
-        'p5': (-0.14, 1),
-        'p6': (0.57, 0)
+        'p2': (0.44, 1),
+        'p5': (-0.15, 1),
+        'p6': (0.59, 0)
     }
-    
+
     # Convert to units of π/a, π/b (multiply by 2)
     wavevectors_pi = {k: (v[0]*2, v[1]*2) for k, v in wavevectors.items()}
-    
+
     # Colors for wavevectors
     vector_colors = {
         'p1': '#FF0000',  # Red
         'p2': '#0000FF',  # Blue
-        'p3': '#FFFF00',  # Yellow
-        'p4': '#00FF00',  # Green
         'p5': '#FF8800',  # Orange
         'p6': '#FF00FF'   # Magenta
     }
-    
+
     # Label positioning offsets and alignments
     label_positions = {
         'p1': {'offset': (0.15, 0.08), 'ha': 'left', 'va': 'bottom'},
         'p2': {'offset': (0.15, 0.08), 'ha': 'left', 'va': 'bottom'},
-        'p3': {'offset': (0.15, 0.08), 'ha': 'left', 'va': 'bottom'},
-        'p4': {'offset': (0.0, 0.12), 'ha': 'center', 'va': 'bottom'},
         'p5': {'offset': (-0.15, 0.08), 'ha': 'right', 'va': 'bottom'},
         'p6': {'offset': (0.15, 0.0), 'ha': 'left', 'va': 'center'}
     }
-    
+
     # Plot wavevectors from origin
     origin = (0, 0)  # (qx, qy) = (0, 0)
-    
+
     for label, (qx_pi, qy_pi) in wavevectors_pi.items():
         # Endpoint is just the vector itself
         endpoint = (qx_pi, qy_pi)
-        
+
         # Plot arrow (swap to qy, qx for our axes)
         ax.annotate('', 
                    xy=(endpoint[1], endpoint[0]),  # (qy, qx)
                    xytext=(origin[1], origin[0]),  # (qy, qx)
                    arrowprops=dict(arrowstyle='->', color=vector_colors[label], 
-                                  lw=3, alpha=0.9, shrinkA=0, shrinkB=0))
-        
+                                  lw=2, alpha=0.9, shrinkA=0, shrinkB=0))
+
         # Add marker at endpoint
         ax.plot(endpoint[1], endpoint[0], 'o', color=vector_colors[label], 
-               markersize=8, markeredgecolor='black', markeredgewidth=1.5, zorder=10)
-        
+               markersize=5, markeredgecolor='black', markeredgewidth=1, zorder=10)
+
         # Add label with smart positioning (offset in qy, qx space)
         pos_info = label_positions[label]
         label_qy = endpoint[1] + pos_info['offset'][0]
         label_qx = endpoint[0] + pos_info['offset'][1]
-        
+
         ax.text(label_qy, label_qx, label, 
-               color='black', fontsize=12, fontweight='bold',
+               color='black', fontsize=6, fontweight='bold',
                horizontalalignment=pos_info['ha'],
                verticalalignment=pos_info['va'],
                bbox=dict(boxstyle='round,pad=0.3', 
@@ -328,7 +317,7 @@ def plot_jdos_011_projection(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_pari
     print(f"  Interpolated JDOS range: {JDOS_011.min():.4f} to {JDOS_011.max():.4f}")
     
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
+    fig, ax = plt.subplots(figsize=(8, 3), dpi=300)
     
     # Plot JDOS with qc* on x-axis, qx on y-axis
     im = ax.imshow(JDOS_011, 
@@ -337,14 +326,10 @@ def plot_jdos_011_projection(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_pari
                   origin='lower', cmap='gray_r', aspect='auto')
     
     # Style
-    ax.set_xlabel(r'$q_{c^*}$ (π/c*)', fontsize=16, fontweight='bold')
-    ax.set_ylabel(r'$q_x$ (π/a)', fontsize=16, fontweight='bold')
+    ax.set_xlabel(r'$q_{c^*}$ (π/c*)', fontsize=10, fontweight='bold')
+    ax.set_ylabel(r'$q_x$ (π/a)', fontsize=10, fontweight='bold')
     
-    # Title
-    weight_str = '5f-Weighted'
-    ax.set_title(f'UTe₂ JDOS on (0-11) Plane ({weight_str})\n' +
-                f'kz={kz:.3f}, {param_set}', 
-                fontsize=18, fontweight='bold')
+
     
     # Grid
     ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5, color='gray')
@@ -356,26 +341,26 @@ def plot_jdos_011_projection(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_pari
     ax.add_patch(bz_rect)
     
     # Set axis limits
-    ax.set_xlim(qc_011_pi_cstar.min()*0.8, qc_011_pi_cstar.max()*0.8)
+    ax.set_xlim(qc_011_pi_cstar.min(), qc_011_pi_cstar.max())
     ax.set_ylim(qx_011.min()*0.8, qx_011.max()*0.8)
     ax.set_aspect('equal', adjustable='box')
     
     # Add projected wavevectors p1-p6 from origin (0,0)
     print("  Adding projected wavevectors from origin...")
     
-    # Original wavevector definitions (in units of 2π/a, 2π/b)
+    # Original wavevector definitions (in units of 2π/a, 2π/b), excluding p3 and p4
     wavevectors_original = {
         'p1': (0.29, 0),
-        'p2': (0.43, 1),
+        'p2': (0.44, 1),
         'p3': (0.29, 2),
         'p4': (0, 2),
-        'p5': (-0.14, 1),
-        'p6': (0.57, 0)
+        'p5': (-0.15, 1),
+        'p6': (0.59, 0)
     }
-    
+
     # Convert to π/a, π/b units (multiply by 2)
     wavevectors_pi = {k: (v[0]*2, v[1]*2) for k, v in wavevectors_original.items()}
-    
+
     # Project to (0-11) plane: convert qy (π/b units) to qc* (π/c* units)
     # qc* [π/c*] = qy [π/b] * scaling_factor
     wavevectors_projected = {}
@@ -384,52 +369,52 @@ def plot_jdos_011_projection(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_pari
         qc_proj = qy_pi_b * scaling_factor  # convert from π/b to π/c*
         wavevectors_projected[label] = (qx_proj, qc_proj)
         print(f"    {label}: ({qx_pi_a:.2f}, {qy_pi_b:.2f}) π/a,π/b -> ({qx_proj:.2f}, {qc_proj:.2f}) π/a,π/c*")
-    
+
     # Colors for wavevectors
     vector_colors = {
         'p1': '#FF0000',  # Red
         'p2': '#0000FF',  # Blue
-        'p3': '#FFFF00',  # Yellow
-        'p4': '#00FF00',  # Green
+        'p3': "#9738737A",  
+        'p4': '#00FF00', 
         'p5': '#FF8800',  # Orange
         'p6': '#FF00FF'   # Magenta
     }
-    
+
     # Label positioning offsets and alignments (adjusted for new coordinates)
     label_positions = {
         'p1': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
         'p2': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
         'p3': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
-        'p4': {'offset': (0.0, 0.12), 'ha': 'center', 'va': 'bottom'},
+        'p4': {'offset': (-0.10, 0.08), 'ha': 'right', 'va': 'bottom'},
         'p5': {'offset': (-0.10, 0.08), 'ha': 'right', 'va': 'bottom'},
         'p6': {'offset': (0.10, 0.0), 'ha': 'left', 'va': 'center'}
     }
-    
+
     # Plot wavevectors from origin
     origin = (0, 0)  # (qx, qc*) = (0, 0)
-    
+
     for label, (qx_proj, qc_proj) in wavevectors_projected.items():
         # Endpoint is the projected vector
         endpoint = (qx_proj, qc_proj)
-        
+
         # Plot arrow (qc* on x-axis, qx on y-axis)
         ax.annotate('', 
                    xy=(endpoint[1], endpoint[0]),  # (qc*, qx)
                    xytext=(origin[1], origin[0]),  # (qc*, qx)
                    arrowprops=dict(arrowstyle='->', color=vector_colors[label], 
-                                  lw=3, alpha=0.9, shrinkA=0, shrinkB=0))
-        
+                                  lw=2, alpha=0.9, shrinkA=0, shrinkB=0))
+
         # Add marker at endpoint
         ax.plot(endpoint[1], endpoint[0], 'o', color=vector_colors[label], 
-               markersize=8, markeredgecolor='black', markeredgewidth=1.5, zorder=10)
-        
+               markersize=5, markeredgecolor='black', markeredgewidth=1, zorder=10)
+
         # Add label with smart positioning
         pos_info = label_positions[label]
         label_qc = endpoint[1] + pos_info['offset'][0]
         label_qx = endpoint[0] + pos_info['offset'][1]
-        
+
         ax.text(label_qc, label_qx, label, 
-               color='black', fontsize=12, fontweight='bold',
+               color='black', fontsize=6, fontweight='bold',
                horizontalalignment=pos_info['ha'],
                verticalalignment=pos_info['va'],
                bbox=dict(boxstyle='round,pad=0.3', 
