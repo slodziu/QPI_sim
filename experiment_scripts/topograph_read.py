@@ -8,7 +8,7 @@ import os
 ds = xr.open_dataset("experimental_data/topograph.sxm", engine="nanonis")
 
 # Output directory for plots
-output_dir = r"C:\\Masters\\Code\\QPI_sim\\experiment_output\\read_topography"
+output_dir = "experiment_output/read_topography"
 os.makedirs(output_dir, exist_ok=True)
 print("Data variables:", ds.data_vars)
 print(ds["Z"])
