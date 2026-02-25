@@ -4,7 +4,7 @@ import xarray as xr
 
 
 topograph_file = "experimental_data/topograph.sxm"
-window_size = 100  # pixels (must be even)
+window_size = 120  # pixels (must be even)
 half = window_size // 2
 
 
@@ -143,16 +143,25 @@ average_defect = np.mean(aligned_windows, axis=0)
 average_defect_type2 = np.mean(aligned_windows_type2, axis=0) if len(aligned_windows_type2) > 0 else None
 
 
+
+# Plot and save averaged type 1 vacancy
 fig, ax = plt.subplots()
 im = ax.imshow(average_defect, origin="lower", cmap="viridis")
-
-
 ax.set_title("Common-Origin Averaged Type 1 Vacancy")
 fig.colorbar(im, ax=ax, label="Height (m)")
 plt.savefig("experiment_output/average_defect_type_1.png", bbox_inches="tight", dpi=300)
 plt.show()
 
-# Plot for type 2 vacancies
+# Fourier transform of averaged type 1 vacancy
+fft1 = np.fft.fftshift(np.fft.fft2(average_defect))
+fft1_mag = np.abs(fft1)
+fig_fft1, ax_fft1 = plt.subplots()
+ax_fft1.imshow(np.log(fft1_mag + 1e-12), origin="lower", cmap="viridis")
+ax_fft1.set_title("FFT Magnitude (Type 1 Vacancy)")
+plt.savefig("experiment_output/average_defect_type_1_fft.png", bbox_inches="tight", dpi=300)
+plt.close(fig_fft1)
+
+# Plot and save averaged type 2 vacancy
 if average_defect_type2 is not None:
     fig2, ax2 = plt.subplots()
     im2 = ax2.imshow(average_defect_type2, origin="lower", cmap="viridis")
@@ -160,3 +169,33 @@ if average_defect_type2 is not None:
     fig2.colorbar(im2, ax=ax2, label="Height (m)")
     plt.savefig("experiment_output/average_defect_type2.png", bbox_inches="tight", dpi=300)
     plt.show()
+
+    # Fourier transform of averaged type 2 vacancy
+    fft2 = np.fft.fftshift(np.fft.fft2(average_defect_type2))
+    fft2_mag = np.abs(fft2)
+    fig_fft2, ax_fft2 = plt.subplots()
+    ax_fft2.imshow(np.log(fft2_mag + 1e-12), origin="lower", cmap="viridis")
+    ax_fft2.set_title("FFT Magnitude (Type 2 Vacancy)")
+    plt.savefig("experiment_output/average_defect_type_2_fft.png", bbox_inches="tight", dpi=300)
+    plt.close(fig_fft2)
+
+    # Take log of FFT magnitudes to compress dynamic range
+    log_fft1_mag = np.log(fft1_mag + 1e-12)
+    log_fft2_mag = np.log(fft2_mag + 1e-12)
+
+    # Normalize log-FFTs using global min and max
+    global_min = min(np.min(log_fft1_mag), np.min(log_fft2_mag))
+    global_max = max(np.max(log_fft1_mag), np.max(log_fft2_mag))
+    log_fft1_mag_norm = (log_fft1_mag - global_min) / (global_max - global_min + 1e-12)
+    log_fft2_mag_norm = (log_fft2_mag - global_min) / (global_max - global_min + 1e-12)
+
+    # Take the difference
+    fft_diff = log_fft1_mag_norm - log_fft2_mag_norm
+
+    # Plot and save the difference
+    fig_diff, ax_diff = plt.subplots()
+    im_diff = ax_diff.imshow(fft_diff, origin="lower", cmap="bwr", vmin=-1, vmax=1)
+    ax_diff.set_title("Log-Scaled FFT Magnitude Difference (Type 1 - Type 2)")
+    fig_diff.colorbar(im_diff, ax=ax_diff, label="Normalized Log Difference")
+    plt.savefig("experiment_output/fft_magnitude_difference.png", bbox_inches="tight", dpi=300)
+    plt.close(fig_diff)
