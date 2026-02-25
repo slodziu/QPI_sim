@@ -49,22 +49,15 @@ z_flat = Zvals - plane
 
 plt.figure()
 plt.imshow(
-    z_flat,
+    np.log(z_flat-np.nanmin(z_flat)+1e-12),  # log scale for better contrast, shift to avoid log(0)
     extent=[x.min(), x.max(), y.min(), y.max()],
     origin="lower",
-    cmap="viridis"
+    cmap="plasma"
 )
 plt.colorbar(label="Height (m)")
 plt.gca().set_aspect("equal")
-plt.title("Plane-subtracted Topography")
-flat_plot_path = os.path.join(output_dir, "plane_subtracted_topography.png")
+plt.title("Log contrast Topography")
+flat_plot_path = os.path.join(output_dir, "log_contrast_topography.png")
 plt.savefig(flat_plot_path, bbox_inches="tight", dpi=300)
 plt.close()
-
-
-fft = np.fft.fftshift(np.fft.fft2(z_flat))
-fft_mag = np.abs(fft)
-
-plt.imshow(np.log(fft_mag))
-plt.savefig(os.path.join(output_dir, "fft_magnitude.png"), bbox_inches="tight", dpi=300)
 
