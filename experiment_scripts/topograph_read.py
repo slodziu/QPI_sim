@@ -31,7 +31,8 @@ plt.close()
 
 x = z.coords["x"].values
 y = z.coords["y"].values
-
+print("x range (m):", x.min(), "to", x.max())
+print("y range (m):", y.min(), "to", y.max())
 X, Y = np.meshgrid(x, y)
 
 Zvals = z.values
@@ -61,3 +62,14 @@ flat_plot_path = os.path.join(output_dir, "log_contrast_topography.png")
 plt.savefig(flat_plot_path, bbox_inches="tight", dpi=300)
 plt.close()
 
+# Plot and save FFT of log-contrast topograph
+fft_map = np.fft.fftshift(np.fft.fft2(z_flat))
+fft_mag = np.abs(fft_map)
+
+plt.figure()
+plt.imshow(np.log(fft_mag + 1e-12), cmap="viridis", origin="lower")
+plt.colorbar(label="Log FFT Magnitude")
+plt.title("FFT of Log-Contrast Topography")
+fft_plot_path = os.path.join(output_dir, "log_contrast_topography_fft.png")
+plt.savefig(fft_plot_path, bbox_inches="tight", dpi=300)
+plt.close()
