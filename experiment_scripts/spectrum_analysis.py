@@ -1,133 +1,129 @@
-import xarray as xr
 import numpy as np
-import os
+import xarray as xr
 import matplotlib.pyplot as plt
+import os
+from matplotlib.patches import Rectangle
 
-# Path to .3ds file
-file_path = "experimental_data/spectrum.3ds"
+a = 0.41   # nm
+b = 0.61   # nm
+c = 1.39   # nm
+c_star = 0.76  # nm, intertellurium distance
+scaling_factor = 0.5  # for qc* axis
 
-# Output directory for defect analysis
-output_dir = "experiment_output/defect_analysis"
+# --- Replicate Figure 3c: g(q,0) with vectors overlaid ---
+spectrum_file = "experimental_data/spectrum.3ds"
+output_dir = "experiment_output/mahaem"
 os.makedirs(output_dir, exist_ok=True)
 
-# Load .3ds file
-ds = xr.open_dataset(file_path, engine="nanonis")
+ds_spec = xr.open_dataset(spectrum_file, engine="nanonis")
+spec_x = ds_spec.coords["x"].values
+spec_y = ds_spec.coords["y"].values
+dx = spec_x[1] - spec_x[0]
+dy = spec_y[1] - spec_y[0]
+Nx = len(spec_x)
+Ny = len(spec_y)
 
 # Find dI/dV channel
 di_channel = None
-for var in ds.data_vars:
-	if "dI/dV" in var or "Input 3" in var:
-		di_channel = var
-		break
+for var in ds_spec.data_vars:
+    if "dI/dV" in var or "Input" in var:
+        di_channel = var
+        break
 if di_channel is None:
-	raise ValueError("dI/dV channel not found.")
+    raise ValueError("dI/dV channel not found.")
 
-# Get spatial axes
-x = ds.coords["x"].values
-y = ds.coords["y"].values
+bias_vals = ds_spec.coords["bias"].values
+E0 = bias_vals[np.argmin(np.abs(bias_vals))]
+g0 = ds_spec[di_channel].sel(bias=E0, method="nearest").values
 
-# Convert spatial axes to pixel indices
-def coord_to_pixel(coord, axis):
-	return np.abs(axis - coord).argmin()
+# FFT to get g(q,0)
+G0 = np.fft.fftshift(np.fft.fft2(g0))
 
-orig_size = 1024
-new_size = 270
+# FFT axes in π/a and π/b units
+qx = 2 * np.pi * np.fft.fftfreq(Nx, d=dx)
+qy = 2 * np.pi * np.fft.fftfreq(Ny, d=dy)
+qx = np.fft.fftshift(qx) / (np.pi / a)  # π/a
+qy = np.fft.fftshift(qy) / (np.pi / b)  # π/b
 
-# Original vacancy coordinates (from 1024x1024 topograph)
-vacancy_coords_orig = [
-	(15, 29), (33, 439), (87, 703), (88, 907), (118, 153), (171, 337), (237, 81),
-	(341, 680), (371, 84), (408, 472), (426, 780), (461, 850), (510, 834), (573, 12),
-	(574, 500), (577, 1002), (660, 477), (663, 949), (729, 870), (627, 620),
-	(797, 971), (844, 591), (847, 1000), (877, 560), (958, 239), (993, 147), (641, 138)
-]
-vacancy_coords_type2_orig = [
-	(195, 669), (365, 555), (279, 366), (446, 105), (463, 120), (434, 902), (700, 508)
-]
+# Project to (0-11) plane: qx stays, qc* = qy * 0.5
+qx_011 = qx  # π/a units
+qc_011_pi_cstar = qy * scaling_factor  # π/c* units
 
-# Rescale coordinates to 270x270 grid
-def rescale_coords(coords, orig_size, new_size):
-	return [
-		(int(round(x * new_size / orig_size)), int(round(y * new_size / orig_size)))
-		for (x, y) in coords
-	]
+# Log scale for FFT magnitude
+G0_log = np.log(np.abs(G0) + 1e-10)
 
-vacancy_coords = rescale_coords(vacancy_coords_orig, orig_size, new_size)
-vacancy_coords_type2 = rescale_coords(vacancy_coords_type2_orig, orig_size, new_size)
+# Mask out all but the top itensities
+threshold = np.percentile(G0_log, 50)
+G0_log_masked = np.where(G0_log >= threshold, G0_log, np.nan)
 
-window_size = 120
-half = window_size // 2
+fig, ax = plt.subplots(figsize=(8, 8), dpi=300)
+im = ax.imshow(G0_log_masked, extent=[qc_011_pi_cstar.min(), qc_011_pi_cstar.max(), qx_011.min(), qx_011.max()],
+               origin='lower', cmap='viridis', aspect='equal')
 
- # Get bias values
-if "bias" in ds.coords:
-	bias = ds.coords["bias"].values
-elif "Sweep Signal" in ds.coords:
-	bias = ds.coords["Sweep Signal"].values
-else:
-	raise ValueError("Bias/energy coordinate not found.")
+ax.set_xlabel(r'$q_{c^*}$ ($\pi$/c*)', fontsize=12, fontweight='bold')
+ax.set_ylabel(r'$q_x$ ($\pi$/a)', fontsize=12, fontweight='bold')
+ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5, color='gray')
 
-print("Bias values:", bias)
+# Brillouin zone rectangle in π/a, π/c* units
+bz_rect = Rectangle((-1, -1), 2, 2, linewidth=2, edgecolor='red', facecolor='none', linestyle='--', alpha=0.8)
+ax.add_patch(bz_rect)
+ax.set_xlim(qc_011_pi_cstar.min(), qc_011_pi_cstar.max())
+ax.set_ylim(qx_011.min(), qx_011.max())
+ax.set_aspect('equal')
 
-# For each bias, extract windows around vacancies
-for b_idx, b_val in enumerate(bias):
-	# Get dI/dV map at this bias
-	didv_map = ds[di_channel].sel(bias=b_val, method="nearest").values
-	print(f"Bias index {b_idx}, value {b_val}: dI/dV map shape {didv_map.shape}")
+# --- Overlay wavevectors (π/a, π/c* units, with qy scaled by 0.5) ---
+wvecs = {
+    'p1': (0.29*2, 0),
+    'p2': (0.44*2, 1*2),
+    'p3': (0.29*2, 2*2),
+    'p4': (0, 2*2),
+    'p5': (-0.15*2, 1*2),
+    'p6': (0.59*2, 0)
+}
+vector_colors = {
+    'p1': '#FF0000',  # Red
+    'p2': '#0000FF',  # Blue
+    'p3': "#9738737A",  
+    'p4': '#00FF00', 
+    'p5': '#FF8800',  # Orange
+    'p6': '#FF00FF'   # Magenta
+}
+label_positions = {
+    'p1': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
+    'p2': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
+    'p3': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
+    'p4': {'offset': (-0.10, 0.08), 'ha': 'right', 'va': 'bottom'},
+    'p5': {'offset': (-0.10, 0.08), 'ha': 'right', 'va': 'bottom'},
+    'p6': {'offset': (0.10, 0.0), 'ha': 'left', 'va': 'center'}
+}
+origin = (0, 0)
+for label, (qx_pi, qy_pi) in wvecs.items():
+    qcstar_val = qy_pi * scaling_factor  # π/c*
+    endpoint = (qcstar_val*1e9, qx_pi*1e9)
+    ax.annotate('', xy=endpoint, xytext=(origin[0], origin[1]),
+                arrowprops=dict(arrowstyle='->', color=vector_colors[label],
+                                lw=2, alpha=0.9, shrinkA=0, shrinkB=0))
+    ax.plot(endpoint[0], endpoint[1], 'o', color=vector_colors[label],
+            markersize=5, markeredgecolor='black', markeredgewidth=1, zorder=10)
+    pos_info = label_positions[label]
+    label_qc = endpoint[0] + pos_info['offset'][0]
+    label_qx = endpoint[1] + pos_info['offset'][1]
+    ax.text(label_qc, label_qx, label,
+            color='black', fontsize=6, fontweight='bold',
+            horizontalalignment=pos_info['ha'],
+            verticalalignment=pos_info['va'],
+            bbox=dict(boxstyle='round,pad=0.3',
+                      facecolor='white', edgecolor='black', linewidth=1.5, alpha=0.95),
+            zorder=11)
 
-	# Save folder for this bias
-	bias_folder = os.path.join(output_dir, f"bias_{b_val:.3f}V")
-	os.makedirs(bias_folder, exist_ok=True)
+cbar = plt.colorbar(im, ax=ax, label='Log FFT Magnitude', orientation='vertical',
+                   fraction=0.045, pad=0.04)
+cbar.ax.tick_params(labelsize=11)
+ax.set_facecolor('white')
+fig.patch.set_facecolor('white')
 
-
-	# Plot and save type 1 vacancies
-	for i, (x0, y0) in enumerate(vacancy_coords):
-		x_min = x0 - half
-		x_max = x0 + half
-		y_min = y0 - half
-		y_max = y0 + half
-		if (
-			x_min < 0 or x_max > didv_map.shape[1] or
-			y_min < 0 or y_max > didv_map.shape[0]
-		):
-			print(f"Skipping vacancy {i} at ({x0},{y0}) for bias {b_val:.3f} V: out of bounds")
-			continue
-		window = didv_map[y_min:y_max, x_min:x_max]
-		if window.shape == (window_size, window_size):
-			print(f"Processing vacancy {i} at ({x0},{y0}) for bias {b_val:.3f} V")
-			np.save(os.path.join(bias_folder, f"vacancy_{i}_type1.npy"), window)
-			# Plot
-			fig, ax = plt.subplots()
-			im = ax.imshow(window, origin="lower", cmap="plasma")
-			ax.set_title(f"Type 1 Vacancy (Bias={b_val:.3f} V)")
-			fig.colorbar(im, ax=ax, label="dI/dV (V)")
-			plt.savefig(os.path.join(bias_folder, f"vacancy_{i}_type1.png"), bbox_inches="tight", dpi=300)
-			plt.close(fig)
-		else:
-			print(f"Skipping vacancy {i} at ({x0},{y0}) for bias {b_val:.3f} V: window shape {window.shape}")
-
-	# Plot and save type 2 vacancies
-	for i, (x0, y0) in enumerate(vacancy_coords_type2):
-		x_min = x0 - half
-		x_max = x0 + half
-		y_min = y0 - half
-		y_max = y0 + half
-		if (
-			x_min < 0 or x_max > didv_map.shape[1] or
-			y_min < 0 or y_max > didv_map.shape[0]
-		):
-			print(f"Skipping type2 vacancy {i} at ({x0},{y0}) for bias {b_val:.3f} V: out of bounds")
-			continue
-		window = didv_map[y_min:y_max, x_min:x_max]
-		if window.shape == (window_size, window_size):
-			print(f"Processing type2 vacancy {i} at ({x0},{y0}) for bias {b_val:.3f} V")
-			np.save(os.path.join(bias_folder, f"vacancy_{i}_type2.npy"), window)
-			# Plot
-			fig, ax = plt.subplots()
-			im = ax.imshow(window, origin="lower", cmap="plasma")
-			ax.set_title(f"Type 2 Vacancy (Bias={b_val:.3f} V)")
-			fig.colorbar(im, ax=ax, label="dI/dV (V)")
-			plt.savefig(os.path.join(bias_folder, f"vacancy_{i}_type2.png"), bbox_inches="tight", dpi=300)
-			plt.close(fig)
-		else:
-			print(f"Skipping type2 vacancy {i} at ({x0},{y0}) for bias {b_val:.3f} V: window shape {window.shape}")
-
-print("Saved vacancy windows for each bias to", output_dir)
+save_path = f'{output_dir}/gq0_with_vectors_qcstar_projection.png'
+plt.tight_layout()
+plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
+print(f"Saved g(q,0) plot with vectors to: {save_path}")
+plt.show()
