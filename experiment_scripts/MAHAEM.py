@@ -20,43 +20,73 @@ os.makedirs(output_dir, exist_ok=True)
 ds_topo = xr.open_dataset(topograph_file, engine="nanonis")
 ds_spec = xr.open_dataset(spectrum_file,  engine="nanonis")
 
-topo_x = ds_topo.coords["x"].values
-topo_y = ds_topo.coords["y"].values
+# ==========================================================
+# BUILD PHYSICAL COORDINATE ARRAYS FROM FILE METADATA
+#
+# xarray-nanonis returns x/y starting from 0 for both files,
+# ignoring the physical scan offset.  We must rebuild the axes
+# from the actual center positions stored in the file headers:
+#   .sxm  → SCAN_OFFSET  (center_x, center_y) and SCAN_RANGE (size_x, size_y)
+#   .3ds  → Grid settings (center_x, center_y, size_x, size_y, angle)
+#
+# Both scans share SCAN_ANGLE = 4.7°.  We do NOT rotate here
+# because both files use the same rotated frame, so relative
+# positions are consistent.  Absolute q-vectors should be
+# interpreted in the rotated frame as well.
+# ==========================================================
 
-spec_x = ds_spec.coords["x"].values
-spec_y = ds_spec.coords["y"].values
+def parse_scan_range_pair(s):
+    """Parse a Nanonis two-value string like '5.0E-8  5.0E-8' → (float, float)."""
+    parts = s.split()
+    return float(parts[0]), float(parts[1])
+
+# --- Topograph ---
+topo_range_x, topo_range_y = parse_scan_range_pair(ds_topo.attrs["SCAN_RANGE"])
+topo_ctr_x,   topo_ctr_y   = parse_scan_range_pair(ds_topo.attrs["SCAN_OFFSET"])
+topo_Nx = len(ds_topo.coords["x"])
+topo_Ny = len(ds_topo.coords["y"])
+topo_x = np.linspace(topo_ctr_x - topo_range_x / 2,
+                     topo_ctr_x + topo_range_x / 2, topo_Nx)
+topo_y = np.linspace(topo_ctr_y - topo_range_y / 2,
+                     topo_ctr_y + topo_range_y / 2, topo_Ny)
+
+# --- Spectrum ---
+# Grid settings field: (center_x, center_y, size_x, size_y, angle)
+_gs = [float(v) for v in ds_spec.attrs["Grid settings"]]
+spec_ctr_x, spec_ctr_y, spec_range_x, spec_range_y = _gs[0], _gs[1], _gs[2], _gs[3]
+spec_Nx = len(ds_spec.coords["x"])
+spec_Ny = len(ds_spec.coords["y"])
+spec_x = np.linspace(spec_ctr_x - spec_range_x / 2,
+                     spec_ctr_x + spec_range_x / 2, spec_Nx)
+spec_y = np.linspace(spec_ctr_y - spec_range_y / 2,
+                     spec_ctr_y + spec_range_y / 2, spec_Ny)
+
+print(f"Topo physical range:  x [{topo_x[0]*1e9:.2f}, {topo_x[-1]*1e9:.2f}] nm  "
+      f"y [{topo_y[0]*1e9:.2f}, {topo_y[-1]*1e9:.2f}] nm")
+print(f"Spec physical range:  x [{spec_x[0]*1e9:.2f}, {spec_x[-1]*1e9:.2f}] nm  "
+      f"y [{spec_y[0]*1e9:.2f}, {spec_y[-1]*1e9:.2f}] nm")
 
 dx = spec_x[1] - spec_x[0]
 dy = spec_y[1] - spec_y[0]
 
-Nx = len(spec_x)
-Ny = len(spec_y)
+Nx = spec_Nx
+Ny = spec_Ny
 
 # ==========================================================
-# UNIT / CO-REGISTRATION CHECKS
-# Topograph: 1024×1024 px, 50×50 nm, origin (0,0)
-# Spectrum:   270×270 px, 66×66 nm, origin (0,0)
-#
-# Shared origin means topo pixel coords translate directly to
-# physical meters that are valid positions within the spec FOV.
-# Vacancy coords are stored as (x_pixel, y_pixel) where
-# x_pixel indexes topo_x (fast-scan / horizontal axis) and
-# y_pixel indexes topo_y (slow-scan / vertical axis).
-# This matches standard Nanonis/WSxM image coordinate convention.
+# CO-REGISTRATION CHECKS (physical coordinates)
 # ==========================================================
 
-topo_fov_x = topo_x.max() - topo_x.min()
-topo_fov_y = topo_y.max() - topo_y.min()
-spec_fov_x = spec_x.max() - spec_x.min()
-spec_fov_y = spec_y.max() - spec_y.min()
+assert spec_x[0] <= topo_x[0] and topo_x[-1] <= spec_x[-1], \
+    f"Topo x [{topo_x[0]*1e9:.1f}, {topo_x[-1]*1e9:.1f}] nm extends outside " \
+    f"spec x [{spec_x[0]*1e9:.1f}, {spec_x[-1]*1e9:.1f}] nm"
+# y: topo bottom may extend slightly below spec (known offset ~3 nm) — handled by filtering below
+if not (spec_y[0] <= topo_y[0]):
+    print(f"WARNING: topo y_min ({topo_y[0]*1e9:.2f} nm) is below spec y_min ({spec_y[0]*1e9:.2f} nm) "
+          f"by {(spec_y[0]-topo_y[0])*1e9:.2f} nm — vacancies in that strip will be dropped.")
 
-assert topo_x[0] == spec_x[0] and topo_y[0] == spec_y[0], \
-    f"Topo and spec origins differ! topo=({topo_x[0]},{topo_y[0]}) spec=({spec_x[0]},{spec_y[0]})"
-assert topo_fov_x <= spec_fov_x and topo_fov_y <= spec_fov_y, \
-    f"Topo FOV ({topo_fov_x*1e9:.1f}×{topo_fov_y*1e9:.1f} nm) extends outside spec FOV ({spec_fov_x*1e9:.1f}×{spec_fov_y*1e9:.1f} nm)"
-
-print(f"Co-registration OK: topo {topo_fov_x*1e9:.1f}×{topo_fov_y*1e9:.1f} nm "
-      f"inside spec {spec_fov_x*1e9:.1f}×{spec_fov_y*1e9:.1f} nm, shared origin (0,0)")
+print(f"Co-registration OK: topo center ({topo_ctr_x*1e9:.2f}, {topo_ctr_y*1e9:.2f}) nm  "
+      f"spec center ({spec_ctr_x*1e9:.2f}, {spec_ctr_y*1e9:.2f}) nm  "
+      f"offset = ({(topo_ctr_x-spec_ctr_x)*1e9:.2f}, {(topo_ctr_y-spec_ctr_y)*1e9:.2f}) nm")
 
 # ==========================================================
 # LATTICE CONSTANTS (PHYSICAL UNITS)
@@ -67,7 +97,8 @@ a      = 0.41e-9   # a-axis
 b      = 0.61e-9   # b-axis
 c      = 1.39e-9   # c-axis
 c_star = 0.76e-9  # intertellurium distance along c* (0-11) direction
-scaling_factor = 0.5       # qy (π/b) → qc* (π/c*): c* ≈ b/2 for (0-11) projection
+# No scaling_factor needed: wavevectors below are defined directly in (π/a, π/c*) units,
+# and the q axes are normalised by π/c_star directly — same convention as spectrum_read.py.
 
 # ==========================================================
 # SELECT dI/dV CHANNEL
@@ -116,15 +147,27 @@ vacancy_coords_type2 = [
     (446, 105), (463, 120), (434, 902), (700, 508)
 ]
 
-R_type1 = [(topo_x[x], topo_y[y]) for (x, y) in vacancy_coords_type1]
-R_type2 = [(topo_x[x], topo_y[y]) for (x, y) in vacancy_coords_type2]
+# Filter out vacancies outside the spectrum FOV (can happen at topo bottom edge)
+def _in_spec(rx, ry):
+    return spec_x[0] <= rx <= spec_x[-1] and spec_y[0] <= ry <= spec_y[-1]
 
-# Verify all vacancy positions lie within the spectrum scan area
-for label, Rlist in [("type1", R_type1), ("type2", R_type2)]:
-    for rx, ry in Rlist:
-        assert spec_x.min() <= rx <= spec_x.max() and spec_y.min() <= ry <= spec_y.max(), \
-            f"Vacancy {label} at ({rx*1e9:.2f},{ry*1e9:.2f}) nm is outside spectrum FOV!"
-print(f"All {len(R_type1)} type-1 and {len(R_type2)} type-2 vacancy positions are within spectrum FOV.")
+R_type1_raw = [(topo_x[x], topo_y[y]) for (x, y) in vacancy_coords_type1]
+R_type2_raw = [(topo_x[x], topo_y[y]) for (x, y) in vacancy_coords_type2]
+
+R_type1 = [(rx, ry) for (rx, ry) in R_type1_raw if _in_spec(rx, ry)]
+R_type2 = [(rx, ry) for (rx, ry) in R_type2_raw if _in_spec(rx, ry)]
+
+if len(R_type1) < len(R_type1_raw):
+    print(f"Type-1: dropped {len(R_type1_raw)-len(R_type1)} of {len(R_type1_raw)} vacancies outside spec FOV → {len(R_type1)} remaining")
+if len(R_type2) < len(R_type2_raw):
+    print(f"Type-2: dropped {len(R_type2_raw)-len(R_type2)} of {len(R_type2_raw)} vacancies outside spec FOV → {len(R_type2)} remaining")
+print(f"Using {len(R_type1)} type-1 and {len(R_type2)} type-2 vacancy positions.")
+
+# Express vacancy positions relative to the spectrum's first pixel (0,0 in FFT space).
+# NumPy FFT assigns e^{-iq·r} with r=0 at the first array element, so R_i must use
+# the same origin as the spectrum pixel grid, not absolute physical coordinates.
+R_type1_fft = [(rx - spec_x[0], ry - spec_y[0]) for (rx, ry) in R_type1]
+R_type2_fft = [(rx - spec_x[0], ry - spec_y[0]) for (rx, ry) in R_type2]
 
 # ==========================================================
 # BUILD Q GRID (rad/m)
@@ -142,29 +185,20 @@ QX, QY = np.meshgrid(qx, qy)
 # DEFINE TARGET WAVEVECTORS
 # ==========================================================
 
-wavevectors_original = {
-    'p2': (0.43, 0.5),
-    'p4': (0, 1),
-    'p5': (-0.14, 0.5),
-    'p6': (0.57, 0)
+# Wavevectors defined directly in (π/a, π/c*) — matches spectrum_read.py wvecs.
+# q_x component is the fast-scan direction (a-axis), q_c* is the c*-projected direction.
+wavevectors_pi_cstar = {
+    'p2': ( 0.84,  1.0),   # (q_x [π/a],  q_c* [π/c*])
+    'p4': ( 0.00,  2.0),
+    'p5': (-0.28,  1.0),
+    'p6': ( 1.14,  0.0),
 }
 
-# Convert to π/a , π/b
-wavevectors_pi = {k: (v[0]*2, v[1]*2)
-                  for k, v in wavevectors_original.items()}
-
-wavevectors_projected = {}
-for label, (qx_pi_a, qy_pi_b) in wavevectors_pi.items():
-    qx_proj = qx_pi_a
-    qc_proj = qy_pi_b * scaling_factor
-    wavevectors_projected[label] = (qx_proj, qc_proj)
-
-# Convert to physical rad/m
-wavevectors_phys = {}
-for label, (qx_pi_a, qc_pi_cstar) in wavevectors_projected.items():
-    qx_phys = qx_pi_a * (np.pi / a)
-    qy_phys = qc_pi_cstar * (np.pi / c_star)
-    wavevectors_phys[label] = (qx_phys, qy_phys)
+# Convert directly to physical rad/m
+wavevectors_phys = {
+    label: (qx_pi * (np.pi / a), qc_pi * (np.pi / c_star))
+    for label, (qx_pi, qc_pi) in wavevectors_pi_cstar.items()
+}
 
 # ==========================================================
 # PRECOMPUTE STRUCTURE FACTORS S(q) FOR BOTH VACANCY TYPES
@@ -180,8 +214,8 @@ for label, (qx_pi_a, qc_pi_cstar) in wavevectors_projected.items():
 # additionally averages over a small circle in q for noise robustness.
 # ==========================================================
 
-R1 = np.array(R_type1)  # (N1, 2): columns = [x_m, y_m]
-R2 = np.array(R_type2)  # (N2, 2)
+R1 = np.array(R_type1_fft)  # (N1, 2): positions relative to spec corner, in metres
+R2 = np.array(R_type2_fft)  # (N2, 2)
 
 # QX, QY already shape (Ny, Nx)
 # Broadcast: (N_vac, Ny, Nx)
@@ -203,13 +237,26 @@ rho_type1 = {label: [] for label in wavevectors_phys}
 rho_type2 = {label: [] for label in wavevectors_phys}
 energy_list = []
 
-# Single-vacancy HAEM (no multi-atom sum) — for comparison on same plots.
-# Uses the first vacancy of each type as the representative single defect.
-# Change index to test a different vacancy.
-R_single1 = np.array(R_type1[0])   # shape (2,)
-R_single2 = np.array(R_type2[0])   # shape (2,)
-rho_single1 = {label: [] for label in wavevectors_phys}
-rho_single2 = {label: [] for label in wavevectors_phys}
+# Real/imaginary decomposition of MAHAEM:
+#   ρ⁻(q,E) = Re[ΔG · S]  =  Re[ΔG]·Re[S]  -  Im[ΔG]·Im[S]
+#                          =  ρ_cos          +  ρ_sin
+# ρ_cos: correlates Re[ΔG] with the cosine (symmetric) superposition of defect phases.
+# ρ_sin: correlates Im[ΔG] with the sine   (antisymmetric) superposition.
+# A genuine gap-sign signal should appear in BOTH; artifacts typically appear in only one.
+rho_cos_type1 = {label: [] for label in wavevectors_phys}
+rho_sin_type1 = {label: [] for label in wavevectors_phys}
+rho_cos_type2 = {label: [] for label in wavevectors_phys}
+rho_sin_type2 = {label: [] for label in wavevectors_phys}
+
+# Single-vacancy HAEM averaged over ALL vacancies of each type,
+# then also store per-vacancy arrays to show spread.
+# MAHAEM ≈ mean-HAEM when phases add constructively (commensurate q),
+# and MAHAEM < mean-|HAEM| when phases partially cancel (random positions).
+# The ratio |MAHAEM| / mean-|HAEM| is a direct measure of phase coherence.
+rho_mean_haem1 = {label: [] for label in wavevectors_phys}   # mean over all type-1 vacancies
+rho_mean_haem2 = {label: [] for label in wavevectors_phys}   # mean over all type-2 vacancies
+rho_std_haem1  = {label: [] for label in wavevectors_phys}   # std dev (spread)
+rho_std_haem2  = {label: [] for label in wavevectors_phys}
 
 # ==========================================================
 # PREPROCESSING HELPER
@@ -282,12 +329,41 @@ for E in bias_vals:
         rho_type1[label].append(rho1)
         rho_type2[label].append(rho2)
 
-        # Single-vacancy HAEM: Re[(G⁺-G⁻) · e^{iq·R}] averaged over circle
-        # shape of phases: (n_mask,)
-        phase_s1 = np.exp(1j * (R_single1[0] * qx_m + R_single1[1] * qy_m))
-        phase_s2 = np.exp(1j * (R_single2[0] * qx_m + R_single2[1] * qy_m))
-        rho_single1[label].append(np.sum(np.real(G_diff_m * phase_s1)) / n_mask)
-        rho_single2[label].append(np.sum(np.real(G_diff_m * phase_s2)) / n_mask)
+        # --- Real/imaginary decomposition ---
+        # Re[S] = (1/N)Σ cos(q·R),  Im[S] = (1/N)Σ sin(q·R)
+        # ρ_cos = Re[ΔG]·Re[S],   ρ_sin = -Im[ΔG]·Im[S]
+        ReG = np.real(G_diff_m)   # shape (n_mask,)
+        ImG = np.imag(G_diff_m)
+
+        ReS1 = np.sum(np.cos(R1[:, 0:1] * qx_m[np.newaxis, :]
+                           + R1[:, 1:2] * qy_m[np.newaxis, :]), axis=0) / len(R_type1)
+        ImS1 = np.sum(np.sin(R1[:, 0:1] * qx_m[np.newaxis, :]
+                           + R1[:, 1:2] * qy_m[np.newaxis, :]), axis=0) / len(R_type1)
+        rho_cos_type1[label].append(np.sum(ReG * ReS1) / n_mask)
+        rho_sin_type1[label].append(np.sum(-ImG * ImS1) / n_mask)
+
+        ReS2 = np.sum(np.cos(R2[:, 0:1] * qx_m[np.newaxis, :]
+                           + R2[:, 1:2] * qy_m[np.newaxis, :]), axis=0) / len(R_type2)
+        ImS2 = np.sum(np.sin(R2[:, 0:1] * qx_m[np.newaxis, :]
+                           + R2[:, 1:2] * qy_m[np.newaxis, :]), axis=0) / len(R_type2)
+        rho_cos_type2[label].append(np.sum(ReG * ReS2) / n_mask)
+        rho_sin_type2[label].append(np.sum(-ImG * ImS2) / n_mask)
+
+        # Mean single-HAEM over all vacancies + std dev
+        # per_vac shape: (N_vac,)  — HAEM value for each individual vacancy
+        per_vac1 = np.array([
+            np.sum(np.real(G_diff_m * np.exp(1j * (ri[0]*qx_m + ri[1]*qy_m)))) / n_mask
+            for ri in R1
+        ])
+        per_vac2 = np.array([
+            np.sum(np.real(G_diff_m * np.exp(1j * (ri[0]*qx_m + ri[1]*qy_m)))) / n_mask
+            for ri in R2
+        ])
+        rho_mean_haem1[label].append(per_vac1.mean())
+        rho_std_haem1[label].append(per_vac1.std())
+        rho_mean_haem2[label].append(per_vac2.mean())
+        rho_std_haem2[label].append(per_vac2.std())
+        # (kept as dummy for backward compat if needed)
 
 # ==========================================================
 # PLOT ENERGY DEPENDENCE
@@ -322,7 +398,7 @@ for rho_2d, type_label, fname in [
     fig, ax = plt.subplots(figsize=(7, 5))
     im = ax.imshow(rho_2d,
                    extent=extent_2d,
-                   origin="lower", aspect="equal",
+                   origin="lower", aspect="auto",
                    cmap="RdBu_r", vmin=-vmax, vmax=vmax)
     plt.colorbar(im, ax=ax, label="ρ⁻(q,E)  [arb. units]")
     ax.set_xlabel(r"$q_{c^*}$ (π/c*)")
@@ -339,36 +415,66 @@ for rho_2d, type_label, fname in [
 
 for label in wavevectors_phys:
 
-    plt.figure(figsize=(6,4))
+    fig, axes = plt.subplots(2, 1, figsize=(6, 7), sharex=True)
+    fig.subplots_adjust(hspace=0.08)
+    E_arr = np.array(energy_list)
 
-    plt.plot(energy_list, rho_type1[label],    label="In-chain Te (MAHAEM)")
-    plt.plot(energy_list, rho_type2[label],    label="Between-chain Te (MAHAEM)")
-    plt.plot(energy_list, rho_single1[label],  label="In-chain Te (single, HAEM)",     ls='--', alpha=0.7)
-    plt.plot(energy_list, rho_single2[label],  label="Between-chain Te (single, HAEM)", ls='--', alpha=0.7)
+    # Top panel: MAHAEM vs mean single-HAEM with ±1σ spread band
+    ax = axes[0]
+    ax.plot(E_arr, rho_type1[label],     color='C0', label="In-chain MAHAEM")
+    ax.plot(E_arr, rho_mean_haem1[label], color='C0', ls='--', label="In-chain mean HAEM")
+    ax.plot(E_arr, rho_type2[label],     color='C1', label="B/w-chain MAHAEM")
+    ax.plot(E_arr, rho_mean_haem2[label], color='C1', ls='--', label="B/w-chain mean HAEM")
+    ax.axhline(0, color='black', linewidth=0.8)
+    ax.set_ylabel("ρ⁻  [arb.]")
+    ax.set_title(f"MAHAEM ρ⁻(E) at {label}  |  dashed=mean HAEM")
+    ax.legend(fontsize=7)
 
-    plt.axhline(0, color='black', linewidth=1)
+    # Bottom panel: real/imaginary decomposition
+    ax = axes[1]
+    l1, = ax.plot(E_arr, rho_cos_type1[label], label="In-chain cos (Re[ΔG]·Re[S])")
+    ax.plot(E_arr, rho_sin_type1[label],
+            color=l1.get_color(), ls=':', label="In-chain sin (−Im[ΔG]·Im[S])")
+    l2, = ax.plot(E_arr, rho_cos_type2[label], label="B/w-chain cos (Re[ΔG]·Re[S])")
+    ax.plot(E_arr, rho_sin_type2[label],
+            color=l2.get_color(), ls=':', label="B/w-chain sin (−Im[ΔG]·Im[S])")
+    ax.axhline(0, color='black', linewidth=0.8)
+    ax.set_xlabel("Energy (V)")
+    ax.set_ylabel("ρ⁻  [arb.]")
+    ax.set_title("Decomposition: solid=cos (Re[S]), dotted=sin (Im[S])")
+    ax.legend(fontsize=7)
 
-    plt.xlabel("Energy (V)")
-    plt.ylabel("ρ⁻(q,E)  [per vacancy, per q-pixel]")
-    plt.title(f"MAHAEM ρ⁻(E) at {label}\n(sign flip between types at some q is physical — structure factor)")
-    plt.legend()
     plt.tight_layout()
+    plt.savefig(f"{output_dir}/rho_minus_{label}.png", dpi=300, bbox_inches='tight')
+    plt.close()
 
-    plt.savefig(f"{output_dir}/rho_minus_{label}.png", dpi=300)
+    # Standalone sin (Im[S]) component plot
+    fig, ax = plt.subplots(figsize=(6, 3.5))
+    ax.plot(E_arr, rho_sin_type1[label], color='C0', label="In-chain sin (−Im[ΔG]·Im[S])")
+    ax.plot(E_arr, rho_sin_type2[label], color='C1', label="B/w-chain sin (−Im[ΔG]·Im[S])")
+    ax.axhline(0, color='black', linewidth=0.8)
+    ax.set_xlabel("Energy (V)")
+    ax.set_ylabel("ρ⁻  [arb.]")
+    ax.set_title(f"Sin component ρ⁻(E) at {label}  [−Im[ΔG]·Im[S]]")
+    ax.legend(fontsize=8)
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/rho_sin_{label}.png", dpi=300, bbox_inches='tight')
     plt.close()
 
 # ==========================================================
 # PLOT: all vectors on one figure per vacancy type
 # ==========================================================
 
+E_arr = np.array(energy_list)
+
 fig, ax = plt.subplots(figsize=(8, 5))
 for label in wavevectors_phys:
-    l, = ax.plot(energy_list, rho_type1[label], label=f"{label} MAHAEM")
-    ax.plot(energy_list, rho_single1[label], color=l.get_color(), ls='--', alpha=0.7, label=f"{label} HAEM (single)")
+    l, = ax.plot(E_arr, rho_type1[label], label=f"{label} MAHAEM")
+    ax.plot(E_arr, rho_mean_haem1[label], color=l.get_color(), ls='--', alpha=0.7, label=f"{label} mean HAEM")
 ax.axhline(0, color='black', linewidth=1)
 ax.set_xlabel("Energy (V)")
-ax.set_ylabel("ρ⁻(q,E)  [per vacancy, per q-pixel]")
-ax.set_title("MAHAEM vs single-vacancy HAEM — In-chain Te, all wavevectors")
+ax.set_ylabel("ρ⁻(q,E)  [arb.]")
+ax.set_title("MAHAEM vs mean HAEM — In-chain Te, all wavevectors")
 ax.legend(fontsize=7)
 plt.tight_layout()
 plt.savefig(f"{output_dir}/rho_minus_type1_all_vectors.png", dpi=300)
@@ -376,12 +482,12 @@ plt.close()
 
 fig, ax = plt.subplots(figsize=(8, 5))
 for label in wavevectors_phys:
-    l, = ax.plot(energy_list, rho_type2[label], label=f"{label} MAHAEM")
-    ax.plot(energy_list, rho_single2[label], color=l.get_color(), ls='--', alpha=0.7, label=f"{label} HAEM (single)")
+    l, = ax.plot(E_arr, rho_type2[label], label=f"{label} MAHAEM")
+    ax.plot(E_arr, rho_mean_haem2[label], color=l.get_color(), ls='--', alpha=0.7, label=f"{label} mean HAEM")
 ax.axhline(0, color='black', linewidth=1)
 ax.set_xlabel("Energy (V)")
-ax.set_ylabel("ρ⁻(q,E)  [per vacancy, per q-pixel]")
-ax.set_title("MAHAEM vs single-vacancy HAEM — Between-chain Te, all wavevectors")
+ax.set_ylabel("ρ⁻(q,E)  [arb.]")
+ax.set_title("MAHAEM vs mean HAEM — Between-chain Te, all wavevectors")
 ax.legend(fontsize=7)
 plt.tight_layout()
 plt.savefig(f"{output_dir}/rho_minus_type2_all_vectors.png", dpi=300)

@@ -92,92 +92,27 @@ plt.colorbar(label="dI/dV")
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, f"spatial_map_bias_{nearest_bias:.3f}V.png"), dpi=300)
 plt.close()
+# --- Topograph embedded in the .3ds file ---
+# The Z coordinate records the tip height at the start of each spectrum pixel,
+# giving a full topographic map at no extra cost.
+topo = ds.coords["Z"].values  # (y, x), metres
+topo_pm = (topo - np.nanmean(topo)) * 1e12  # convert to pm, plane-subtract mean
 
-# Plot and save FFT of dI/dV spatial map
-# --- Background removal before FFT ---
-# Step 1: Line-by-line linear detrend along rows, then columns.
-#         Removes slow spatial background (offset + tilt per line) that causes
-#         the bright central line/cross in the FFT.
-map_array = np.array(spatial_map, dtype=float)
-map_detrended = np.apply_along_axis(lambda r: r - np.polyval(np.polyfit(np.arange(len(r)), r, 1), np.arange(len(r))), axis=1, arr=map_array)
-map_detrended = np.apply_along_axis(lambda r: r - np.polyval(np.polyfit(np.arange(len(r)), r, 1), np.arange(len(r))), axis=0, arr=map_detrended)
-
-# Step 2: Apply a 2D Hann (cosine) apodization window.
-#         Suppresses edge discontinuities that produce the cross-shaped
-#         ringing artifact along qx=0 and qy=0 in the FFT.
-hann_x = np.hanning(map_detrended.shape[0])
-hann_y = np.hanning(map_detrended.shape[1])
-window_2d = np.outer(hann_x, hann_y)
-map_windowed = map_detrended * window_2d
-
-fft_map = np.fft.fftshift(np.fft.fft2(map_windowed))
-fft_mag = np.abs(fft_map)
-# Gaussian smoothing in k-space to reduce spottiness and highlight features.
-# sigma=1.5 pixels is a mild smooth; increase to 2-3 for stronger smoothing.
-fft_mag = gaussian_filter(fft_mag, sigma=1)
-scaling_factor = 0.5  # for qc* axis
-# Calculate FFT axes in π/a and π/c* units
-Nx, Ny = spatial_map.shape
-qx = 2 * np.pi * np.fft.fftfreq(Nx, d=(x_nm[1] - x_nm[0]))
-qy = 2 * np.pi * np.fft.fftfreq(Ny, d=(y_nm[1] - y_nm[0]))
-qx = np.fft.fftshift(qx) / (np.pi / a)  # π/a
-qy = np.fft.fftshift(qy) / (np.pi / b)  # π/b
-qcstar = qy * scaling_factor  # π/c*
-
-# Prepare meshgrid for plotting
-qcstar_grid, qx_grid = np.meshgrid(qcstar, qx)
-
-plt.figure()
-plt.imshow(np.log(fft_mag + 1e-12), vmin=1.2, vmax=2.5,
-           extent=[qcstar.min(), qcstar.max(), qx.min(), qx.max()],
-           cmap="viridis", origin="lower", aspect="equal")
-plt.colorbar(label="Log FFT Magnitude")
-plt.title(f"FFT of dI/dV Map at Bias={nearest_bias:.3f} V")
-plt.xlabel(r"$q_{c^*}$ (π/c*)")
-plt.ylabel(r"$q_x$ (π/a)")
-plt.ylim(-1.3, 1.3)
-
-# Overlay wavevectors
-# qx in π/a (×2 from 2π/a units), qy already in π/b units
-wvecs = {
-    'p2': (0.44*2, 1),
-    'p4': (0, 2),
-    'p5': (-0.15*2, 1),
-    'p6': (0.59*2, 0)
-}
-vector_colors = {
-    'p2': '#0000FF',  # Blue 
-    'p4': '#00FF00', 
-    'p5': '#FF8800',  # Orange
-    'p6': '#FF00FF'   # Magenta
-}
-label_positions = {
-    'p2': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
-    'p4': {'offset': (-0.10, 0.08), 'ha': 'right', 'va': 'bottom'},
-    'p5': {'offset': (-0.10, -0.08), 'ha': 'right', 'va': 'bottom'},
-    'p6': {'offset': (0.10, 0.0), 'ha': 'left', 'va': 'center'}
-}
-origin = (0, 0)
-for label, (qx_pi, qy_pi) in wvecs.items():
-    qcstar_val = qy_pi * scaling_factor  # π/c*
-    endpoint = (qcstar_val, qx_pi)
-    plt.annotate('', xy=endpoint, xytext=(origin[0], origin[1]),
-                 arrowprops=dict(arrowstyle='->', color=vector_colors[label],
-                                 lw=2, alpha=0.5, shrinkA=0, shrinkB=0))
-    pos_info = label_positions[label]
-    label_qc = endpoint[0] + pos_info['offset'][0]
-    label_qx = endpoint[1] + pos_info['offset'][1]
-    plt.text(label_qc, label_qx, label,
-             color='black', fontsize=6, fontweight='bold',
-             horizontalalignment=pos_info['ha'],
-             verticalalignment=pos_info['va'],
-             bbox=dict(boxstyle='round,pad=0.3',
-                       facecolor='white', edgecolor='black', linewidth=1.5, alpha=0.95),
-             zorder=11)
-
-fft_plot_path = os.path.join(output_dir, f"spatial_map_bias_{nearest_bias:.3f}V_fft_with_vectors.png")
-plt.tight_layout()
-plt.savefig(fft_plot_path, bbox_inches="tight", dpi=300)
+fig, ax = plt.subplots(figsize=(5, 5))
+im = ax.imshow(
+    topo_pm,
+    origin="lower",
+    aspect="equal",
+    cmap="afmhot",
+)
+cb = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+cb.set_label("Height (pm)")
+ax.set_xlabel("x (pixel)")
+ax.set_ylabel("y (pixel)")
+ax.set_title("Topograph (Z channel from .3ds)")
+topo_path = os.path.join(output_dir, "topograph_from_3ds.png")
+plt.savefig(topo_path, dpi=300, bbox_inches="tight")
+plt.show()
 plt.close()
-print("Plots saved to", output_dir)
+print("Topograph saved to", topo_path)
 
