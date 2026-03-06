@@ -168,7 +168,7 @@ print("Cleaned map saved.")
 # ── FFT of cleaned map ─────────────────────────────────────────────────────────
 from scipy.ndimage import gaussian_filter
 a      = 0.416   # nm
-c_star = 0.76129292851   # nm
+c_star = 0.8   # nm
 
 x = ds.coords["x"].values
 y = ds.coords["y"].values
@@ -190,7 +190,7 @@ fft_mag = np.abs(fft_map)
 
 # Symmetrize across both axes: average |F| with reflections in qx and qc*
 # enforces 4-fold mirror symmetry, reducing asymmetric noise
-fft_mag = (fft_mag + fft_mag[::-1, :] + fft_mag[:, ::-1] + fft_mag[::-1, ::-1])
+fft_mag = 0.25 * (fft_mag + fft_mag[::-1, :] + fft_mag[:, ::-1] + fft_mag[::-1, ::-1])
 # Blend qx=0 rows from their immediate neighbors (even N → two centre rows affected)
 _cx = fft_mag.shape[0] // 2
 fft_mag[_cx - 1, :] = 0.5 * (fft_mag[_cx - 2, :] + fft_mag[_cx + 1, :])
@@ -214,6 +214,11 @@ from scipy.signal import find_peaks
 col_power = fft_mag.mean(axis=0)   # shape (Ny,) — mean |F| for each q_{c*} bin
 peaks, _ = find_peaks(col_power, prominence=2 * col_power.std())
 artifact_qy = qy[peaks]
+    # Exclude peaks within ±0.1 of qy=0
+mask = np.abs(artifact_qy) > 0.1
+artifact_qy = artifact_qy[mask]
+peaks = peaks[mask]
+print(f"\nDetected artifact q_{{c*}} positions (\u03c0/c*): {np.round(artifact_qy, 3).tolist()}")
 print(f"\nDetected artifact q_{{c*}} positions (π/c*): {np.round(artifact_qy, 3).tolist()}")
 
 # ── Combined 2D FFT + 1D marginal diagnostic ──────────────────────────────────
@@ -253,7 +258,7 @@ print(f"FFT saved to {fft_path}")
 # ── Notch-filtered FFT (artifact q_{c*} columns interpolated away) ─────────────
 # Artifacts are suppressed in FFT space; their locations are still marked.
 NOTCH               = True   # set False to skip
-NOTCH_HALF          = 1      # half-width in q_{c*} bins for vertical line notch
+NOTCH_HALF          = 2      # half-width in q_{c*} bins for vertical line notch
 NOTCH_SIGMA         = 1    # Gaussian smooth sigma (px) applied after notch+symmetrise; 0 = off
 
 if NOTCH and len(peaks) > 0:
@@ -274,17 +279,72 @@ if NOTCH and len(peaks) > 0:
     if NOTCH_SIGMA > 0:
         fft_mag_notched = gaussian_filter(fft_mag_notched, sigma=NOTCH_SIGMA)
 
-    fig, ax = plt.subplots(figsize=(6, 6))
-    im = ax.imshow(
+    # ── Scattering vectors (given in 2π/a, 2π/c*) — convert to π/a, π/c* by ×2 ──
+    # Only q2, q4, q5, q6 are plotted; format: (qx_2pi_a, qy_2pi_cstar)
+    scattering_vectors = {
+        'q2': (0.44, 0.5),
+        'q4': (0.0,  1.0),
+        'q5': (-0.15, 0.5),
+        'q6': (0.59, 0.0),
+    }
+    sv_colors = {'q2': 'red', 'q4': 'lime', 'q5': 'cyan', 'q6': 'orange'}
+    # Convert to plot units (π/a, π/c*): horizontal=qy, vertical=qx
+    sv_plot = {k: (v[1] * 2, v[0] * 2) for k, v in scattering_vectors.items()}
+    # sv_plot[k] = (qy_in_pi_cstar, qx_in_pi_a)
+
+    sv_names = list(sv_plot.keys())
+    n_sv = len(sv_names)
+
+    fig = plt.figure(figsize=(14, 6))
+    # Left: 2D FFT spanning full height; right: 4 stacked line-cut panels
+    gs = fig.add_gridspec(n_sv, 2, width_ratios=[3, 1], hspace=0.08, wspace=0.35)
+    ax2d = fig.add_subplot(gs[:, 0])
+
+    im = ax2d.imshow(
         fft_mag_notched,
         extent=[qy.min(), qy.max(), qx.min(), qx.max()],
-        origin="lower", aspect="auto", **_imshow_kw,
+        origin="lower", aspect="auto", vmin=7, vmax=20,
     )
-    plt.colorbar(im, ax=ax, label="FFT magnitude")
-    ax.set_xlim(-2.4, 2.4); ax.set_ylim(-1.3, 1.3)
-    ax.set_xlabel(r"$q_{c^*}$  ($\pi/c^*$)")
-    ax.set_ylabel(r"$q_x$  ($\pi/a$)")
-    ax.set_title(f"FFT — notch filtered  ({bias0*1000:.2f} mV)")
+    plt.colorbar(im, ax=ax2d, label="FFT magnitude", fraction=0.046, pad=0.04)
+    ax2d.set_xlim(-2.4, 2.4); ax2d.set_ylim(-1.3, 1.3)
+    ax2d.set_xlabel(r"$q_{c^*}$  ($\pi/c^*$)")
+    ax2d.set_ylabel(r"$q_x$  ($\pi/a$)")
+    ax2d.set_title(f"FFT — notch filtered  ({bias0*1000:.2f} mV)")
+
+    # Draw each scattering vector as an arrow from origin
+    arrowprops = dict(arrowstyle="-|>", lw=1.5, mutation_scale=12)
+    for name, (qy_plot, qx_plot) in sv_plot.items():
+        col = sv_colors[name]
+        ax2d.annotate("", xy=(qy_plot, qx_plot), xytext=(0, 0),
+                      arrowprops={**arrowprops, "color": col})
+        # Label near arrowhead
+        ax2d.text(qy_plot * 1.05, qx_plot * 1.05 + 0.04, name,
+                  color=col, fontsize=8, fontweight="bold",
+                  ha="center", va="bottom")
+
+    # ── Line cuts: at each vector's qx row, plot intensity vs qy ────────────
+    lc_axes = []
+    for i, name in enumerate(sv_names):
+        ax_lc = fig.add_subplot(gs[i, 1])
+        lc_axes.append(ax_lc)
+        qy_plot, qx_plot = sv_plot[name]
+        col = sv_colors[name]
+        # Find nearest row for this qx value
+        row_idx = np.argmin(np.abs(qx - qx_plot))
+        lc = fft_mag_notched[row_idx, :]
+        ax_lc.plot(qy, lc, lw=0.9, color=col)
+        # Mark the vector's qy position
+        ax_lc.axvline(qy_plot, color=col, lw=0.8, ls="--", alpha=0.8)
+        ax_lc.set_ylabel("mag.", fontsize=6, labelpad=2)
+        ax_lc.set_title(f"{name}  $q_x$={qx_plot:.2f}", fontsize=7, pad=2,
+                        color=col)
+        ax_lc.tick_params(labelsize=6)
+        ax_lc.set_xlim(-2.4, 2.4)
+        if i < n_sv - 1:
+            ax_lc.set_xticklabels([])
+        else:
+            ax_lc.set_xlabel(r"$q_{c^*}$  ($\pi/c^*$)", fontsize=7)
+
     notch_path = os.path.join(output_dir, "didv_0V_fft_notched.png")
     plt.savefig(notch_path, dpi=300, bbox_inches="tight")
     plt.show(); plt.close()
