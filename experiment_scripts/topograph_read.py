@@ -1,8 +1,18 @@
 
 import xarray as xr
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import numpy as np
 import os
+
+# ── custom colormap matching crystal_cleave_figure.py ───────────────────────
+cmap_bluegrey = mcolors.LinearSegmentedColormap.from_list(
+    "black_bluegrey",
+    [(0.00, "#000000"),
+     (0.45, "#2a3a4a"),
+     (0.75, "#7090a8"),
+     (1.00, "#d8e8f0")],
+)
 
 # Load file
 ds = xr.open_dataset("experimental_data/topograph.sxm", engine="nanonis")
@@ -22,7 +32,7 @@ print("Z dims:", z.dims)
 
 
 plt.figure()
-z.plot(cmap="viridis")
+z.plot(cmap=cmap_bluegrey)
 plt.gca().set_aspect("equal")
 plt.title("Raw Topography")
 raw_plot_path = os.path.join(output_dir, "raw_topography.png")
@@ -48,17 +58,26 @@ z_flat = Zvals - plane
 
 
 
+z_pm = (z_flat - z_flat.min()) * 1e12
+vmax_pm = float(np.percentile(z_pm, 98))
+
 plt.figure()
 plt.imshow(
-    np.log(z_flat-np.nanmin(z_flat)+1e-12),  # log scale for better contrast, shift to avoid log(0)
-    extent=[x.min(), x.max(), y.min(), y.max()],
+    np.clip(z_pm, 0, vmax_pm),
+    extent=[x.min()*1e9, x.max()*1e9, y.min()*1e9, y.max()*1e9],
     origin="lower",
-    cmap="plasma"
+    cmap=cmap_bluegrey,
+    vmin=0, vmax=vmax_pm,
 )
-plt.colorbar(label="Height (m)")
+cbar = plt.colorbar()
+cbar.set_label("Height (pm)")
+cbar.set_ticks([0, vmax_pm/2, vmax_pm])
+cbar.set_ticklabels(["0 pm", f"{vmax_pm/2:.0f} pm", f"{vmax_pm:.0f} pm"])
 plt.gca().set_aspect("equal")
-plt.title("Log contrast Topography")
-flat_plot_path = os.path.join(output_dir, "log_contrast_topography.png")
+plt.xlabel("x (nm)")
+plt.ylabel("y (nm)")
+plt.title("Plane-subtracted Topography")
+flat_plot_path = os.path.join(output_dir, "plane_sub_topography.png")
 plt.savefig(flat_plot_path, bbox_inches="tight", dpi=300)
 plt.close()
 
@@ -67,7 +86,7 @@ fft_map = np.fft.fftshift(np.fft.fft2(z_flat))
 fft_mag = np.abs(fft_map)
 
 plt.figure()
-plt.imshow(np.log(fft_mag + 1e-12), cmap="viridis", origin="lower")
+plt.imshow(np.log(fft_mag + 1e-12), cmap=cmap_bluegrey, origin="lower")
 plt.colorbar(label="Log FFT Magnitude")
 plt.title("FFT of Log-Contrast Topography")
 fft_plot_path = os.path.join(output_dir, "log_contrast_topography_fft.png")

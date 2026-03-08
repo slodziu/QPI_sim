@@ -107,7 +107,9 @@ RANDOM_30_IMPURITIES = SimulationConfig(
     n_frames=10,    # Reduced frames for faster computation
     E_min=10.0,
     E_max=20.0,
-    V_s=1.5,       # Much weaker impurities for numerical stability
+    mu=0.0,         # Zero chemical potential: k_F = sqrt(E)
+    eta=0.2,        # Larger broadening to suppress Gibbs ringing inside FFT ring
+    V_s=1.0,       # Much weaker impurities for numerical stability
 )
 
 # Dynamic N-impurity configuration template
@@ -340,3 +342,7 @@ def list_configurations():
     print("- random_10_impurities: Ten randomly placed impurities")
     print("- random_30_impurities: Thirty randomly placed impurities")
     print("- random_N_impurities: Dynamic N impurities (e.g., random_7_impurities)")
+
+
+# Alias for backwards compatibility
+list_available_configs = list_configurations

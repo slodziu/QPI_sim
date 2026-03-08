@@ -125,7 +125,7 @@ class CustomLayoutQPIVisualiser(QPIvisualiser):
         self.ax4.set_ylim(self.params.E_min - 2, self.params.E_max + 2)
 
 
-def run_simulation(config_name: str, save_frames: bool = False):
+def run_simulation(config_name: str, save_frames: bool = False, poster_frame: bool = False):
     """Run a QPI simulation with the specified configuration."""
     try:
         # Get configuration
@@ -157,7 +157,7 @@ def run_simulation(config_name: str, save_frames: bool = False):
         print(f"Using parabolic dispersion model")
         
         # Create and run simulation
-        simulation = QPISimulation(params, impurity_positions, model)
+        simulation = QPISimulation(params, impurity_positions, model=None)
         
         # Use custom layout visualizer
         visualiser = CustomLayoutQPIVisualiser(simulation)
@@ -189,6 +189,11 @@ def run_simulation(config_name: str, save_frames: bool = False):
         
         # Save snapshot at mid-energy
         visualiser.save_mid_energy_snapshot(snapshot_filename)
+
+        # Optionally save a single zoomed poster frame
+        if poster_frame:
+            poster_dir = os.path.join(config_output_dir, "poster")
+            visualiser.save_poster_frame(poster_dir, frame=0)
         
         # Print results
         print(f"\nSimulation completed!")
@@ -222,6 +227,8 @@ def main():
     parser.add_argument('config_name', nargs='?', help='Configuration name to run')
     parser.add_argument('--save-frames', action='store_true', 
                         help='Save individual frames to frames folder')
+    parser.add_argument('--poster-frame', action='store_true',
+                        help='Save a single zoomed azimuthal poster figure (first energy frame)')
     parser.add_argument('--list', action='store_true', 
                         help='List available configurations')
     
@@ -237,7 +244,7 @@ def main():
         list_available_configs()
         sys.exit(1)
     
-    success = run_simulation(args.config_name, save_frames=args.save_frames)
+    success = run_simulation(args.config_name, save_frames=args.save_frames, poster_frame=args.poster_frame)
     sys.exit(0 if success else 1)
 
 

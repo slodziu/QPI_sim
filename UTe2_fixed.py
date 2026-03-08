@@ -697,7 +697,7 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
     # Create momentum grid with physical k-values
     nk = resolution
     kx_vals = np.linspace(-np.pi/a, np.pi/a, nk)  # -1 to 1 in π/a units
-    ky_vals = np.linspace(-3*np.pi/b, 3*np.pi/b, nk)  # Extended range: -3 to 3 in π/b units
+    ky_vals = np.linspace(-np.pi/b, np.pi/b, nk)  # Extended range: -3 to 3 in π/b units
     KX, KY = np.meshgrid(kx_vals, ky_vals)
     
     # Calculate Fermi surface for overlay using same range as gap plots
@@ -731,7 +731,7 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
         gap_mag = calculate_gap_magnitude(KX, KY, kz, pairing_type=pairing_type)
         
         # Plot gap magnitude - use same coordinate order as contour
-        im = ax.imshow(gap_mag.T, extent=[ky_vals.min(), ky_vals.max(), 
+        im = ax.imshow(gap_mag.T * 1000, extent=[ky_vals.min(), ky_vals.max(), 
                                          kx_vals.min(), kx_vals.max()],
                       origin='lower', cmap='RdYlBu_r', alpha=0.8)
         
@@ -803,8 +803,8 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
                                 print(f"    B2u Band {band+1} gap node: ky={ky_pi_b:.3f}π/b, kx={kx_pi_a:.3f}π/a")
                                 
                                 # Add circle marker at gap node
-                                ax.scatter(ky_node, kx_node, s=100, c='yellow',
-                                         marker='o', edgecolors='red', linewidth=2,
+                                ax.scatter(ky_node, kx_node, s=100, c='black',
+                                         marker='o', edgecolors='white', linewidth=2,
                                          alpha=0.9, zorder=10)
                                 total_gap_nodes += 1
                                 band_nodes += 1
@@ -860,8 +860,8 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
                                     print(f"    B3u Band {band+1} gap node: ky={ky_pi_b:.3f}π/b, kx={kx_pi_a:.3f}π/a")
                                 
                                 # Add circle marker at gap node
-                                ax.scatter(ky_node, kx_node, s=100, c='yellow', 
-                                         marker='o', edgecolors='red', linewidth=2,
+                                ax.scatter(ky_node, kx_node, s=100, c='black', 
+                                         marker='o', edgecolors='white', linewidth=2,
                                          alpha=0.9, zorder=10)
                                 total_gap_nodes += 1
                                 band_nodes += 1
@@ -905,21 +905,22 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
                    bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.9, edgecolor='black'),
                    zorder=1000)
         
-        # Add colorbar with scientific notation
-        cbar = plt.colorbar(im, ax=ax, shrink=0.3, format='%.1e')
-        cbar.set_label(r'|Δ$_k$|', fontsize=12)
+        # Add colorbar in meV
+        cbar = plt.colorbar(im, ax=ax, shrink=0.45, format='%.2f', extend='neither')
+        cbar.set_label(r'|$\Delta_k$| (meV)', fontsize=12)
+        cbar.set_ticks(np.linspace(im.get_array().min(), im.get_array().max(), 6))
         
-        print(f"    {pairing_type}: gap range 0 to {np.max(gap_mag):.3f}")
+        print(f"    {pairing_type}: gap range 0 to {np.max(gap_mag)*1000:.3f} meV")
         print(f"    {pairing_type}: no gap nodes detected")
     
     # Add legend closer to the plots
     legend_elements = [
         plt.Line2D([0], [0], color='#FD0000', lw=3, label='Electron-like'),
         plt.Line2D([0], [0], color='#9635E5', lw=3, label='Hole-like'),
-        plt.Line2D([0], [0], marker='o', color='yellow', markersize=8, 
-                  markeredgecolor='red', markeredgewidth=2, linestyle='None', label='Nodes')
+        plt.Line2D([0], [0], marker='o', color='black', markersize=8, 
+                  markeredgecolor='white', markeredgewidth=2, linestyle='None', label='Nodes')
     ]
-    fig.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, 0.17), 
+    fig.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, 0.01), 
               ncol=3, fontsize=11, frameon=False)
     
     # Hide unused subplots if necessary
@@ -928,7 +929,7 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
             axes[j].set_visible(False)
     
     plt.tight_layout()
-    plt.subplots_adjust(bottom=0.01)  # Reduced margin for closer legend
+    plt.subplots_adjust(bottom=0.12)  # Leave room below plots for legend
     
     # Save the plot
     filename = f'gap_magnitude_2d_kz_{kz:.3f}.png'
@@ -1026,12 +1027,12 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
                                 
                                 # Add circle marker at gap node
                                 if gap_nodes_found == 0:  # Add to legend only once
-                                    ax_single.scatter(ky_node, kx_node, s=150, c='yellow',
-                                                   marker='o', edgecolors='red', linewidth=2,
+                                    ax_single.scatter(ky_node, kx_node, s=150, c='black',
+                                                   marker='o', edgecolors='white', linewidth=2,
                                                    alpha=0.9, zorder=10, label='Gap nodes')
                                 else:
-                                    ax_single.scatter(ky_node, kx_node, s=150, c='yellow',
-                                                   marker='o', edgecolors='red', linewidth=2,
+                                    ax_single.scatter(ky_node, kx_node, s=150, c='black',
+                                                   marker='o', edgecolors='white', linewidth=2,
                                                    alpha=0.9, zorder=10)
                                 gap_nodes_found += 1
                                 band_nodes += 1
@@ -1088,12 +1089,12 @@ def plot_gap_magnitude_2d(kz=0.0, pairing_types=['B1u', 'B2u', 'B3u'],
                                 
                                 # Add circle marker at gap node
                                 if gap_nodes_found == 0:  # Add to legend only once
-                                    ax_single.scatter(ky_node, kx_node, s=150, c='yellow', 
-                                                   marker='o', edgecolors='red', linewidth=2,
+                                    ax_single.scatter(ky_node, kx_node, s=150, c='black', 
+                                                   marker='o', edgecolors='white', linewidth=2,
                                                    alpha=0.9, zorder=10, label='Gap nodes')
                                 else:
-                                    ax_single.scatter(ky_node, kx_node, s=150, c='yellow', 
-                                                   marker='o', edgecolors='red', linewidth=2,
+                                    ax_single.scatter(ky_node, kx_node, s=150, c='black', 
+                                                   marker='o', edgecolors='white', linewidth=2,
                                                    alpha=0.9, zorder=10)
                                 gap_nodes_found += 1
                                 band_gap_nodes += 1
@@ -3250,9 +3251,9 @@ if __name__ == "__main__":
     print("\n" + "="*70)
     print("Generating 3D Fermi Surface (alt orientation, no gap nodes)")
     print("="*70)
-    #plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False)
+    plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False)
 
-    #plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False,orientation='alt')
+    plot_3d_fermi_surface(save_dir='outputs/ute2_fixed', show_gap_nodes=False,orientation='alt')
 
     
     # Generate 3D plots with gap nodes for each pairing symmetry
@@ -3261,7 +3262,7 @@ if __name__ == "__main__":
     #print("="*70)
     
 
-    plot_gap_magnitude_2d(kz=0, pairing_types=['B2u', 'B3u'], save_dir='outputs/ute2_fixed')
+    #plot_gap_magnitude_2d(kz=0, pairing_types=['B2u', 'B3u'], save_dir='outputs/ute2_fixed')
     
     # Generate (0-11) crystallographic projections
     

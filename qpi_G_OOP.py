@@ -65,7 +65,7 @@ class SystemParameters:
     L: float = 50.0
     t: float = 0.3
     mu: float = 0.0
-    eta: float = 0.1
+    eta: float = 0.01
     V_s: float = 1.0
     
     E_min: float = 5.0
@@ -91,7 +91,7 @@ class SystemParameters:
     @property
     def k_F_max(self) -> float:
         """Maximum Fermi wavevector for parabolic dispersion."""
-        return np.sqrt(max(abs(self.E_min), abs(self.E_max)))
+        return np.sqrt(max(abs(self.E_min), abs(self.E_max)) + self.mu)
 
 
 class SignalProcessing:
@@ -598,8 +598,8 @@ class QPISimulation:
             Fermi wavevector (approximate for tight-binding)
         """
         if self.model is None:
-            # Parabolic dispersion: ε(k) = k² 
-            return np.sqrt(max(0, E))  # Avoid sqrt of negative numbers
+            # Parabolic dispersion: ε(k) = k² - μ, so k_F = √(E + μ)
+            return np.sqrt(max(0, E + self.params.mu))  # Avoid sqrt of negative numbers
         else:
             # For tight-binding, this is approximate
             # Use energy scale to estimate reasonable k-space range
@@ -964,10 +964,15 @@ class QPIvisualiser:
         )
         
         # Create 2x3 subplot figure with tighter layout
-        fig = plt.figure(figsize=(8.3, 5.5), dpi=300)
-        gs = fig.add_gridspec(2, 3, hspace=0.4, wspace=0.65, 
-                             width_ratios=[1.3, 1.3, 0.8],  # Make 2D plots (a,b,d,e) bigger
-                             top=0.95, bottom=0.08, left=0.06, right=0.98)
+        fig = plt.figure(figsize=(13, 8), dpi=300)
+        _style = getattr(self, '_poster_style', 'default')
+        if _style == 'spaced':
+            _hspace, _wspace = 0.30, 0.42
+        else:
+            _hspace, _wspace = 0.30, 0.30
+        gs = fig.add_gridspec(2, 3, hspace=_hspace, wspace=_wspace,
+                             width_ratios=[1.0, 1.0, 0.9],
+                             top=0.93, bottom=0.08, left=0.055, right=0.99)
         
         # Get k-space extent - this must match the coordinates used in azimuthal integration
         dk = 2 * np.pi / self.params.L
@@ -1064,6 +1069,15 @@ class QPIvisualiser:
         # Create q-vector array for plotting (use bin centers)
         q_plot = (q_bins[:-1] + q_bins[1:]) / 2
         scale = 0.7
+
+        # Pre-compute expected_2kF so it's available for all panels
+        if hasattr(self.sim, 'energy_to_kF'):
+            k_F = self.sim.energy_to_kF(energy)
+            expected_2kF = 2 * k_F
+        else:
+            k_F = np.sqrt(max(0, energy))
+            expected_2kF = 2 * k_F
+
         # Panel 1: Real part of FFT
         ax1 = fig.add_subplot(gs[0, 0])
         # Crop the data for better visibility
@@ -1072,16 +1086,24 @@ class QPIvisualiser:
         vmax_real_fft = np.max(np.abs(real_fft_crop))
         im1 = ax1.imshow(real_fft_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-scale*np.max(real_fft_crop), vmax=scale*np.max(real_fft_crop))
-        ax1.set_title('Re[FFT(δN(r))]', fontsize=12)
+        ax1.set_title(r'Re[$\delta N(\mathbf{q})$]', fontsize=12)
         ax1.set_xlabel('$k_x$ (1/a)', fontsize=10)
         ax1.set_ylabel('$k_y$ (1/a)', fontsize=10)
         ax1.tick_params(axis='both', which='major', labelsize=11)
+        ax1.set_xlim(-1.5 * expected_2kF, 1.5 * expected_2kF)
+        ax1.set_ylim(-1.5 * expected_2kF, 1.5 * expected_2kF)
 
-        plt.colorbar(im1, ax=ax1, label='Re[FFT]')
+        plt.colorbar(im1, ax=ax1, label=r'Re[$\delta N(\mathbf{q})$]')
         # Add panel label (a)
         ax1.text(0.05, 0.95, '(a)', transform=ax1.transAxes, fontsize=12, fontweight='bold',
                 verticalalignment='top', horizontalalignment='left',
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        # Add 2k_F arrow from origin pointing right
+        if expected_2kF > 0:
+            ax1.annotate('', xy=(expected_2kF, 0), xytext=(0, 0),
+                        arrowprops=dict(arrowstyle='->', color='red', lw=1.5))
+            ax1.plot([], [], '->', color='red', lw=1.5, label=r'$2k_\mathrm{F}$')
+            ax1.legend(loc='lower right', fontsize=8, framealpha=0.8)
         
         # Panel 2: Imaginary part of FFT
         ax2 = fig.add_subplot(gs[0, 1])
@@ -1091,12 +1113,14 @@ class QPIvisualiser:
         vmax_imag_fft = np.max(np.abs(imag_fft_crop))
         im2 = ax2.imshow(imag_fft_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-scale*np.max(imag_fft_crop), vmax=scale*np.max(imag_fft_crop))
-        ax2.set_title('Im[FFT(δN(r))]', fontsize=12)
+        ax2.set_title(r'Im[$\delta N(\mathbf{q})$]', fontsize=12)
         ax2.set_xlabel('$k_x$ (1/a)', fontsize=10)
         ax2.set_ylabel('$k_y$ (1/a)', fontsize=10)
         ax2.tick_params(axis='both', which='major', labelsize=11)
+        ax2.set_xlim(-1.5 * expected_2kF, 1.5 * expected_2kF)
+        ax2.set_ylim(-1.5 * expected_2kF, 1.5 * expected_2kF)
 
-        plt.colorbar(im2, ax=ax2, label='Im[FFT]')
+        plt.colorbar(im2, ax=ax2, label=r'Im[$\delta N(\mathbf{q})$]')
         # Add panel label (b)
         ax2.text(0.05, 0.95, '(b)', transform=ax2.transAxes, fontsize=12, fontweight='bold',
                 verticalalignment='top', horizontalalignment='left',
@@ -1108,22 +1132,15 @@ class QPIvisualiser:
         ax3.axhline(y=0, color='gray', linestyle=':', linewidth=1, alpha=0.5)
         
         # Add expected 2k_F peak position (if meaningful)
-        if hasattr(self.sim, 'energy_to_kF'):
-            k_F = self.sim.energy_to_kF(energy)
-            expected_2kF = 2 * k_F
-            if expected_2kF > 0 and expected_2kF <= np.max(q_plot):
-                ax3.axvline(x=expected_2kF, color='black', linestyle='--', linewidth=2, alpha=0.8, label=f'2k_F ≈ {expected_2kF:.2f}')
-        else:
-            # Fallback for backward compatibility
-            k_F = np.sqrt(max(0, energy))
-            expected_2kF = 2 * k_F
-            if expected_2kF <= np.max(q_plot):
-                ax3.axvline(x=expected_2kF, color='black', linestyle='--', linewidth=2, alpha=0.8, label=f'2k_F = {expected_2kF:.2f}')
+        if expected_2kF > 0 and expected_2kF <= np.max(q_plot):
+            ax3.axvline(x=expected_2kF, color='black', linestyle=':', linewidth=1, alpha=0.8, label=f'$2k_\\mathrm{{F}} \\approx {expected_2kF:.2f}$')
         
-        ax3.set_xlabel('|q| (1/a)', fontsize=10)
-        ax3.set_ylabel('Re[FFT(δN)]', fontsize=10)
-        ax3.set_title('Azimuthal Integration: Re[FFT]', fontsize=12)
+        ax3.set_xlabel('$|q|$ (1/a)', fontsize=10)
+        ax3.set_ylabel(r'Re[$\delta N(\mathbf{q})$]', fontsize=10)
+        ax3.set_title(r'Azimuthal Integration: Re[$\delta N$]', fontsize=12)
         ax3.tick_params(axis='both', which='major', labelsize=11)
+        if expected_2kF > 0:
+            ax3.set_xlim(0, min(2 * expected_2kF, np.max(q_plot)))
         # Add panel label (c)
         ax3.text(0.05, 0.95, '(c)', transform=ax3.transAxes, fontsize=12, fontweight='bold',
                 verticalalignment='top', horizontalalignment='left',
@@ -1139,15 +1156,23 @@ class QPIvisualiser:
         vmax_R_MA = np.max(np.abs(real_R_MA_crop))
         im4 = ax4.imshow(real_R_MA_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-5*np.max(np.abs(cut_left_R_MA)), vmax=5*np.max(np.abs(cut_right_R_MA)))
-        ax4.set_title('Re[δN_MA(q)]', fontsize=12)
+        ax4.set_title(r'Re[$\delta N_\mathrm{MA}(\mathbf{q})$]', fontsize=12)
         ax4.set_xlabel('$k_x$ (1/a)', fontsize=10)
         ax4.set_ylabel('$k_y$ (1/a)', fontsize=10)
         ax4.tick_params(axis='both', which='major', labelsize=11)
+        ax4.set_xlim(-1.5 * expected_2kF, 1.5 * expected_2kF)
+        ax4.set_ylim(-1.5 * expected_2kF, 1.5 * expected_2kF)
         # Add panel label (d)
         ax4.text(0.05, 0.95, '(d)', transform=ax4.transAxes, fontsize=12, fontweight='bold',
                 verticalalignment='top', horizontalalignment='left',
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-        plt.colorbar(im4, ax=ax4, label='Re[R_MA]')
+        plt.colorbar(im4, ax=ax4, label=r'Re[$\delta N_\mathrm{MA}$]')
+        # Add 2k_F arrow from origin pointing right
+        if expected_2kF > 0:
+            ax4.annotate('', xy=(expected_2kF, 0), xytext=(0, 0),
+                        arrowprops=dict(arrowstyle='->', color='red', lw=1.5))
+            ax4.plot([], [], '->', color='red', lw=1.5, label=r'$2k_\mathrm{F}$')
+            ax4.legend(loc='lower right', fontsize=8, framealpha=0.8)
         
         # Panel 5: Imaginary part of R_MA
         ax5 = fig.add_subplot(gs[1, 1])
@@ -1157,15 +1182,17 @@ class QPIvisualiser:
         vmax_imag_R_MA = np.max(np.abs(imag_R_MA_crop))
         im5 = ax5.imshow(imag_R_MA_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-0.1*vmax_imag_R_MA, vmax=0.1*vmax_imag_R_MA)
-        ax5.set_title('Im[δN_MA(q)]', fontsize=12)
+        ax5.set_title(r'Im[$\delta N_\mathrm{MA}(\mathbf{q})$]', fontsize=12)
         ax5.set_xlabel('$k_x$ (1/a)', fontsize=10)
         ax5.set_ylabel('$k_y$ (1/a)', fontsize=10)
         ax5.tick_params(axis='both', which='major', labelsize=11)
+        ax5.set_xlim(-1.5 * expected_2kF, 1.5 * expected_2kF)
+        ax5.set_ylim(-1.5 * expected_2kF, 1.5 * expected_2kF)
         # Add panel label (e)
         ax5.text(0.05, 0.95, '(e)', transform=ax5.transAxes, fontsize=12, fontweight='bold',
                 verticalalignment='top', horizontalalignment='left',
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-        plt.colorbar(im5, ax=ax5, label='Im[R_MA]')
+        plt.colorbar(im5, ax=ax5, label=r'Im[$\delta N_\mathrm{MA}$]')
         
         # Panel 6: Azimuthally integrated profiles for Re[R_MA]
         ax6 = fig.add_subplot(gs[1, 2])
@@ -1174,23 +1201,118 @@ class QPIvisualiser:
         
         # Add expected 2k_F peak position  
         if expected_2kF <= np.max(q_plot):
-            ax6.axvline(x=expected_2kF, color='black', linestyle='--', linewidth=2, alpha=0.8, label=f'2k_F = {expected_2kF:.2f}')
+            ax6.axvline(x=expected_2kF, color='black', linestyle=':', linewidth=1, alpha=0.8, label=f'$2k_\\mathrm{{F}} = {expected_2kF:.2f}$')
         
-        ax6.set_xlabel('|q| (1/a)', fontsize=10)
-        ax6.set_ylabel('Re[δN_MA]', fontsize=10)
-        ax6.set_title('Azimuthal Integration: Re[δN_MA]', fontsize=12)
+        ax6.set_xlabel('$|q|$ (1/a)', fontsize=10)
+        ax6.set_ylabel(r'Re[$\delta N_\mathrm{MA}$]', fontsize=10)
+        ax6.set_title(r'Azimuthal Integration: Re[$\delta N_\mathrm{MA}$]', fontsize=12)
         ax6.tick_params(axis='both', which='major', labelsize=11)
+        if expected_2kF > 0:
+            ax6.set_xlim(0, min(2 * expected_2kF, np.max(q_plot)))
         # Add panel label (f)
         ax6.text(0.05, 0.95, '(f)', transform=ax6.transAxes, fontsize=12, fontweight='bold',
                 verticalalignment='top', horizontalalignment='left',
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         ax6.legend(loc='best', fontsize=8)
         ax6.grid(True, alpha=0.3)
-        
-        # Save figure with tight layout (no suptitle for compact output)
+
+        # Draw dividing grid lines BEFORE saving so they appear in the output.
+        if getattr(self, '_poster_style', 'default') == 'dividers':
+            from matplotlib.lines import Line2D
+            from matplotlib.transforms import Bbox as MplBbox
+
+            # Force a render pass so get_tightbbox returns accurate pixel coordinates.
+            fig.canvas.draw()
+            renderer = fig.canvas.get_renderer()
+            disp_to_fig = fig.transFigure.inverted()
+
+            def _tight_fig_bb(ax):
+                bb = ax.get_tightbbox(renderer)
+                return bb.transformed(disp_to_fig) if bb is not None else None
+
+            # Assign every axes object (main plots AND colorbars) to the nearest
+            # gridspec cell by comparing axis centres to cell centres.
+            cell_axes = [[[] for _ in range(3)] for _ in range(2)]
+            for ax in fig.get_axes():
+                pos = ax.get_position()
+                ax_cx = (pos.x0 + pos.x1) / 2
+                ax_cy = (pos.y0 + pos.y1) / 2
+                best_i, best_j, best_dist = 0, 0, float('inf')
+                for ri in range(2):
+                    for ci in range(3):
+                        cp = gs[ri, ci].get_position(fig)
+                        cx = (cp.x0 + cp.x1) / 2
+                        cy = (cp.y0 + cp.y1) / 2
+                        dist = (ax_cx - cx) ** 2 + (ax_cy - cy) ** 2
+                        if dist < best_dist:
+                            best_dist = dist
+                            best_i, best_j = ri, ci
+                cell_axes[best_i][best_j].append(ax)
+
+            def _union_bb(axes):
+                bbs = [_tight_fig_bb(ax) for ax in axes]
+                bbs = [b for b in bbs if b is not None]
+                return MplBbox.union(bbs) if bbs else None
+
+            # Bounding box for each full column (both rows) and each full row (all cols).
+            col_bb = [_union_bb(cell_axes[0][c] + cell_axes[1][c]) for c in range(3)]
+            row_bb = [_union_bb(cell_axes[r][0] + cell_axes[r][1] + cell_axes[r][2])
+                      for r in range(2)]
+
+            # Outer extent of all content.
+            x_min = col_bb[0].x0
+            x_max = col_bb[2].x1
+            y_min = row_bb[1].y0   # row 1 is the bottom row in figure coords
+            y_max = row_bb[0].y1   # row 0 is the top row
+
+            # Internal separators at the midpoint of the actual whitespace gaps.
+            x_sep1 = (col_bb[0].x1 + col_bb[1].x0) / 2   # col 0 | col 1
+            x_sep2 = (col_bb[1].x1 + col_bb[2].x0) / 2   # col 1 | col 2
+            y_sep  = (row_bb[1].y1 + row_bb[0].y0) / 2   # top row bottom | bottom row top
+
+            kw = dict(transform=fig.transFigure, color='#888888',
+                      linestyle='--', linewidth=1.0, alpha=0.9, clip_on=False)
+            for x in [x_min, x_sep1, x_sep2, x_max]:
+                fig.add_artist(Line2D([x, x], [y_min, y_max], **kw))
+            for y in [y_min, y_sep, y_max]:
+                fig.add_artist(Line2D([x_min, x_max], [y, y], **kw))
+
+        # Save figure (dividers already drawn above when requested).
         fourier_filename = os.path.join(frames_dir, f'fourier_analysis_{frame_idx+1:03d}.png')
         fig.savefig(fourier_filename, dpi=300, bbox_inches='tight', pad_inches=0.1)
         plt.close(fig)
+
+    def save_poster_frame(self, output_dir: str, frame: int = 0):
+        """
+        Save a single high-quality fourier analysis figure for poster use.
+        Saves three variants: default, spaced (more padding), dividers (dashed lines).
+
+        Args:
+            output_dir: Directory to save the image.
+            frame: Which energy frame index to use (0 = E_min, default).
+        """
+        import os, shutil
+        os.makedirs(output_dir, exist_ok=True)
+        energy = self.params.E_min + (self.params.E_max - self.params.E_min) * frame / max(self.params.n_frames - 1, 1)
+
+        saved = []
+        for style, suffix in [('default', ''), ('spaced', '_spaced'), ('dividers', '_dividers')]:
+            self._poster_style = style
+            tmp_dir = os.path.join(output_dir, f'_poster_tmp_{style}')
+            os.makedirs(tmp_dir, exist_ok=True)
+            self.save_fourier_analysis_figure(energy, tmp_dir, frame)
+            src = os.path.join(tmp_dir, f'fourier_analysis_{frame+1:03d}.png')
+            dst = os.path.join(output_dir, f'azimuthal_poster_E{energy:+.3f}{suffix}.png')
+            shutil.move(src, dst)
+            try:
+                os.rmdir(tmp_dir)
+            except OSError:
+                pass
+            print(f"Poster frame saved: {dst}")
+            saved.append(dst)
+
+        del self._poster_style
+        return saved
     
     def create_animation(self, filename: str = 'qpi_animation.mp4', frames_dir: str = None):
         """

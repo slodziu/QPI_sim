@@ -48,11 +48,10 @@ def create_3d_comparison(save_dir='outputs/ute2_fixed'):
         return
     
     # Create our comparison plot - make it taller, less wide
-    fig = plt.figure(figsize=(9, 6), dpi=300)
+    fig = plt.figure(figsize=(12, 8), dpi=300)
     
     # Configuration for each subplot
     configs = [
-        {'title': 'B1u', 'show_gap_nodes': False, 'gap_node_pairing': None},
         {'title': 'B2u', 'show_gap_nodes': True, 'gap_node_pairing': 'B2u'},
         {'title': 'B3u', 'show_gap_nodes': True, 'gap_node_pairing': 'B3u'}
     ]
@@ -64,7 +63,7 @@ def create_3d_comparison(save_dir='outputs/ute2_fixed'):
     
     # Create each subplot
     for i, config in enumerate(configs):
-        ax = fig.add_subplot(1, 3, i+1, projection='3d')
+        ax = fig.add_subplot(1, 2, i+1, projection='3d')
         
         print(f"  Creating subplot {i+1}: {config['title']}")
         
@@ -292,8 +291,8 @@ def create_3d_comparison(save_dir='outputs/ute2_fixed'):
         # Set title
         ax.set_title(config['title'], fontsize=12, pad=10)
         
-        # Add panel label (a), b), c)) - debug with print
-        panel_labels = ['a)', 'b)', 'c)', 'd)', 'e)', 'f)']
+        # Add panel label - debug with print
+        panel_labels = ['c)', 'd)', 'e)', 'f)']
         print(f"    Adding panel label {panel_labels[i]} to subplot {i+1}")
         if i < len(panel_labels):
             ax.text2D(0.02, 0.98, panel_labels[i], transform=ax.transAxes, 
@@ -328,19 +327,18 @@ def create_3d_comparison(save_dir='outputs/ute2_fixed'):
         Line2D([0], [0], marker='o', color='yellow', markersize=8, 
               markeredgecolor='black', markeredgewidth=2, linestyle='None', label='Nodes')
     ]
-    fig.legend(handles=legend_elements, loc='upper center', ncol=3, fontsize=11, framealpha=0.9,
-               bbox_to_anchor=(0.5, 0.92))  # Moved closer to plots
+    fig.legend(handles=legend_elements, loc='lower center', ncol=3, fontsize=11, framealpha=0.9,
+               bbox_to_anchor=(0.5, 0.12))  # Below plots
     
     # Adjust layout with larger margins to prevent axis title clipping
-    plt.subplots_adjust(left=0.08, right=0.92, bottom=0.2, top=0.85, wspace=0.05)
+    plt.subplots_adjust(left=0.05, right=0.95, bottom=0.12, top=0.95, wspace=0.1)
     
     # Save the comparison plot - use more padding to prevent clipping
     comparison_filename = os.path.join(save_dir, '3d_fermi_surface_comparison.png')
     plt.savefig(comparison_filename, dpi=300, bbox_inches='tight', pad_inches=0.5,
                 facecolor='white', edgecolor='none')
     print(f"  Saved comparison plot: {comparison_filename}")
-    
-    plt.show()
+
 
 if __name__ == "__main__":
     create_3d_comparison()

@@ -370,17 +370,17 @@ def plot_jdos_011_projection(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_pari
         wavevectors_projected[label] = (qx_proj, qc_proj)
         print(f"    {label}: ({qx_pi_a:.2f}, {qy_pi_b:.2f}) π/a,π/b -> ({qx_proj:.2f}, {qc_proj:.2f}) π/a,π/c*")
 
-    # Colors for wavevectors
+    # Colors
     vector_colors = {
-        'p1': '#FF0000',  # Red
-        'p2': '#0000FF',  # Blue
+        'p1': '#FF0000',  
+        'p2': '#0000FF',  
         'p3': "#9738737A",  
         'p4': '#00FF00', 
-        'p5': '#FF8800',  # Orange
-        'p6': '#FF00FF'   # Magenta
+        'p5': '#FF8800', 
+        'p6': '#FF00FF'   
     }
 
-    # Label positioning offsets and alignments (adjusted for new coordinates)
+    # label offsets
     label_positions = {
         'p1': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
         'p2': {'offset': (0.10, 0.08), 'ha': 'left', 'va': 'bottom'},
@@ -390,25 +390,24 @@ def plot_jdos_011_projection(jdos, qx_vals, qy_vals, kz=0.0, param_set='odd_pari
         'p6': {'offset': (0.10, 0.0), 'ha': 'left', 'va': 'center'}
     }
 
-    # Plot wavevectors from origin
     origin = (0, 0)  # (qx, qc*) = (0, 0)
 
     for label, (qx_proj, qc_proj) in wavevectors_projected.items():
-        # Endpoint is the projected vector
+        # Endpoint 
         endpoint = (qx_proj, qc_proj)
 
-        # Plot arrow (qc* on x-axis, qx on y-axis)
+        # arrow
         ax.annotate('', 
                    xy=(endpoint[1], endpoint[0]),  # (qc*, qx)
                    xytext=(origin[1], origin[0]),  # (qc*, qx)
                    arrowprops=dict(arrowstyle='->', color=vector_colors[label], 
                                   lw=2, alpha=0.9, shrinkA=0, shrinkB=0))
 
-        # Add marker at endpoint
+        # marker circle
         ax.plot(endpoint[1], endpoint[0], 'o', color=vector_colors[label], 
                markersize=5, markeredgecolor='black', markeredgewidth=1, zorder=10)
 
-        # Add label with smart positioning
+        # LABEL
         pos_info = label_positions[label]
         label_qc = endpoint[1] + pos_info['offset'][0]
         label_qx = endpoint[0] + pos_info['offset'][1]
