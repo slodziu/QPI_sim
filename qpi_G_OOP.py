@@ -881,7 +881,12 @@ class QPIvisualiser:
         self.im1.set_data(LDOS)
         vmin = np.percentile(LDOS, self.ldos_percentile_low)
         vmax = np.percentile(LDOS, self.ldos_percentile_high)
-        if vmax - vmin < 1e-10 * (abs(vmax) + abs(vmin) + 1e-6):
+        # Relative tolerance: range is considered collapsed when it is less than
+        # _CLIM_RELATIVE_TOL of the typical signal magnitude plus _CLIM_ABS_FLOOR
+        # to handle near-zero arrays without divide-by-zero.
+        _CLIM_RELATIVE_TOL = 1e-10
+        _CLIM_ABS_FLOOR    = 1e-6
+        if vmax - vmin < _CLIM_RELATIVE_TOL * (abs(vmax) + abs(vmin) + _CLIM_ABS_FLOOR):
             # fallback when range collapses
             vabs = np.max(np.abs(LDOS))
             vmin, vmax = -0.1 * vabs, vabs

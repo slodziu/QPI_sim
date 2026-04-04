@@ -158,7 +158,6 @@ class CustomLayoutQPIVisualiser(QPIvisualiser):
         """
         Override: dynamic per-frame ±(MOMENTUM_EXTENT_MULT × k_F) framing with red 2k_F arrow.
         """
-        from typing import Optional
         dk = 2 * np.pi / self.params.L
         k_actual_max = dk * self.params.gridsize / 2
 
@@ -189,7 +188,7 @@ class CustomLayoutQPIVisualiser(QPIvisualiser):
         if self._kF_arrow is not None:
             try:
                 self._kF_arrow.remove()
-            except Exception:
+            except (ValueError, AttributeError):
                 pass
             self._kF_arrow = None
 
