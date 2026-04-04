@@ -14,12 +14,50 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
+from typing import Optional
 from qpi_G_OOP import SystemParameters, QPISimulation, QPIvisualiser, DEFAULT_LDOS_COLORMAP
 from config import get_config, list_available_configs
 
 
+THESIS_LDOS_PERCENTILE = 85  # Percentile for LDOS clipping (0-100); lower = more contrast boost and oscillation visibility
+THESIS_LDOS_VMIN = 0 # Asymmetric LDOS colorbar: minimum (set to None to use percentile-based vmin)
+THESIS_LDOS_VMAX = 2e-2   # Asymmetric LDOS colorbar: maximum (set to None to use percentile-based vmax)
+THESIS_MOMENTUM_EXTENT_MULTIPLIER = 2.5  # k-space half-width in units of k_F; shows 2k_F feature comfortably
+THESIS_SHOW_2KF_ARROW = True  # Draw red 2k_F arrow in momentum panel (b)
+THESIS_SHOW_DISPERSION_GUIDE_ARROW = True  # Draw guidance arrow in dispersion panel (c)
+THESIS_POSTER_SIZE = (3600, 2400)  # Output poster figure pixel size (12x8 inches at 300 DPI) - fits A4 nicely with margins
+THESIS_POSTER_DPI = 300  # DPI for poster export matches savefig DPI
+
+# Snapshot energies for specific configurations
+THESIS_SNAPSHOT_ENERGIES = {
+    'high_quality_single': 5.0,      # E=5 for high_quality_single
+    'fast_preview': 10.0,            # E=10 for fast_preview (within E_min=10, E_max=20)
+    'random_30_impurities': 10.0,    # E=10 for random_30_impurities
+}
+
+
 class CustomLayoutQPIVisualiser(QPIvisualiser):
     """QPI Visualiser with custom layout: top real space (full width), bottom two plots (half width each)."""
+    
+    def __init__(self, *args, **kwargs):
+        """Initialize with thesis plotting parameters."""
+        # Store thesis configuration BEFORE calling super().__init__()
+        # because parent init calls _setup_figure which needs these attributes
+        self.thesis_ldos_percentile = THESIS_LDOS_PERCENTILE
+        self.thesis_ldos_vmin = THESIS_LDOS_VMIN
+        self.thesis_ldos_vmax = THESIS_LDOS_VMAX
+        self.thesis_momentum_extent_multiplier = THESIS_MOMENTUM_EXTENT_MULTIPLIER
+        self.thesis_show_2kf_arrow = THESIS_SHOW_2KF_ARROW
+        self.thesis_show_dispersion_guide_arrow = THESIS_SHOW_DISPERSION_GUIDE_ARROW
+        self.thesis_poster_size = THESIS_POSTER_SIZE
+        self.thesis_poster_dpi = THESIS_POSTER_DPI
+        self.thesis_snapshot_energies = THESIS_SNAPSHOT_ENERGIES
+        
+        # Storage for guidance arrow artist (panel c)
+        self.dispersion_guide_arrow = None
+        
+        # Now call parent init
+        super().__init__(*args, **kwargs)
     
     def _setup_figure(self):
         """Initialize the figure with custom gridspec layout."""
@@ -71,9 +109,11 @@ class CustomLayoutQPIVisualiser(QPIvisualiser):
         dk = 2 * np.pi / self.params.L
         k_actual_max = dk * self.params.gridsize / 2
         
-        # Set momentum space bounds based on energy range for better focus
-        max_kF = np.sqrt(self.params.E_max)
-        k_zoom = min(k_actual_max, max_kF * 5)  # Show up to 5*kF_max for QPI features
+        # For thesis: use dynamic per-frame extent, but initialize with max energy
+        # At max energy, we'll display ±(2.5 * kF_max) in k-space
+        max_kF = self.sim.energy_to_kF(self.params.E_max)
+        k_initial_extent = self.thesis_momentum_extent_multiplier * max_kF  # ±2.5*kF_max
+        k_zoom = min(k_actual_max, k_initial_extent)  # Cap at FFT extent
         
         self.im2 = self.ax2.imshow(
             np.zeros((self.params.gridsize, self.params.gridsize)), 
@@ -96,8 +136,11 @@ class CustomLayoutQPIVisualiser(QPIvisualiser):
                      verticalalignment='top', horizontalalignment='left',
                      bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
+        # Store k_zoom for later frame updates
+        self.k_zoom_initial = k_zoom
+        
         # Set up dispersion plot
-        self.ax4.set_xlabel('$k_F$ (1/length units)', fontsize=10)
+        self.ax4.set_xlabel(r'$k_\mathrm{F}$ (1/length units)', fontsize=10)
         self.ax4.set_ylabel('Energy E', fontsize=10)
         self.ax4.set_title('Dispersion: Theory vs Extracted', fontsize=12)
         self.ax4.tick_params(axis='both', which='major', labelsize=8)
@@ -109,6 +152,9 @@ class CustomLayoutQPIVisualiser(QPIvisualiser):
                      verticalalignment='top', horizontalalignment='left',
                      bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
+        # Store parameters for guidance arrow (will be computed per-frame)
+        self.e_mid = (self.params.E_min + self.params.E_max) / 2  # Mid-energy for guidance arrow
+        
         # Set plot bounds based on energy range
         k_disp_max = np.sqrt(self.params.E_max) + 1
         
@@ -117,12 +163,201 @@ class CustomLayoutQPIVisualiser(QPIvisualiser):
         self.theory_lines = self._plot_theoretical_dispersion(k_theory)
         
         self.extracted_scatter = self.ax4.scatter(
-            [], [], c='red', s=50, alpha=0.7, label='From q=2k_F peaks'
+            [], [], c='red', s=50, alpha=0.7, label=r'From q=2$k_\mathrm{F}$ peaks'
         )
         
         self.ax4.legend(fontsize=9)
         self.ax4.set_xlim(-k_disp_max, k_disp_max)
         self.ax4.set_ylim(self.params.E_min - 2, self.params.E_max + 2)
+
+    def animate_frame(self, frame_idx: int):
+        """
+        Animate a single frame with thesis enhancements (dynamic extents, arrows, etc.).
+        
+        Args:
+            frame_idx: Frame index in the animation sequence
+            
+        Returns:
+            List of artists that were modified
+        """
+        energy = self.params.E_min + (self.params.E_max - self.params.E_min) * frame_idx / (self.params.n_frames - 1)
+        k_F = self.sim.energy_to_kF(energy)
+        
+        LDOS, fft_display, fft_complex, peak_q = self.sim.run_single_energy(energy)
+        
+        self._update_real_space_plot(LDOS, energy, k_F)
+        self._update_momentum_plot(fft_display, energy=energy)  # Pass energy for dynamic extent
+        self._update_dispersion_plot(peak_q, energy=energy)  # Pass energy for guidance arrow
+        
+        # Return all artists that need to be redrawn (including theory lines for persistence)
+        artists = [self.im1, self.im2, self.energy_text, self.extracted_scatter]
+        if hasattr(self, 'theory_lines'):
+            artists.extend(self.theory_lines)
+        if self.dispersion_guide_arrow is not None:
+            artists.append(self.dispersion_guide_arrow)
+        return artists
+
+    def _update_real_space_plot(self, LDOS: np.ndarray, energy: float, k_F: float):
+        """
+        Update the real space LDOS plot with asymmetric or percentile-based contrast (thesis version).
+        
+        Args:
+            LDOS: 2D LDOS array
+            energy: Current energy value
+            k_F: Fermi wavevector at current energy
+        """
+        self.im1.set_data(LDOS)
+        
+        # Use asymmetric colorbar if vmin/vmax are specified, otherwise use percentile-based
+        if self.thesis_ldos_vmin is not None and self.thesis_ldos_vmax is not None:
+            vmin = self.thesis_ldos_vmin
+            vmax = self.thesis_ldos_vmax
+        else:
+            # Fall back to percentile-based contrast clipping for thesis quality
+            abs_ldos = np.abs(LDOS)
+            try:
+                # Calculate percentile-based limits for robust contrast
+                vmax_raw = np.percentile(abs_ldos, self.thesis_ldos_percentile)
+                vmax_raw = max(vmax_raw, np.max(abs_ldos) * 0.01)  # Avoid collapse to zero
+                vmin = -vmax_raw
+                vmax = vmax_raw
+            except:
+                # Fallback if percentile calculation fails
+                vmax = np.max(abs_ldos)
+                vmin = -vmax * 0.1
+        
+        self.im1.set_clim(vmin=vmin, vmax=vmax)
+        self.ax1.set_title(f"LDOS (E = {energy:.3f}, $k_\\mathrm{{F}}$ = {k_F:.2f})")
+        self.energy_text.set_text(f'E = {energy:.2f}\n$k_\\mathrm{{F}}$ = {k_F:.2f}')
+        
+        for artist in self.ax1.lines:
+            artist.remove()
+        
+        if len(self.sim.impurities.positions) > 1 and len(self.sim.impurities.positions) <= 5:
+            self.ax1.legend(loc='upper right')
+    
+    def _update_momentum_plot(self, fft_display: np.ndarray, energy: float = None):
+        """Update momentum plot with ±2.5*k_F extent"""
+        fft_log = np.log10(fft_display + 1)
+        
+        # Calculate proper k-space bounds with thesis multiplier (dynamic per frame)
+        dk = 2 * np.pi / self.params.L
+        k_actual_max = dk * self.params.gridsize / 2
+        
+        # If energy is provided, compute current k_F; otherwise use max
+        if energy is not None:
+            current_kF = self.sim.energy_to_kF(energy)
+        else:
+            current_kF = self.sim.energy_to_kF(self.params.E_max)
+        
+        # Dynamic extent: ±2.5 * k_F for proper framing of the 2k_F feature
+        k_zoom = self.thesis_momentum_extent_multiplier * current_kF
+        
+        # Crop the FFT data to match the zoom range
+        center = fft_log.shape[0] // 2
+        pixels_to_show = int(k_zoom / dk) if dk > 0 else center
+        pixels_to_show = min(pixels_to_show, center)
+        
+        fft_cropped = fft_log[center-pixels_to_show:center+pixels_to_show, 
+                             center-pixels_to_show:center+pixels_to_show]
+        
+        self.im2.set_data(fft_cropped)
+        self.im2.set_extent([-k_zoom, k_zoom, -k_zoom, k_zoom])
+        self.ax2.set_xlim(-k_zoom, k_zoom)
+        self.ax2.set_ylim(-k_zoom, k_zoom)
+        
+        vmin_fft = np.min(fft_cropped)
+        vmax_fft = np.max(fft_cropped)
+        self.im2.set_clim(vmin=vmin_fft, vmax=vmax_fft)
+        
+        # Clean up old 2k_F arrow and annotations before redrawing
+        if self.thesis_show_2kf_arrow and current_kF > 0:
+            # Remove all patches (arrows) and texts (labels) except panel label
+            for artist in list(self.ax2.patches):
+                artist.remove()
+            for txt in list(self.ax2.texts):
+                if '(b)' not in txt.get_text():  # Keep panel label
+                    txt.remove()
+            
+            # Remove legend if present
+            legend = self.ax2.get_legend()
+            if legend is not None:
+                legend.remove()
+            
+            expected_2kF = 2 * current_kF
+            if expected_2kF <= k_zoom:
+                # Draw fresh arrow from origin to 2k_F
+                self.ax2.annotate('', xy=(expected_2kF, 0), xytext=(0, 0),
+                                 arrowprops=dict(arrowstyle='->', color='red', lw=1.5))
+                # Add text label directly instead of legend to avoid accumulation
+                self.ax2.text(expected_2kF * 0.5, k_zoom * 0.15, r'$2k_\mathrm{F}$',
+                            fontsize=8, color='red', weight='bold',
+                            bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
+    
+    def _update_dispersion_plot(self, peak_q: Optional[float], energy: float = None):
+        """
+        Update the dispersion plot with guidance arrow (thesis version).
+        
+        Args:
+            peak_q: Detected peak position in momentum space
+            energy: Current energy value (for mid-energy guidance arrow placement)
+        """
+        self.sim.update_dispersion_data(peak_q)
+        
+        if len(self.sim.extracted_k) > 0:
+            self.extracted_scatter.set_offsets(
+                np.column_stack([self.sim.extracted_k, self.sim.extracted_E])
+            )
+        
+        # Draw guidance arrow from (0, E_mid) to theory curve at E_mid
+        if self.thesis_show_dispersion_guide_arrow:
+            # Remove old guidance arrow and label if they exist
+            if self.dispersion_guide_arrow is not None:
+                self.dispersion_guide_arrow.remove()
+                self.dispersion_guide_arrow = None
+            # Remove old label texts from dispersion plot
+            for txt in list(self.ax4.texts):
+                if '2k' in txt.get_text() or 'mathrm{F}' in txt.get_text():
+                    txt.remove()
+            
+            # Compute target point on E=k^2 at mid-energy
+            # For parabolic: E = k^2, so k = sqrt(E)
+            k_at_mid = np.sqrt(max(0, self.e_mid))
+            
+            # Draw bidirectional arrow from -k_F to +k_F at E_mid (shows 2k_F separation)
+            if k_at_mid <= self.ax4.get_xlim()[1]:
+                self.dispersion_guide_arrow = self.ax4.annotate(
+                    '', xy=(k_at_mid, self.e_mid), xytext=(-k_at_mid, self.e_mid),
+                    arrowprops=dict(arrowstyle='<->', color='red', lw=1.5, alpha=0.7)
+                )
+                # Add label to the arrow at center
+                self.ax4.text(0, self.e_mid + 1.0, r'$2k_\mathrm{F}$',
+                            fontsize=9, color='red', weight='bold',
+                            horizontalalignment='center',
+                            bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
+    
+    def save_snapshot_at_energy(self, energy: float, filename: str):
+        """
+        Save a snapshot at a specific energy value.
+        
+        Args:
+            energy: The energy at which to save the snapshot
+            filename: Output filename
+        """
+        # Clamp energy to valid range
+        energy = max(self.params.E_min, min(self.params.E_max, energy))
+        
+        # Run simulation at this energy and update plots
+        k_F = self.sim.energy_to_kF(energy)
+        LDOS, fft_display, fft_complex, peak_q = self.sim.run_single_energy(energy)
+        
+        self._update_real_space_plot(LDOS, energy, k_F)
+        self._update_momentum_plot(fft_display, energy=energy)
+        self._update_dispersion_plot(peak_q, energy=energy)
+        
+        # Save the figure
+        self.fig.savefig(filename, dpi=300, bbox_inches='tight', pad_inches=0.05)
+        print(f"✓ Saved snapshot at E={energy:.2f} to {filename}")
 
 
 def run_simulation(config_name: str, save_frames: bool = False, poster_frame: bool = False):
@@ -187,8 +422,12 @@ def run_simulation(config_name: str, save_frames: bool = False, poster_frame: bo
         # Create separate fourier analysis animation 
         visualiser.create_fourier_animation(fourier_anim_filename, frames_dir=frames_dir)
         
-        # Save snapshot at mid-energy
-        visualiser.save_mid_energy_snapshot(snapshot_filename)
+        # Save snapshot at config-specific energy or mid-energy
+        snapshot_energy = THESIS_SNAPSHOT_ENERGIES.get(config.name, None)
+        if snapshot_energy is not None:
+            visualiser.save_snapshot_at_energy(snapshot_energy, snapshot_filename)
+        else:
+            visualiser.save_mid_energy_snapshot(snapshot_filename)
 
         # Optionally save a single zoomed poster frame
         if poster_frame:

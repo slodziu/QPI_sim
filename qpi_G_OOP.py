@@ -91,7 +91,7 @@ class SystemParameters:
     @property
     def k_F_max(self) -> float:
         """Maximum Fermi wavevector for parabolic dispersion."""
-        return np.sqrt(max(abs(self.E_min), abs(self.E_max)) + self.mu)
+        return np.sqrt(max(abs(self.E_min), abs(self.E_max)))
 
 
 class SignalProcessing:
@@ -159,7 +159,7 @@ class GreensFunction:
             self.eigenvalues, self.eigenvectors = self.model.get_band_structure(KX, KY)
         else:
             # Backward compatibility: parabolic dispersion
-            self.epsilon_k = (KX**2 + KY**2) - self.params.mu
+            self.epsilon_k = KX**2 + KY**2
             self.eigenvalues = self.epsilon_k[np.newaxis, ...]  # Add band dimension
         
         self.kx, self.ky = kx, ky
@@ -189,7 +189,7 @@ class GreensFunction:
         if self.model is not None:
             # Use tight-binding eigenvalues
             epsilon_k = self.eigenvalues[band_index]
-            Gk = 1.0 / (energy - epsilon_k + self.params.mu + 1j*self.params.eta)
+            Gk = 1.0 / (energy - epsilon_k + 1j*self.params.eta)
         else:
             # Backward compatibility: parabolic dispersion
             Gk = 1.0 / (energy - self.epsilon_k + 1j*self.params.eta)
@@ -598,8 +598,8 @@ class QPISimulation:
             Fermi wavevector (approximate for tight-binding)
         """
         if self.model is None:
-            # Parabolic dispersion: ε(k) = k² - μ, so k_F = √(E + μ)
-            return np.sqrt(max(0, E + self.params.mu))  # Avoid sqrt of negative numbers
+            # Parabolic dispersion: ε(k) = k², so k_F = √E
+            return np.sqrt(max(0, E))  # Avoid sqrt of negative numbers
         else:
             # For tight-binding, this is approximate
             # Use energy scale to estimate reasonable k-space range
@@ -752,7 +752,7 @@ class QPIvisualiser:
         
         # Set dispersion plot bounds based on energy range
         k_disp_max = np.sqrt(self.params.E_max) + 1
-        self.ax4.set_xlabel('k_F (1/length units)')
+        self.ax4.set_xlabel(r'$k_\mathrm{F}$ (1/length units)')
         self.ax4.set_ylabel('Energy E')
         self.ax4.set_title('Dispersion: Theory vs Extracted')
         self.ax4.set_xlim(-k_disp_max, k_disp_max)
@@ -764,7 +764,7 @@ class QPIvisualiser:
         self.theory_lines = self._plot_theoretical_dispersion(k_theory)
         
         self.extracted_scatter = self.ax4.scatter(
-            [], [], c='red', s=50, alpha=0.7, label='From q=2k_F peaks'
+            [], [], c='red', s=50, alpha=0.7, label=r'From q=2$k_\mathrm{F}$ peaks'
         )
         
         self.ax4.legend()
@@ -811,7 +811,7 @@ class QPIvisualiser:
                     colors = ['blue', 'green', 'red', 'orange'] * (n_bands // 4 + 1)
                     
                     for band_idx in range(min(n_bands, 4)):  # Limit to 4 bands for clarity
-                        E_band = eigenvalues[band_idx, 0, :] + self.params.mu  # Add chemical potential
+                        E_band = eigenvalues[band_idx, 0, :]
                         
                         # Plot all energies, both positive and negative
                         if len(E_band) > 0:
@@ -877,8 +877,8 @@ class QPIvisualiser:
         vmax = np.max(np.abs(LDOS))
         scale=0.1
         self.im1.set_clim(vmin=-scale*vmax, vmax=vmax)
-        self.ax1.set_title(f"LDOS (E = {energy:.3f}, k_F = {k_F:.2f})")
-        self.energy_text.set_text(f'E = {energy:.2f}\nk_F = {k_F:.2f}')
+        self.ax1.set_title(f"LDOS (E = {energy:.3f}, $k_\\mathrm{{F}}$ = {k_F:.2f})")
+        self.energy_text.set_text(f'E = {energy:.2f}\n$k_\\mathrm{{F}}$ = {k_F:.2f}')
         
         for artist in self.ax1.lines:
             artist.remove()
@@ -964,12 +964,22 @@ class QPIvisualiser:
         )
         
         # Create 2x3 subplot figure with tighter layout
-        fig = plt.figure(figsize=(13, 8), dpi=300)
+        # Use thesis poster size settings if available (from CustomLayoutQPIVisualiser)
+        if hasattr(self, 'thesis_poster_size') and hasattr(self, 'thesis_poster_dpi'):
+            poster_width_px, poster_height_px = self.thesis_poster_size
+            dpi_poster = self.thesis_poster_dpi
+            figsize_poster = (poster_width_px / dpi_poster, poster_height_px / dpi_poster)
+        else:
+            # Default: 13x8 at 300 dpi (3900x2400 px)
+            figsize_poster = (13, 8)
+            dpi_poster = 300
+        
+        fig = plt.figure(figsize=figsize_poster, dpi=dpi_poster)
         _style = getattr(self, '_poster_style', 'default')
         if _style == 'spaced':
-            _hspace, _wspace = 0.30, 0.42
+            _hspace, _wspace = 0.45, 0.65
         else:
-            _hspace, _wspace = 0.30, 0.30
+            _hspace, _wspace = 0.45, 0.65
         gs = fig.add_gridspec(2, 3, hspace=_hspace, wspace=_wspace,
                              width_ratios=[1.0, 1.0, 0.9],
                              top=0.93, bottom=0.08, left=0.055, right=0.99)
@@ -997,7 +1007,7 @@ class QPIvisualiser:
             max_k_F = self.sim.energy_to_kF(max_energy)
             max_ring_radius = 2 * max_k_F  # Rings appear at 2*k_F
         
-        k_crop = 1.5 * max_ring_radius  # Crop to reasonable range
+        k_crop = 1.25 * max_ring_radius  # 1.25*(2*k_F) = 2.5*k_F per side
         
         # Use the actual k-space coordinates for proper scaling
         extent = [-k_actual_max, k_actual_max, -k_actual_max, k_actual_max]
@@ -1086,12 +1096,11 @@ class QPIvisualiser:
         vmax_real_fft = np.max(np.abs(real_fft_crop))
         im1 = ax1.imshow(real_fft_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-scale*np.max(real_fft_crop), vmax=scale*np.max(real_fft_crop))
-        ax1.set_title(r'Re[$\delta N(\mathbf{q})$]', fontsize=12)
         ax1.set_xlabel('$k_x$ (1/a)', fontsize=10)
         ax1.set_ylabel('$k_y$ (1/a)', fontsize=10)
         ax1.tick_params(axis='both', which='major', labelsize=11)
-        ax1.set_xlim(-1.5 * expected_2kF, 1.5 * expected_2kF)
-        ax1.set_ylim(-1.5 * expected_2kF, 1.5 * expected_2kF)
+        ax1.set_xlim(-k_crop, k_crop)
+        ax1.set_ylim(-k_crop, k_crop)
 
         plt.colorbar(im1, ax=ax1, label=r'Re[$\delta N(\mathbf{q})$]')
         # Add panel label (a)
@@ -1113,12 +1122,11 @@ class QPIvisualiser:
         vmax_imag_fft = np.max(np.abs(imag_fft_crop))
         im2 = ax2.imshow(imag_fft_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-scale*np.max(imag_fft_crop), vmax=scale*np.max(imag_fft_crop))
-        ax2.set_title(r'Im[$\delta N(\mathbf{q})$]', fontsize=12)
         ax2.set_xlabel('$k_x$ (1/a)', fontsize=10)
         ax2.set_ylabel('$k_y$ (1/a)', fontsize=10)
         ax2.tick_params(axis='both', which='major', labelsize=11)
-        ax2.set_xlim(-1.5 * expected_2kF, 1.5 * expected_2kF)
-        ax2.set_ylim(-1.5 * expected_2kF, 1.5 * expected_2kF)
+        ax2.set_xlim(-k_crop, k_crop)
+        ax2.set_ylim(-k_crop, k_crop)
 
         plt.colorbar(im2, ax=ax2, label=r'Im[$\delta N(\mathbf{q})$]')
         # Add panel label (b)
@@ -1137,7 +1145,6 @@ class QPIvisualiser:
         
         ax3.set_xlabel('$|q|$ (1/a)', fontsize=10)
         ax3.set_ylabel(r'Re[$\delta N(\mathbf{q})$]', fontsize=10)
-        ax3.set_title(r'Azimuthal Integration: Re[$\delta N$]', fontsize=12)
         ax3.tick_params(axis='both', which='major', labelsize=11)
         if expected_2kF > 0:
             ax3.set_xlim(0, min(2 * expected_2kF, np.max(q_plot)))
@@ -1156,12 +1163,11 @@ class QPIvisualiser:
         vmax_R_MA = np.max(np.abs(real_R_MA_crop))
         im4 = ax4.imshow(real_R_MA_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-5*np.max(np.abs(cut_left_R_MA)), vmax=5*np.max(np.abs(cut_right_R_MA)))
-        ax4.set_title(r'Re[$\delta N_\mathrm{MA}(\mathbf{q})$]', fontsize=12)
         ax4.set_xlabel('$k_x$ (1/a)', fontsize=10)
         ax4.set_ylabel('$k_y$ (1/a)', fontsize=10)
         ax4.tick_params(axis='both', which='major', labelsize=11)
-        ax4.set_xlim(-1.5 * expected_2kF, 1.5 * expected_2kF)
-        ax4.set_ylim(-1.5 * expected_2kF, 1.5 * expected_2kF)
+        ax4.set_xlim(-k_crop, k_crop)
+        ax4.set_ylim(-k_crop, k_crop)
         # Add panel label (d)
         ax4.text(0.05, 0.95, '(d)', transform=ax4.transAxes, fontsize=12, fontweight='bold',
                 verticalalignment='top', horizontalalignment='left',
@@ -1182,12 +1188,11 @@ class QPIvisualiser:
         vmax_imag_R_MA = np.max(np.abs(imag_R_MA_crop))
         im5 = ax5.imshow(imag_R_MA_crop, origin='lower', cmap='RdBu_r', extent=extent_crop,
                         vmin=-0.1*vmax_imag_R_MA, vmax=0.1*vmax_imag_R_MA)
-        ax5.set_title(r'Im[$\delta N_\mathrm{MA}(\mathbf{q})$]', fontsize=12)
         ax5.set_xlabel('$k_x$ (1/a)', fontsize=10)
         ax5.set_ylabel('$k_y$ (1/a)', fontsize=10)
         ax5.tick_params(axis='both', which='major', labelsize=11)
-        ax5.set_xlim(-1.5 * expected_2kF, 1.5 * expected_2kF)
-        ax5.set_ylim(-1.5 * expected_2kF, 1.5 * expected_2kF)
+        ax5.set_xlim(-k_crop, k_crop)
+        ax5.set_ylim(-k_crop, k_crop)
         # Add panel label (e)
         ax5.text(0.05, 0.95, '(e)', transform=ax5.transAxes, fontsize=12, fontweight='bold',
                 verticalalignment='top', horizontalalignment='left',
@@ -1205,7 +1210,6 @@ class QPIvisualiser:
         
         ax6.set_xlabel('$|q|$ (1/a)', fontsize=10)
         ax6.set_ylabel(r'Re[$\delta N_\mathrm{MA}$]', fontsize=10)
-        ax6.set_title(r'Azimuthal Integration: Re[$\delta N_\mathrm{MA}$]', fontsize=12)
         ax6.tick_params(axis='both', which='major', labelsize=11)
         if expected_2kF > 0:
             ax6.set_xlim(0, min(2 * expected_2kF, np.max(q_plot)))

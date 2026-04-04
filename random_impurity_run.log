@@ -1,0 +1,49 @@
+Distributing 30 impurities across grid (32-992, 32-992), min_distance=60
+  Impurity 1 placed at (row=134, col=467)
+  Impurity 2 placed at (row=892, col=302)
+  Impurity 3 placed at (row=138, col=103)
+  Impurity 4 placed at (row=732, col=52)
+  Impurity 5 placed at (row=646, col=153)
+  Impurity 6 placed at (row=498, col=246)
+  Impurity 7 placed at (row=362, col=490)
+  Impurity 8 placed at (row=119, col=404)
+  Impurity 9 placed at (row=131, col=903)
+  Impurity 10 placed at (row=693, col=340)
+  Impurity 11 placed at (row=801, col=375)
+  Impurity 12 placed at (row=523, col=445)
+  Impurity 13 placed at (row=223, col=987)
+  Impurity 14 placed at (row=308, col=192)
+  Impurity 15 placed at (row=491, col=345)
+  Impurity 16 placed at (row=53, col=284)
+  Impurity 17 placed at (row=779, col=888)
+  Impurity 18 placed at (row=592, col=506)
+  Impurity 19 placed at (row=90, col=542)
+  Impurity 20 placed at (row=713, col=507)
+  Impurity 21 placed at (row=731, col=814)
+  Impurity 22 placed at (row=718, col=989)
+  Impurity 23 placed at (row=594, col=907)
+  Impurity 24 placed at (row=598, col=275)
+  Impurity 25 placed at (row=863, col=536)
+  Impurity 26 placed at (row=850, col=678)
+  Impurity 27 placed at (row=52, col=872)
+  Impurity 28 placed at (row=198, col=305)
+  Impurity 29 placed at (row=419, col=632)
+  Impurity 30 placed at (row=347, col=45)
+Successfully placed 30 impurities
+Running simulation: random_30_impurities
+Description: Thirty randomly placed impurities
+--------------------------------------------------
+Impurity positions: 30 impurities
+Using parabolic dispersion model
+✓ Saved snapshot at E=15.00 to outputs/random_30_impurities/qpi_random_30_impurities_snapshot.png
+Poster frame saved: outputs/random_30_impurities/poster/azimuthal_poster_E+10.000.png
+Poster frame saved: outputs/random_30_impurities/poster/azimuthal_poster_E+10.000_spaced.png
+Poster frame saved: outputs/random_30_impurities/poster/azimuthal_poster_E+10.000_dividers.png
+
+Simulation completed!
+Extracted 22 dispersion points
+Energy range: 9.98 to 20.02
+Main QPI animation saved as: outputs/random_30_impurities/qpi_random_30_impurities.mp4
+Fourier analysis animation saved as: outputs/random_30_impurities/qpi_random_30_impurities_fourier.mp4
+Snapshot saved as: outputs/random_30_impurities/qpi_random_30_impurities_snapshot.png
+Individual frames not saved (use --save-frames to save individual frames)

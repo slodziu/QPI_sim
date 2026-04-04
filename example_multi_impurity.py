@@ -15,7 +15,7 @@ def create_custom_multi_impurity_config():
         gridsize=512,
         L=50.0,
         t=1.0,           # Hopping parameter
-        mu=0.3,          # Chemical potential (doped)
+        mu=0.0,          # Chemical potential fixed at zero
         eta=0.08,        # Energy broadening
         V_s=0.25,        # Weak impurity strength for multiple impurities
         E_min=-1.5,      # Energy range appropriate for tight-binding

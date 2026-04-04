@@ -1,0 +1,17 @@
+Running simulation: high_quality_single
+Description: High-resolution single impurity simulation
+--------------------------------------------------
+Impurity positions: 1 impurities
+Using parabolic dispersion model
+✓ Saved snapshot at E=3.00 to outputs/high_quality_single/qpi_high_quality_single_snapshot.png
+Poster frame saved: outputs/high_quality_single/poster/azimuthal_poster_E+1.000.png
+Poster frame saved: outputs/high_quality_single/poster/azimuthal_poster_E+1.000_spaced.png
+Poster frame saved: outputs/high_quality_single/poster/azimuthal_poster_E+1.000_dividers.png
+
+Simulation completed!
+Extracted 20 dispersion points
+Energy range: 15.95 to 20.02
+Main QPI animation saved as: outputs/high_quality_single/qpi_high_quality_single.mp4
+Fourier analysis animation saved as: outputs/high_quality_single/qpi_high_quality_single_fourier.mp4
+Snapshot saved as: outputs/high_quality_single/qpi_high_quality_single_snapshot.png
+Individual frames not saved (use --save-frames to save individual frames)

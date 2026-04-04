@@ -32,7 +32,7 @@ class SimulationConfig:
     
     # Physical parameters (parabolic dispersion)
     t: float = 1.0  # Hopping parameter (sets energy scale)
-    mu: float = 15.0  # Chemical potential
+    mu: float = 0.0  # Chemical potential fixed at zero
     eta: float = 0.05  # Broadening parameter
     V_s: float = 1.0  # Impurity scattering strength
     

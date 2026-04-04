@@ -1,0 +1,17 @@
+Running simulation: fast_preview
+Description: Quick preview with reduced quality
+--------------------------------------------------
+Impurity positions: 1 impurities
+Using parabolic dispersion model
+✓ Saved snapshot at E=10.00 to outputs/fast_preview/qpi_fast_preview_snapshot.png
+Poster frame saved: outputs/fast_preview/poster/azimuthal_poster_E+10.000.png
+Poster frame saved: outputs/fast_preview/poster/azimuthal_poster_E+10.000_spaced.png
+Poster frame saved: outputs/fast_preview/poster/azimuthal_poster_E+10.000_dividers.png
+
+Simulation completed!
+Extracted 10 dispersion points
+Energy range: 9.98 to 20.02
+Main QPI animation saved as: outputs/fast_preview/qpi_fast_preview.mp4
+Fourier analysis animation saved as: outputs/fast_preview/qpi_fast_preview_fourier.mp4
+Snapshot saved as: outputs/fast_preview/qpi_fast_preview_snapshot.png
+Individual frames not saved (use --save-frames to save individual frames)

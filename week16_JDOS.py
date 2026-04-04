@@ -77,14 +77,14 @@ def calculate_jdos(energies, weights_5f=None, band=None, weighted=True,
     
     Parameters:
     - energies: band energies [kx, ky, band]
-    - weights_5f: 5f orbital weights [kx, ky, band] (optional)
+    - weights_5f: 5f orbital weights [kx, ky, band]
     - band: which band to use (None = sum all bands)
     - weighted: if True, weight by 5f character
-    - method: 'wiener-khinchin' (simple) or 'matlab' (normalized with mean subtraction)
+    - method: 'wiener-khinchin' or 'matlab' 
     - zero_pad: if True, zero-pad to avoid circular convolution artifacts
     
     Returns:
-    - jdos: JDOS map (real for wiener-khinchin, complex for matlab)
+    - jdos: JDOS map 
     - fermi_map: Fermi surface occupation map used
     - pad_info: dict with padding information
     """
@@ -371,10 +371,8 @@ def main():
     
     # Calculate JDOS using both methods for comparison
     
-    # Method 1: Wiener-Khinchin (simple autocorrelation) with zero-padding
-    print("\n" + "="*60)
     print("METHOD 1: Wiener-Khinchin with zero-padding")
-    print("="*60)
+
     jdos_wk, fermi_map, pad_info = calculate_jdos(
         energies, weights_5f, band=None, weighted=True,
         method='wiener-khinchin', zero_pad=True
@@ -385,10 +383,6 @@ def main():
                           param_set=metadata['param_set'], use_log=False,
                           method='wiener-khinchin')
     
-    # Method 2: MATLAB supervisor's approach with zero-padding
-    print("\n" + "="*60)
-    print("METHOD 2: MATLAB normalized cross-correlation with zero-padding")
-    print("="*60)
     jdos_matlab, fermi_map2, pad_info2 = calculate_jdos(
         energies, weights_5f, band=None, weighted=True,
         method='matlab', zero_pad=True
