@@ -712,6 +712,11 @@ class QPIvisualiser:
         """
         self.sim = simulation
         self.params = simulation.params
+        # Percentile defaults (overridable by subclasses before calling super().__init__)
+        if not hasattr(self, 'ldos_percentile_low'):
+            self.ldos_percentile_low = 2
+        if not hasattr(self, 'ldos_percentile_high'):
+            self.ldos_percentile_high = 98
         self._setup_figure()
         
     def _setup_figure(self):
@@ -855,7 +860,7 @@ class QPIvisualiser:
         LDOS, fft_display, fft_complex, peak_q = self.sim.run_single_energy(energy)
         
         self._update_real_space_plot(LDOS, energy, k_F)
-        self._update_momentum_plot(fft_display)
+        self._update_momentum_plot(fft_display, k_F=k_F)
         self._update_dispersion_plot(peak_q)
         
         # Return all artists that need to be redrawn (including theory lines for persistence)
@@ -874,9 +879,13 @@ class QPIvisualiser:
             k_F: Fermi wavevector at current energy
         """
         self.im1.set_data(LDOS)
-        vmax = np.max(np.abs(LDOS))
-        scale=0.1
-        self.im1.set_clim(vmin=-scale*vmax, vmax=vmax)
+        vmin = np.percentile(LDOS, self.ldos_percentile_low)
+        vmax = np.percentile(LDOS, self.ldos_percentile_high)
+        if vmax - vmin < 1e-10 * (abs(vmax) + abs(vmin) + 1e-6):
+            # fallback when range collapses
+            vabs = np.max(np.abs(LDOS))
+            vmin, vmax = -0.1 * vabs, vabs
+        self.im1.set_clim(vmin=vmin, vmax=vmax)
         self.ax1.set_title(f"LDOS (E = {energy:.3f}, k_F = {k_F:.2f})")
         self.energy_text.set_text(f'E = {energy:.2f}\nk_F = {k_F:.2f}')
         
@@ -886,7 +895,7 @@ class QPIvisualiser:
         if len(self.sim.impurities.positions) > 1 and len(self.sim.impurities.positions) <= 5:
             self.ax1.legend(loc='upper right')
     
-    def _update_momentum_plot(self, fft_display: np.ndarray):
+    def _update_momentum_plot(self, fft_display: np.ndarray, k_F: Optional[float] = None):
         """
         Update the momentum space plot with correct k-space scaling.
         
@@ -964,7 +973,9 @@ class QPIvisualiser:
         )
         
         # Create 2x3 subplot figure with tighter layout
-        fig = plt.figure(figsize=(13, 8), dpi=300)
+        _poster_figsize = getattr(self, 'poster_figsize', (16.0, 9.0))
+        _poster_dpi = getattr(self, 'poster_dpi', 120)
+        fig = plt.figure(figsize=_poster_figsize, dpi=_poster_dpi)
         _style = getattr(self, '_poster_style', 'default')
         if _style == 'spaced':
             _hspace, _wspace = 0.30, 0.42
@@ -1279,7 +1290,7 @@ class QPIvisualiser:
 
         # Save figure (dividers already drawn above when requested).
         fourier_filename = os.path.join(frames_dir, f'fourier_analysis_{frame_idx+1:03d}.png')
-        fig.savefig(fourier_filename, dpi=300, bbox_inches='tight', pad_inches=0.1)
+        fig.savefig(fourier_filename, dpi=_poster_dpi, bbox_inches='tight', pad_inches=0.1)
         plt.close(fig)
 
     def save_poster_frame(self, output_dir: str, frame: int = 0):

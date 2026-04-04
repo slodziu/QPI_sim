@@ -17,10 +17,29 @@ from matplotlib import gridspec
 from qpi_G_OOP import SystemParameters, QPISimulation, QPIvisualiser, DEFAULT_LDOS_COLORMAP
 from config import get_config, list_available_configs
 
+# --- Thesis plotting controls (user-tweakable) --------------------------------
+LDOS_PERCENTILE_LOW  = 2      # lower percentile for LDOS vmin clipping (1–10 typical)
+LDOS_PERCENTILE_HIGH = 98     # upper percentile for LDOS vmax clipping (90–99 typical)
+MOMENTUM_EXTENT_MULT = 2.2    # momentum panel half-width = MULT × k_F(E) per frame
+POSTER_FIGSIZE       = (16.0, 9.0)  # inches → ≈1920×1080 at POSTER_DPI
+POSTER_DPI           = 120          # DPI for poster export (~1920×1080)
+# ------------------------------------------------------------------------------
+
 
 class CustomLayoutQPIVisualiser(QPIvisualiser):
     """QPI Visualiser with custom layout: top real space (full width), bottom two plots (half width each)."""
-    
+
+    def __init__(self, simulation):
+        """Wire thesis plotting parameters before the parent sets up the figure."""
+        self.ldos_percentile_low  = LDOS_PERCENTILE_LOW
+        self.ldos_percentile_high = LDOS_PERCENTILE_HIGH
+        self.poster_figsize       = POSTER_FIGSIZE
+        self.poster_dpi           = POSTER_DPI
+        # Arrow handles – must exist before _setup_figure so overrides can check them
+        self._kF_arrow      = None
+        self._guidance_arrow = None
+        super().__init__(simulation)
+
     def _setup_figure(self):
         """Initialize the figure with custom gridspec layout."""
         # Create figure with balanced layout:
@@ -71,9 +90,9 @@ class CustomLayoutQPIVisualiser(QPIvisualiser):
         dk = 2 * np.pi / self.params.L
         k_actual_max = dk * self.params.gridsize / 2
         
-        # Set momentum space bounds based on energy range for better focus
+        # Initial zoom: use MOMENTUM_EXTENT_MULT × max k_F (updated per-frame in _update_momentum_plot)
         max_kF = np.sqrt(self.params.E_max)
-        k_zoom = min(k_actual_max, max_kF * 5)  # Show up to 5*kF_max for QPI features
+        k_zoom = min(k_actual_max, MOMENTUM_EXTENT_MULT * max_kF)
         
         self.im2 = self.ax2.imshow(
             np.zeros((self.params.gridsize, self.params.gridsize)), 
@@ -95,6 +114,7 @@ class CustomLayoutQPIVisualiser(QPIvisualiser):
         self.ax2.text(0.05, 0.95, '(b)', transform=self.ax2.transAxes, fontsize=12, fontweight='bold',
                      verticalalignment='top', horizontalalignment='left',
                      bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        # _kF_arrow is drawn per-frame in _update_momentum_plot
         
         # Set up dispersion plot
         self.ax4.set_xlabel('$k_F$ (1/length units)', fontsize=10)
@@ -123,6 +143,63 @@ class CustomLayoutQPIVisualiser(QPIvisualiser):
         self.ax4.legend(fontsize=9)
         self.ax4.set_xlim(-k_disp_max, k_disp_max)
         self.ax4.set_ylim(self.params.E_min - 2, self.params.E_max + 2)
+
+        # Panel (c): one-time static guidance arrow at mid-energy from k=0 to theoretical branch
+        E_mid = (self.params.E_min + self.params.E_max) / 2.0
+        k_mid = np.sqrt(max(0.0, E_mid))  # k_F at E_mid on the parabolic branch E = k²
+        if k_mid > 0:
+            self._guidance_arrow = self.ax4.annotate(
+                '', xy=(k_mid, E_mid), xytext=(0.0, E_mid),
+                arrowprops=dict(arrowstyle='->', color='red', lw=2.0)
+            )
+
+
+    def _update_momentum_plot(self, fft_display, k_F=None):
+        """
+        Override: dynamic per-frame ±(MOMENTUM_EXTENT_MULT × k_F) framing with red 2k_F arrow.
+        """
+        from typing import Optional
+        dk = 2 * np.pi / self.params.L
+        k_actual_max = dk * self.params.gridsize / 2
+
+        if k_F is not None and k_F > 0:
+            k_zoom = min(k_actual_max, MOMENTUM_EXTENT_MULT * k_F)
+        else:
+            max_kF = np.sqrt(self.params.E_max)
+            k_zoom = min(k_actual_max, MOMENTUM_EXTENT_MULT * max_kF)
+
+        fft_log = np.log10(fft_display + 1)
+
+        center = fft_log.shape[0] // 2
+        pixels_to_show = max(1, min(center, int(k_zoom / dk)))
+
+        fft_cropped = fft_log[center - pixels_to_show:center + pixels_to_show,
+                              center - pixels_to_show:center + pixels_to_show]
+
+        self.im2.set_data(fft_cropped)
+        self.im2.set_extent([-k_zoom, k_zoom, -k_zoom, k_zoom])
+        self.ax2.set_xlim(-k_zoom, k_zoom)
+        self.ax2.set_ylim(-k_zoom, k_zoom)
+
+        vmin_fft = np.min(fft_cropped)
+        vmax_fft = np.max(fft_cropped)
+        self.im2.set_clim(vmin=vmin_fft, vmax=vmax_fft)
+
+        # Red 2k_F arrow: remove previous, draw fresh to avoid stacking
+        if self._kF_arrow is not None:
+            try:
+                self._kF_arrow.remove()
+            except Exception:
+                pass
+            self._kF_arrow = None
+
+        if k_F is not None and k_F > 0:
+            self._kF_arrow = self.ax2.annotate(
+                r'$2k_\mathrm{F}$',
+                xy=(2 * k_F, 0), xytext=(0, 0),
+                arrowprops=dict(arrowstyle='->', color='red', lw=2.0),
+                fontsize=9, color='red', ha='left', va='bottom'
+            )
 
 
 def run_simulation(config_name: str, save_frames: bool = False, poster_frame: bool = False):
